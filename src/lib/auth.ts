@@ -1,9 +1,5 @@
-// Helpers للـ profile الحالي (role, visible modules, branch)
-// ملاحظة: النظام داخلي لمصنع واحد. كل مستخدم عنده جلسة Supabase Auth
-// وله وصول لكل البيانات. الفلترة على الصفحات المرئية بتتم عبر
-// mazaya_users.visible_modules (يتم التحكم فيها من صفحة إدارة المستخدمين).
-
-import { createClient } from "@/lib/supabase/server";
+// Types + Constants + Client-safe helpers (NO server imports here)
+// السيرفر-only functions (getCurrentProfile/requireAdmin) في lib/auth-server.ts
 
 export interface CurrentProfile {
   id: number;
@@ -14,26 +10,6 @@ export interface CurrentProfile {
   branch_id: number | null;
   visible_modules: string[];
   is_active: boolean;
-}
-
-export async function getCurrentProfile(): Promise<CurrentProfile | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("mazaya_users")
-    .select("*")
-    .eq("auth_id", user.id)
-    .single();
-  return data as CurrentProfile | null;
-}
-
-export async function requireAdmin() {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.role !== "admin") {
-    throw new Error("Forbidden: Admin only");
-  }
-  return profile;
 }
 
 export const ALL_MODULES = [
@@ -55,7 +31,7 @@ export const ALL_MODULES = [
 export const MODULE_KEYS = ALL_MODULES.map(m => m.key);
 
 /**
- * يتحقق إن الـ profile عنده صلاحية لموديل معيّن.
+ * يتحقق إن الـ profile عنده صلاحية لموديول معيّن.
  * الـ admin دائماً true. الموظفين بيتحققوا من visible_modules.
  */
 export function canSeeModule(profile: CurrentProfile | null, moduleKey: string): boolean {

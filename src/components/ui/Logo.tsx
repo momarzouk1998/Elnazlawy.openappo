@@ -1,3 +1,4 @@
+"use client";
 import Image from "next/image";
 export default function Logo({ size = 40, withText = true }: { size?: number; withText?: boolean }) {
   return (

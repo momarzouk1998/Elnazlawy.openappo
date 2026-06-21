@@ -21,65 +21,148 @@ npm run dev
 
 ---
 
-## 🗄️ إعداد Supabase (Database + Auth)
+## 🗄️ إعداد Supabase خطوة بخطوة
 
-### الخطوة 1: إنشاء مشروع
-1. سجّل في [supabase.com](https://supabase.com) (مجاني)
-2. أنشئ Project جديد
-3. اختر Region قريب (Frankfurt للأوروبا/مصر)
+### الخطوة 1: إنشاء حساب ومشروع
 
-### الخطوة 2: نسخ المفاتيح
-من **Settings → API**:
-- `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
-- `anon public key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `service_role key` → `SUPABASE_SERVICE_ROLE_KEY` ⚠️ **سري — لا تنشره**
+1. افتح [supabase.com](https://supabase.com) وسجّل بالإيميل بتاعك (مجاني).
+2. بعد تسجيل الدخول، اضغط **"New Project"**.
+3. املى الحقول:
+   - **Name**: مثلاً `mazaya-furniture`
+   - **Database Password**: كلمة سر قوية لقاعدة البيانات (**احفظها في مكان آمن**)
+   - **Region**: اختر `Frankfurt (EU Central)` — الأقرب لمصر
+4. اضغط **"Create new project"** وانتظر دقيقتين لحد ما يخلص الـ provisioning.
 
-### الخطوة 3: تشغيل SQL
-من **SQL Editor** في Supabase Dashboard، نفّذ بالترتيب:
-1. افتح `sql/001_create_schema.sql` → الصقه → Run
-2. افتح `sql/002_seed_data.sql` → الصقه → Run
+---
 
-### الخطوة 4: إنشاء مستخدم Admin
-1. اذهب لـ **Authentication → Users → Add user**
-2. Email: `abomrzk@gmail.com`
-3. Password: `123456` (غيّرها لاحقاً)
-4. **Auto Confirm User** ✓
-5. اضغط Add
+### الخطوة 2: نسخ المفاتيح الثلاث (مهمة جداً)
 
-### الخطوة 5: ربط Auth ID
-ارجع لـ SQL Editor ونفّذ:
+1. من الـ Sidebar الشمال، اضغط **⚙️ Settings** (أيقونة الترس في الأسفل).
+2. من القائمة الجانبية، اختر **API**.
+3. هتلاقي 3 حاجات محتاج تنسخهم:
+
+| في Supabase Dashboard (صفحة API) | انسخه في `.env.local` باسم |
+|---|---|
+| **Project URL** (في قسم "Project URL") — شكله زي: `https://abcdefgh.supabase.co` | `NEXT_PUBLIC_SUPABASE_URL` |
+| **anon public** key (في قسم "Project API keys" — المفتاح الطويل اللي بيبدأ بـ `eyJ...`) | `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| **service_role** key (نفس القسم — اضغط "Reveal" لإظهاره — **⚠️ سري**) | `SUPABASE_SERVICE_ROLE_KEY` |
+
+4. افتح ملف `.env.local` في جذر المشروع، والصق القيم:
+
+```bash
+# ===== Supabase =====
+NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+> ⚠️ **تحذير**: الـ `service_role` key بيدّي صلاحية كاملة لكل قاعدة البيانات (يتجاوز RLS). **لا تنشره** على GitHub أو تشاركه مع حد.
+
+---
+
+### الخطوة 3: إنشاء الجداول والبيانات
+
+1. من الـ Sidebar الشمال في Supabase، اضغط **🔨 SQL Editor** (أيقونة الـ terminal).
+2. اضغط **"New query"**.
+3. **أول query** — إنشاء الجداول:
+   - افتح ملف `sql/001_create_schema.sql` من المشروع في محرر النصوص
+   - انسخ **كل** محتواه (Ctrl+A → Ctrl+C)
+   - ارجع لـ Supabase → الصق في محرر SQL → اضغط **"Run"** (أو Ctrl+Enter)
+   - لازم تشوف رسالة خضراء: `Success. No rows returned`
+4. **تاني query** — البيانات التجريبية:
+   - **"New query"** تاني
+   - افتح `sql/002_seed_data.sql` → انسخ كل المحتوى → الصقه → **Run**
+   - المفروض تشوف: `Success. 17 rows inserted` (أو رقم قريب)
+
+---
+
+### الخطوة 4: إنشاء أول حساب Admin
+
+1. من الـ Sidebar، اضغط **🔒 Authentication** (أيقونة القفل).
+2. اضغط تبويب **"Users"**.
+3. اضغط **"Add user"** → **"Create new user"**.
+4. املى:
+   - **Email**: `abomrzk@gmail.com`
+   - **Password**: `123456` (غيّرها لاحقاً من صفحة إدارة الموظفين)
+   - **Auto Confirm User**: ✅ (مهم جداً — لو مش مفعّل هيطلب تأكيد الإيميل)
+5. اضغط **"Create user"**.
+
+---
+
+### الخطوة 5: ربط حساب Auth بحساب الـ Profile
+
+بعد ما عملت الـ user في Supabase Auth، لازم تربطه بالـ row في جدول `mazaya_users`:
+
+1. ارجع لـ **SQL Editor** → **"New query"**.
+2. الصق الـ SQL ده وشغّله:
+
 ```sql
 UPDATE public.mazaya_users
 SET auth_id = (SELECT id FROM auth.users WHERE email = 'abomrzk@gmail.com')
 WHERE username = 'admin';
 ```
 
+3. لو ظهر `Success. 1 row updated` يبقى تمام.
+
+> 💡 **ليـه ده مهم؟** جدول `mazaya_users` فيه بيانات الموظف (الدور، الصفحات المرئية، إلخ). Supabase Auth فيه كلمة السر. الـ `auth_id` هو الجسر اللي بيربط الاتنين.
+
 ---
 
-## 🌐 النشر على Vercel
+### الخطوة 6: تحقق إن كل حاجة تمام
 
-### خطوة 1: رفع الكود على GitHub
-```bash
-git init
-git add -A
-git commit -m "feat: initial mazaya system"
-git branch -M main
-git remote add origin https://github.com/YOUR_USER/mazaya-system.git
-git push -u origin main
+في SQL Editor، شغّل:
+```sql
+SELECT u.username, u.role, u.email_or_phone, u.is_active,
+       a.email as auth_email
+FROM public.mazaya_users u
+LEFT JOIN auth.users a ON u.auth_id = a.id
+ORDER BY u.id;
 ```
 
-### خطوة 2: ربط Vercel
-1. سجّل في [vercel.com](https://vercel.com) بحساب GitHub
-2. **New Project** → اختر `mazaya-system`
-3. **Environment Variables** (نفس القيم من `.env.local`):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-4. **Deploy**
+لازم تشوف **5 صفوف**: `admin` + 4 موظفين (`mohandess`, `mohaseb`, `amen_makhzon`, `moteaba3`)، والـ admin مربوط بالإيميل `abomrzk@gmail.com`.
 
-### خطوة 3: الدومين
-- Vercel بيديك دومين مجاني: `mazaya-system.vercel.app`
-- لو عايز `mazaya.openappo.com`: Vercel → Settings → Domains → أضف الدومين → عدّل DNS عند مزود الدومين
+---
+
+## 🌐 النشر على Vercel — خطوة بخطوة
+
+### الخطوة 1: التأكد إن الكود على GitHub
+الكود اترفع بالفعل على `https://github.com/momarzouk1998/Mazaya.openappo` (شوف الـ commit log).
+لو عايز تعمل repo تاني، شوف `git push` instructions في `SETUP_AR.md` القديمة.
+
+### الخطوة 2: إنشاء مشروع Vercel من GitHub
+
+1. افتح [vercel.com](https://vercel.com) وسجّل بحساب GitHub بتاعك.
+2. اضغط **"Add New → Project"**.
+3. في قائمة **"Import Git Repository"**، اختار `momarzouk1998/Mazaya.openappo`.
+4. اضغط **"Import"**.
+
+### الخطوة 3: إعداد Environment Variables
+
+في صفحة **Configure Project**:
+1. وسّع قسم **"Environment Variables"**.
+2. أضف **3 متغيرات** (النسخ واللصق من ملف `.env.local` بتاعك):
+
+| Name | Value |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | الصق الـ Project URL من Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | الصق الـ anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | الصق الـ service_role key |
+
+3. **مهم**: في كل متغير، اختار من Dropdown: **Production** + **Preview** + **Development** (الـ 3 مع بعض).
+
+### الخطوة 4: Deploy
+
+1. اضغط **"Deploy"**.
+2. استنى 2-3 دقائق لحد ما يخلص الـ build.
+3. لو ظهرت ✅ **"Congratulations!"** يبقى تمام.
+
+### الخطوة 5: افتح الموقع
+
+- Vercel بيديك URL مجاني زي: `https://mazaya-openappo.vercel.app`
+- لو عايز دومين مخصص (`mazaya.openappo.com`):
+  - Vercel → **Settings → Domains** → اكتب الدومين → **Add**
+  - هيظهرلك DNS records، عدّلها عند مزود الدومين بتاعك (openappo.com)
+  - عادةً: أضف CNAME record يشير لـ `cname.vercel-dns.com`
 
 ---
 

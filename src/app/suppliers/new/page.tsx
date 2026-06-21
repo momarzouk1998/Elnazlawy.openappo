@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -15,7 +15,7 @@ export default function NewSupplierPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();

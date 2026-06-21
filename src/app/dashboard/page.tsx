@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
-import { getCurrentProfile } from "@/lib/auth";
+import { getCurrentProfile } from "@/lib/auth-server";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatNumber, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, STATUS_LABELS, STATUS_COLORS } from "@/lib/format";
 import Link from "next/link";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { WeeklyBarChart, StatusPieChart } from "@/components/DashboardCharts";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +35,8 @@ export default async function DashboardPage() {
   ).length;
 
   // Balance
-  const income = (journal ?? []).filter(j => j.entry_type === "income" && !j.is_passthrough).reduce((s, j) => s + j.amount, 0);
-  const spent = (journal ?? []).filter(j => j.entry_type === "expense" || j.entry_type === "purchase" || j.entry_type === "overhead").reduce((s, j) => s + j.amount, 0);
+  const income = (journal ?? []).filter((j: any) => j.entry_type === "income" && !j.is_passthrough).reduce((s: number, j: any) => s + j.amount, 0);
+  const spent = (journal ?? []).filter((j: any) => j.entry_type === "expense" || j.entry_type === "purchase" || j.entry_type === "overhead").reduce((s: number, j: any) => s + j.amount, 0);
   const balance = income - spent;
 
   // Weekly chart (last 7 days)
@@ -47,7 +47,7 @@ export default async function DashboardPage() {
     const key = d.toISOString().slice(0, 10);
     weekly[key] = { day: dayNames[d.getDay()], income: 0, expense: 0, net: 0 };
   }
-  for (const j of (journal ?? [])) {
+  for (const j of (journal ?? []) as any[]) {
     const k = j.entry_date;
     if (weekly[k]) {
       if (j.entry_type === "income" && !j.is_passthrough) weekly[k].income += j.amount;
@@ -59,12 +59,11 @@ export default async function DashboardPage() {
   // Status pie
   const statusCounts: Record<string, number> = { open: 0, in_progress: 0, completed: 0, delivered: 0 };
   for (const o of (orders ?? [])) statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
-  const statusData = Object.entries(statusCounts)
+  const statusData: { name: string; value: number }[] = Object.entries(statusCounts)
     .filter(([_, v]) => v > 0)
     .map(([k, v]) => ({ name: STATUS_LABELS[k] ?? k, value: v }));
-  const PIE_COLORS = ["#F2994A", "#3B82F6", "#10B981", "#6B7280"];
 
-  const recentJournal = (journal ?? []).slice(0, 5);
+  const recentJournal = (journal ?? []).slice(0, 5) as any[];
 
   return (
     <DashboardLayout profile={profile}>
@@ -127,18 +126,7 @@ export default async function DashboardPage() {
         <div className="card lg:col-span-2">
           <h3 className="font-bold text-brand-black mb-3">📊 ملخص اليومية الأسبوعي</h3>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={Object.values(weekly)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="income" name="الوارد" fill="#10B981" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="expense" name="المصروف" fill="#F2994A" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="net" name="الصافي" fill="#3B82F6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <WeeklyBarChart data={Object.values(weekly)} />
           </div>
         </div>
 
@@ -146,14 +134,7 @@ export default async function DashboardPage() {
           <h3 className="font-bold text-brand-black mb-3">🥧 حالة الأوردرات</h3>
           {statusData.length > 0 ? (
             <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={(e: any) => `${e.name}: ${e.value}`}>
-                    {statusData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <StatusPieChart data={statusData} />
             </div>
           ) : <div className="h-72 flex items-center justify-center text-gray-400">لا توجد أوردرات</div>}
         </div>
