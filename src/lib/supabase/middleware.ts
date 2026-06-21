@@ -5,8 +5,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   // Supabase SSR يخزن الـ session في cookies متعدد (sb-*-auth-token).
   // بنبحث عن أي cookie فيها "auth-token" وبنتأكد إنها مش فاضية.
-  const hasSession = Object.keys(request.cookies.getAll()).some(name =>
-    name.includes("auth-token") && request.cookies.get(name)?.value
+  const cookies = request.cookies.getAll();
+  const hasSession = cookies.some(c =>
+    c.name.includes("auth-token") && c.value
   );
 
   const path = request.nextUrl.pathname;

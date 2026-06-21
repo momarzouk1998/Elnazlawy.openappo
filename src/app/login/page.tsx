@@ -57,7 +57,6 @@ export default function LoginPage() {
       if (remember) localStorage.setItem("mazaya_identifier", identifier);
       else localStorage.removeItem("mazaya_identifier");
       router.push("/dashboard");
-      router.refresh();
     } catch (e: any) {
       console.error("[login] unexpected error:", e);
       setError(`❌ خطأ غير متوقع: ${e?.message || "حاول مرة أخرى"}`);
