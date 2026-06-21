@@ -1,0 +1,93 @@
+"use client";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import PageHeader from "@/components/PageHeader";
+import { DataTable } from "@/components/DataTable";
+import { SearchBox, FilterBar } from "@/components/SearchFilter";
+import { Button } from "@/components/ui/Button";
+import { exportToExcel } from "@/lib/excel";
+import { formatCurrency, formatDate } from "@/lib/format";
+
+export default function OverheadPage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<any>(null);
+  const [rows, setRows] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.push("/login");
+      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
+      setProfile(prof);
+      const { data } = await supabase.from("mazaya_overhead_expenses").select("*").order("expense_date", { ascending: false });
+      setRows(data ?? []); setLoading(false);
+    })();
+  }, [router]);
+
+  const filtered = useMemo(() => rows.filter(r =>
+    (!search || r.description.toLowerCase().includes(search.toLowerCase())) &&
+    (!fromDate || r.expense_date >= fromDate) && (!toDate || r.expense_date <= toDate)
+  ), [rows, search, fromDate, toDate]);
+
+  const total = filtered.reduce((s, r) => s + r.amount, 0);
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekTotal = filtered.filter(r => new Date(r.expense_date) >= weekAgo).reduce((s, r) => s + r.amount, 0);
+
+  if (!profile) return null;
+
+  return (
+    <DashboardLayout profile={profile}>
+      <PageHeader
+        title="النثريات"
+        subtitle="مصاريف تشغيل المصنع العامة"
+        helpTitle="النثريات"
+        helpDescription="كهرباء، أجور عمال، شحن، إلخ. كل نثريات بتتسجل تلقائياً كحركة مصروف في اليومية. إجمالي الأسبوع بيظهر كمرجع في صفحة تعديل الأوردر عشان تحدد عمولة المصنع."
+        backHref="/dashboard"
+        actions={<Button onClick={() => router.push("/overhead/new")}>+ نثريات جديدة</Button>}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+          <div className="text-xs opacity-90">إجمالي النثريات</div>
+          <div className="text-2xl font-extrabold">{formatCurrency(total)}</div>
+        </div>
+        <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+          <div className="text-xs opacity-90">آخر 7 أيام</div>
+          <div className="text-2xl font-extrabold">{formatCurrency(weekTotal)}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500">عدد السجلات</div>
+          <div className="text-2xl font-bold">{filtered.length}</div>
+        </div>
+      </div>
+
+      <div className="card mb-4">
+        <FilterBar>
+          <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
+          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" />
+          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" />
+          <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "overhead")}>📥 تصدير</Button>
+        </FilterBar>
+      </div>
+
+      <DataTable
+        loading={loading}
+        rows={filtered}
+        emptyMessage="لا توجد نثريات"
+        columns={[
+          { key: "expense_date", label: "التاريخ", render: r => formatDate(r.expense_date) },
+          { key: "description", label: "البيان" },
+          { key: "amount", label: "المبلغ", render: r => <span className="font-bold text-red-600">{formatCurrency(r.amount)}</span> },
+          { key: "notes", label: "ملاحظات" },
+        ]}
+      />
+    </DashboardLayout>
+  );
+}

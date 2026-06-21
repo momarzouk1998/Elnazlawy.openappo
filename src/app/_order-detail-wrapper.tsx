@@ -1,0 +1,176 @@
+"use client";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import PageHeader from "@/components/PageHeader";
+import { Button } from "@/components/ui/Button";
+import { DataTable } from "@/components/DataTable";
+import { formatCurrency, formatDate, STATUS_LABELS, STATUS_COLORS, ORDER_TYPE_LABELS } from "@/lib/format";
+import { canSeeModule } from "@/lib/auth";
+
+export default function OrderDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [profile, setProfile] = useState<any>(null);
+  const [order, setOrder] = useState<any>(null);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [costs, setCosts] = useState<any>(null);
+  const [external, setExternal] = useState<any[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return router.push("/login");
+      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
+      setProfile(prof);
+
+      const [{ data: o }, { data: m }, { data: c }, { data: e }, { data: j }] = await Promise.all([
+        supabase.from("mazaya_orders").select("*, mazaya_customers(name, phone), mazaya_branches(name)").eq("id", id).single(),
+        supabase.from("mazaya_order_materials").select("*, mazaya_boards_inventory(item_name, code), mazaya_accessories_inventory(item_name, code)").eq("order_id", id),
+        supabase.from("mazaya_order_costs").select("*").eq("order_id", id).maybeSingle(),
+        supabase.from("mazaya_order_external_work").select("*, mazaya_contractors(name)").eq("order_id", id),
+        supabase.from("mazaya_journal_entries").select("*").eq("order_id", id).order("entry_date", { ascending: false }),
+      ]);
+      setOrder(o); setMaterials(m ?? []); setCosts(c); setExternal(e ?? []); setTransfers(j ?? []);
+      setLoading(false);
+    })();
+  }, [id, router]);
+
+  async function setStatus(status: string) {
+    const supabase = createClient();
+    await supabase.from("mazaya_orders").update({ status }).eq("id", id);
+    setOrder((o: any) => ({ ...o, status }));
+  }
+
+  async function deleteOrder() {
+    if (!confirm("هل أنت متأكد من حذف هذا الأوردر؟ سيتم إرجاع المواد المستخدمة للمخزون.")) return;
+    const supabase = createClient();
+    await supabase.from("mazaya_orders").delete().eq("id", id);
+    router.push("/orders");
+    router.refresh();
+  }
+
+  if (!profile) return null;
+  if (!order && !loading) return <DashboardLayout profile={profile}><div className="card">الأوردر غير موجود</div></DashboardLayout>;
+
+  const isAdmin = profile.role === "admin";
+  const showTransfers = canSeeModule(profile, "journal");
+  const transfersSum = transfers.filter(t => t.entry_type === "income" && !t.is_passthrough).reduce((s, t) => s + t.amount, 0);
+  const orderTotal = costs?.order_total ?? 0;
+  const balance = transfersSum - orderTotal;
+
+  return (
+    <DashboardLayout profile={profile}>
+      <PageHeader
+        title={order?.order_name ?? "..."}
+        subtitle={`${ORDER_TYPE_LABELS[order?.order_type ?? "new"]} • ${order?.mazaya_customers?.name ?? "—"} • ${order?.mazaya_branches?.name ?? "—"}`}
+        backHref="/orders"
+        actions={isAdmin ? (
+          <>
+            <Link href={`/orders/${id}/edit`}><Button variant="secondary">✏️ تعديل</Button></Link>
+            <Link href={`/orders/${id}/invoice`}><Button variant="secondary">🧾 الفاتورة</Button></Link>
+            <Button variant="danger" onClick={deleteOrder}>🗑️ حذف</Button>
+          </>
+        ) : (
+          <Link href={`/orders/${id}/invoice`}><Button>🧾 الفاتورة</Button></Link>
+        )}
+      />
+
+      {order && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="card"><div className="text-xs text-gray-500">الحالة</div>
+            {isAdmin ? (
+              <select value={order.status} onChange={e => setStatus(e.target.value)} className={`mt-1 w-full px-2 py-1.5 border rounded text-sm font-semibold`}>
+                {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            ) : (
+              <span className={`badge mt-1 ${STATUS_COLORS[order.status]}`}>{STATUS_LABELS[order.status]}</span>
+            )}
+          </div>
+          <div className="card"><div className="text-xs text-gray-500">تاريخ البدء</div><div className="font-bold mt-1">{formatDate(order.start_date)}</div></div>
+          <div className="card"><div className="text-xs text-gray-500">تاريخ الانتهاء</div><div className="font-bold mt-1">{formatDate(order.end_date)}</div></div>
+          <div className="card"><div className="text-xs text-gray-500">المدة</div><div className="font-bold mt-1 text-brand-orange">{order.duration_days != null ? `${order.duration_days} يوم` : "-"}</div></div>
+        </div>
+      )}
+
+      {order?.notes && <div className="card mb-4">📝 {order.notes}</div>}
+
+      {/* المواد */}
+      <h3 className="font-bold text-lg mt-6 mb-3">📦 المواد المستخدمة</h3>
+      <DataTable
+        rows={materials}
+        emptyMessage="لا توجد مواد"
+        columns={[
+          { key: "name", label: "الصنف", render: r => r.mazaya_boards_inventory?.item_name || r.mazaya_accessories_inventory?.item_name || "-" },
+          { key: "code", label: "الكود", render: r => r.mazaya_boards_inventory?.code || r.mazaya_accessories_inventory?.code || "-" },
+          { key: "type", label: "النوع", render: r => r.board_id ? "لوح" : "اكسسوار" },
+          { key: "quantity_used", label: "الكمية" },
+          { key: "unit_price_snapshot", label: "السعر", render: r => formatCurrency(r.unit_price_snapshot) },
+          { key: "line_total", label: "الإجمالي", render: r => <span className="font-bold">{formatCurrency(r.line_total)}</span> },
+        ]}
+      />
+
+      {/* التكاليف */}
+      {costs && (
+        <>
+          <h3 className="font-bold text-lg mt-6 mb-3">💰 التكاليف</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="card"><div className="text-xs text-gray-500">ألواح</div><div className="font-bold">{formatCurrency(costs.boards_cost)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">اكسسوارات</div><div className="font-bold">{formatCurrency(costs.accessories_cost)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">تركيبات</div><div className="font-bold">{formatCurrency(costs.installation_cost)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">أيام سفر</div><div className="font-bold">{costs.installation_travel_days || 0}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">نقل داخلي</div><div className="font-bold">{formatCurrency(costs.internal_transport_cost)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">نقل خارجي</div><div className="font-bold">{formatCurrency(costs.external_transport_cost)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">عمولة المصنع</div><div className="font-bold">{formatCurrency(costs.factory_commission)}</div></div>
+            <div className="card bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white"><div className="text-xs opacity-90">الإجمالي</div><div className="font-extrabold text-lg">{formatCurrency(costs.order_total)}</div></div>
+          </div>
+        </>
+      )}
+
+      {/* الأعمال الخارجية */}
+      {external.length > 0 && (
+        <>
+          <h3 className="font-bold text-lg mt-6 mb-3">🔨 أعمال خارجية (تتبع فقط)</h3>
+          <DataTable
+            rows={external}
+            emptyMessage="—"
+            columns={[
+              { key: "type", label: "النوع", render: r => r.work_type },
+              { key: "contractor", label: "المقاول", render: r => r.mazaya_contractors?.name ?? "-" },
+              { key: "amount", label: "القيمة", render: r => formatCurrency(r.amount) },
+              { key: "notes", label: "ملاحظات" },
+            ]}
+          />
+        </>
+      )}
+
+      {/* التحويلات */}
+      {showTransfers && (
+        <>
+          <h3 className="font-bold text-lg mt-6 mb-3">💸 التحويلات المرتبطة بهذا الأوردر</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <div className="card"><div className="text-xs text-gray-500">إجمالي التحويلات</div><div className="font-bold text-green-600 text-lg">{formatCurrency(transfersSum)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">تكلفة الأوردر</div><div className="font-bold text-lg">{formatCurrency(orderTotal)}</div></div>
+            <div className="card"><div className="text-xs text-gray-500">الفرق</div><div className={`font-bold text-lg ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>{formatCurrency(balance)}</div></div>
+          </div>
+          <DataTable
+            rows={transfers}
+            emptyMessage="لا توجد تحويلات"
+            columns={[
+              { key: "entry_date", label: "التاريخ", render: r => formatDate(r.entry_date) },
+              { key: "description", label: "البيان" },
+              { key: "entry_type", label: "النوع" },
+              { key: "payment_method", label: "الطريقة" },
+              { key: "amount", label: "المبلغ", render: r => <span className="font-bold">{formatCurrency(r.amount)}</span> },
+            ]}
+          />
+        </>
+      )}
+    </DashboardLayout>
+  );
+}
