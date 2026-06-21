@@ -1,40 +1,35 @@
-import { createServerClient } from "@supabase/ssr";
+// Edge-safe middleware — بدون Supabase (اللي بيستخدم process.version مش شغال في Edge)
+// يتحقق من وجود session cookie فقط. التحقق الفعلي من المستخدم بيحصل في الـ Server Components.
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll(); },
-        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options));
-        },
-      },
-    }
+  // Supabase SSR يخزن الـ session في cookies متعدد (sb-*-auth-token).
+  // بنبحث عن أي cookie فيها "auth-token" وبنتأكد إنها مش فاضية.
+  const hasSession = Object.keys(request.cookies.getAll()).some(name =>
+    name.includes("auth-token") && request.cookies.get(name)?.value
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
+  const isPublic =
+    path === "/login" ||
+    path.startsWith("/auth/") ||
+    path === "/manifest.json" ||
+    path === "/sw.js" ||
+    path.startsWith("/icons/") ||
+    path === "/favicon.ico" ||
+    path === "/logo.png";
 
-  // الصفحات العامة (لا تحتاج تسجيل دخول)
-  const publicPaths = ["/login", "/auth/callback", "/manifest.json", "/sw.js"];
-  const isPublic = publicPaths.some(p => request.nextUrl.pathname.startsWith(p));
-
-  if (!user && !isPublic) {
+  // بدون session → redirect لـ /login
+  if (!hasSession && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user && request.nextUrl.pathname === "/login") {
+  // مع session وهو في /login → redirect لـ /dashboard
+  if (hasSession && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
-  return supabaseResponse;
+  return NextResponse.next({ request });
 }
