@@ -15,14 +15,24 @@ export default async function DashboardPage() {
 
   const supabase = await createClient();
 
-  // Fetch metrics
-  const [{ data: boards }, { data: accessories }, { data: orders }, { data: journal }, { data: suppliers }] = await Promise.all([
-    supabase.from("mazaya_boards_inventory").select("unit_price, quantity_remaining"),
-    supabase.from("mazaya_accessories_inventory").select("unit_price, quantity_remaining"),
-    supabase.from("mazaya_orders").select("status, created_at"),
-    supabase.from("mazaya_journal_entries").select("entry_type, amount, entry_date").order("entry_date", { ascending: false }).limit(200),
-    supabase.from("mazaya_suppliers").select("id"),
+  // Fetch metrics — مع error handling لكل query لو في مشكلة في الجدول
+  const safeQuery = async <T,>(p: any): Promise<{ data: T[]; error: string | null }> => {
+    try {
+      const r = await p;
+      return { data: (r.data ?? []) as T[], error: r.error?.message ?? null };
+    } catch (e: any) {
+      return { data: [] as T[], error: e?.message ?? String(e) };
+    }
+  };
+  const [boardsR, accessoriesR, ordersR, journalR, suppliersR] = await Promise.all([
+    safeQuery<any>(supabase.from("mazaya_boards_inventory").select("unit_price, quantity_remaining")),
+    safeQuery<any>(supabase.from("mazaya_accessories_inventory").select("unit_price, quantity_remaining")),
+    safeQuery<any>(supabase.from("mazaya_orders").select("status, created_at")),
+    safeQuery<any>(supabase.from("mazaya_journal_entries").select("entry_type, amount, entry_date, is_passthrough").order("entry_date", { ascending: false }).limit(200)),
+    safeQuery<any>(supabase.from("mazaya_suppliers").select("id")),
   ]);
+  const boards = boardsR.data, accessories = accessoriesR.data, orders = ordersR.data, journal = journalR.data, suppliers = suppliersR.data;
+  const queryErrors = [boardsR, accessoriesR, ordersR, journalR, suppliersR].filter(r => r.error).map(r => r.error);
 
   const inventoryValue = (boards ?? []).reduce((s, b) => s + (b.unit_price * b.quantity_remaining), 0)
                        + (accessories ?? []).reduce((s, a) => s + (a.unit_price * a.quantity_remaining), 0);
@@ -73,6 +83,13 @@ export default async function DashboardPage() {
         helpTitle="لوحة التحكم"
         helpDescription="من هنا تقدر تشوف ملخص شامل لكل حاجة: قيمة المخزون، الأوردرات المفتوحة، الرصيد الحالي، وأحدث الحركات المالية. اضغط على أي بطاقة للتفاصيل."
       />
+
+      {queryErrors.length > 0 && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-300 text-yellow-800 p-3 rounded-lg text-sm">
+          ⚠️ <strong>تنبيه:</strong> بعض الاستعلامات ما اشتغلتش:
+          <ul className="list-disc mr-5 mt-1">{queryErrors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-3 mb-6">
