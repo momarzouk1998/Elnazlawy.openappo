@@ -1,3 +1,4 @@
+// Build: 2026-06-22T01:30Z
 import { createBrowserClient } from "@supabase/ssr";
 
 export function createClient() {
