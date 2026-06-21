@@ -18,7 +18,8 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/icons/") ||
     path === "/favicon.ico" ||
     path === "/logo.png" ||
-    path === "/api/auth/debug";
+    path === "/api/auth/debug" ||
+    path === "/debug";
 
   // بدون session → redirect لـ /login
   if (!hasSession && !isPublic) {
