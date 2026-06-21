@@ -9,6 +9,14 @@ import { DataTable } from "@/components/DataTable";
 import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const customerFields: FieldDef[] = [
+  { name: "name", label: "اسم العميل", required: true },
+  { name: "phone", label: "رقم التواصل" },
+  { name: "address", label: "العنوان" },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -82,6 +90,7 @@ export default function CustomersPage() {
           { key: "phone", label: "رقم التواصل" },
           { key: "orders_count", label: "عدد الأوردرات" },
           { key: "address", label: "العنوان" },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_customers" fields={customerFields} entityLabel="العميل" deleteHint="لا يمكن حذف هذا العميل لوجود أوردرات أو سجلات يومية مرتبطة به" /> },
         ]}
       />
     </DashboardLayout>

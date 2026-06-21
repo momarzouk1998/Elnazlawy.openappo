@@ -11,6 +11,14 @@ import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { PAYMENT_METHOD_LABELS } from "@/lib/format";
 import { MODULE_KEYS } from "@/lib/auth";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const supplierFields: FieldDef[] = [
+  { name: "name", label: "اسم الشركة", required: true },
+  { name: "payment_type", label: "نوع التعامل", options: Object.entries(PAYMENT_METHOD_LABELS).map(([v, l]) => ({ value: v, label: l })) },
+  { name: "phone", label: "رقم التواصل" },
+  { name: "notes", label: "ملاحظات", rows: 3 },
+];
 
 interface Supplier { id: number; name: string; payment_type: string; phone: string | null; notes: string | null; items_count?: number; }
 
@@ -90,6 +98,7 @@ export default function SuppliersPage() {
           { key: "phone", label: "رقم التواصل", render: r => r.phone || "-" },
           { key: "items_count", label: "عدد الأكواد" },
           { key: "notes", label: "ملاحظات", render: r => <span className="text-gray-500 text-xs">{r.notes || "-"}</span> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_suppliers" fields={supplierFields} entityLabel="المورد" deleteHint="لا يمكن حذف هذا المورد لوجود أكواد أو مدفوعات مرتبطة به" /> },
         ]}
       />
     </DashboardLayout>

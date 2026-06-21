@@ -10,6 +10,16 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel, importFromExcel } from "@/lib/excel";
 import { formatCurrency } from "@/lib/format";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const accessoryFields: FieldDef[] = [
+  { name: "item_name", label: "اسم الصنف", required: true },
+  { name: "code", label: "الكود", required: true },
+  { name: "type", label: "النوع" },
+  { name: "unit_price", label: "سعر الوحدة", type: "number" },
+  { name: "quantity_in", label: "الكمية المدخلة", type: "number" },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 interface Accessory {
   id: number; item_name: string; type: string | null; code: string;
@@ -142,6 +152,7 @@ export default function AccessoriesPage() {
           { key: "quantity_used", label: "المستخدم" },
           { key: "quantity_remaining", label: "المتبقي", render: r => <span className={r.quantity_remaining > 0 ? "font-bold text-green-600" : "text-gray-400"}>{r.quantity_remaining}</span> },
           { key: "total_price", label: "الإجمالي", render: r => <span className="font-bold">{formatCurrency(r.total_price)}</span> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_accessories_inventory" fields={accessoryFields} entityLabel="الاكسسوار" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" /> },
         ]}
       />
     </DashboardLayout>

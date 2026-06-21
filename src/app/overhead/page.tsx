@@ -9,6 +9,14 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency, formatDate } from "@/lib/format";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const overheadFields: FieldDef[] = [
+  { name: "expense_date", label: "التاريخ", type: "date", required: true },
+  { name: "description", label: "البيان", required: true },
+  { name: "amount", label: "المبلغ", type: "number", required: true },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function OverheadPage() {
   const router = useRouter();
@@ -86,6 +94,7 @@ export default function OverheadPage() {
           { key: "description", label: "البيان" },
           { key: "amount", label: "المبلغ", render: r => <span className="font-bold text-red-600">{formatCurrency(r.amount)}</span> },
           { key: "notes", label: "ملاحظات" },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_overhead_expenses" fields={overheadFields} entityLabel="النثريات" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بحركة يومية" /> },
         ]}
       />
     </DashboardLayout>

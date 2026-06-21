@@ -11,6 +11,16 @@ import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency, formatDate, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, PAYMENT_METHOD_LABELS } from "@/lib/format";
 import { canSeeModule } from "@/lib/auth";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const journalFields: FieldDef[] = [
+  { name: "entry_date", label: "التاريخ", type: "date", required: true },
+  { name: "entry_type", label: "نوع الحركة", options: Object.entries(ENTRY_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l })), required: true },
+  { name: "description", label: "البيان", required: true },
+  { name: "amount", label: "المبلغ", type: "number", required: true },
+  { name: "payment_method", label: "طريقة الدفع", options: [{ value: "cash", label: "نقدي" }, { value: "transfer", label: "تحويل" }] },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function JournalPageWrapper({ showSummary = false }: { showSummary?: boolean }) {
   const router = useRouter();
@@ -116,6 +126,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 { key: "party", label: "الجهة", render: r => r.mazaya_suppliers?.name || r.mazaya_branches?.name || "-" },
                 { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
                 { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "income" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
+                { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_journal_entries" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
               ]}
             />
           )}

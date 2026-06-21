@@ -10,6 +10,14 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency } from "@/lib/format";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const branchFields: FieldDef[] = [
+  { name: "name", label: "اسم المعرض", required: true },
+  { name: "location", label: "الموقع" },
+  { name: "phone", label: "رقم التواصل" },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function BranchesPage() {
   const router = useRouter();
@@ -76,6 +84,7 @@ export default function BranchesPage() {
           { key: "customers_count", label: "عدد العملاء" },
           { key: "orders_count", label: "عدد الأوردرات" },
           { key: "total_income", label: "إجمالي التحويلات", render: r => <span className="font-bold text-green-600">{formatCurrency(r.total_income)}</span> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_branches" fields={branchFields} entityLabel="المعرض" deleteHint="لا يمكن حذف هذا المعرض لوجود عملاء أو أوردرات أو تحويلات مرتبطة به" /> },
         ]}
       />
     </DashboardLayout>

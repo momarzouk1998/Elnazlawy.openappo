@@ -10,6 +10,14 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency } from "@/lib/format";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const contractorFields: FieldDef[] = [
+  { name: "name", label: "اسم المقاول", required: true },
+  { name: "type", label: "النوع" },
+  { name: "phone", label: "رقم التواصل" },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function ContractorsPage() {
   const router = useRouter();
@@ -81,6 +89,7 @@ export default function ContractorsPage() {
           { key: "phone", label: "رقم التواصل" },
           { key: "total_work", label: "إجمالي الأعمال", render: r => formatCurrency(r.total_work) },
           { key: "notes", label: "ملاحظات" },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_contractors" fields={contractorFields} entityLabel="المقاول" deleteHint="لا يمكن حذف هذا المقاول لوجود أعمال خارجية مسندة إليه" /> },
         ]}
       />
     </DashboardLayout>
