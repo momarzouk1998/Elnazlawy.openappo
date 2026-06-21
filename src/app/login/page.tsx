@@ -28,19 +28,39 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      // بحث بالـ email أو phone: نعتبر المُدخل email دائماً (للاتساق مع Supabase Auth)
-      const email = identifier.includes("@") ? identifier : `${identifier}@mazaya.local`;
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      // Supabase Auth بيشتغل بـ email دائماً. لو المُدخل مش email (مثلاً username أو phone)
+      // بنضيف @mazaya.local عشان نوصل لنفس الـ Auth user.
+      const isEmail = identifier.includes("@");
+      const email = isEmail ? identifier : `${identifier}@mazaya.local`;
+
+      console.log("[login] attempting signInWithPassword for:", email);
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
+      console.log("[login] result:", { hasUser: !!data?.user, error: err?.message });
+
       if (err) {
-        setError("اسم المستخدم أو البريد/الهاتف أو كلمة السر غير صحيحة");
+        // رسائل خطأ أوضح من Supabase:
+        if (err.message.includes("Invalid login credentials")) {
+          setError("❌ البريد/الهاتف أو كلمة السر غير صحيحة. تأكد من البيانات ومن إنشاء الحساب في Supabase Auth أولاً.");
+        } else if (err.message.includes("Email not confirmed")) {
+          setError("📧 الحساب مش مفعّل. روح Supabase Dashboard → Authentication → Users → اختار المستخدم → Confirm email.");
+        } else if (err.message.includes("fetch")) {
+          setError("🌐 مشكلة في الاتصال بـ Supabase. تأكد من NEXT_PUBLIC_SUPABASE_URL في Environment Variables.");
+        } else {
+          setError(`❌ ${err.message}`);
+        }
+        return;
+      }
+      if (!data?.user) {
+        setError("❌ فشل تسجيل الدخول — لا توجد جلسة. حاول مرة أخرى.");
         return;
       }
       if (remember) localStorage.setItem("mazaya_identifier", identifier);
       else localStorage.removeItem("mazaya_identifier");
       router.push("/dashboard");
       router.refresh();
-    } catch {
-      setError("حدث خطأ غير متوقع. حاول مرة أخرى.");
+    } catch (e: any) {
+      console.error("[login] unexpected error:", e);
+      setError(`❌ خطأ غير متوقع: ${e?.message || "حاول مرة أخرى"}`);
     } finally {
       setLoading(false);
     }
