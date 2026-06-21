@@ -19,6 +19,7 @@ export async function updateSession(request: NextRequest) {
     path === "/favicon.ico" ||
     path === "/logo.png" ||
     path === "/api/auth/debug" ||
+    path === "/api/auth/whoami" ||
     path === "/debug";
 
   // بدون session → redirect لـ /login
