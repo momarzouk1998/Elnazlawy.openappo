@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   }
 
   const user = r.rows[0];
-  return NextResponse.json({
+  const body = JSON.stringify({
     data: {
       user: {
         id: user.id,
@@ -33,5 +33,9 @@ export async function GET(request: Request) {
       },
     },
     error: null,
+  });
+  return new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
   });
 }
