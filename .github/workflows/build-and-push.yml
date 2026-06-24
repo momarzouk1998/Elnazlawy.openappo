@@ -62,14 +62,8 @@ jobs:
 
             NET="bridge"
             if docker inspect "$CONTAINER" > /tmp/ci.json 2>/dev/null; then
-              NET=$(python3 -c "import json;d=json.load(open('/tmp/ci.json'));print(list(d[0]['NetworkSettings']['Networks'].keys())[0])" 2>/dev/null || echo bridge)
-              python3 << 'PYEOF'
-import json
-d = json.load(open('/tmp/ci.json'))
-with open('/tmp/ci.env','w') as f:
-    for e in d[0]['Config']['Env']:
-        f.write(e + '\n')
-PYEOF
+              NET=$(python3 -c 'import json;d=json.load(open("/tmp/ci.json"));print(list(d[0]["NetworkSettings"]["Networks"].keys())[0])' 2>/dev/null || echo bridge)
+              python3 -c 'import json,sys;d=json.load(open("/tmp/ci.json"));[print(e) for e in d[0]["Config"]["Env"]]' > /tmp/ci.env 2>/dev/null
             fi
 
             docker stop "$CONTAINER" 2>/dev/null || true
