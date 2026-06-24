@@ -11,7 +11,13 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
   const payload = await verifySession(sessionCookie);
   if (!payload) return null;
 
-  const r = await query('SELECT * FROM mazaya.users WHERE id = $1', [payload.userId]);
+  const r = await query(
+    `SELECT id, COALESCE(username, name) AS username, email_or_phone, email, role, branch_id,
+            COALESCE(visible_modules, '{}') AS visible_modules,
+            COALESCE(is_active, true) AS is_active
+     FROM mazaya.users WHERE id = $1`,
+    [payload.userId]
+  );
   if (r.rows.length === 0) return null;
   return r.rows[0] as CurrentProfile;
 }

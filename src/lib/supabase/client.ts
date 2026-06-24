@@ -13,7 +13,7 @@ class BrowserDbQuery implements PromiseLike<DbResult> {
   private conflictCol: string | null = null;
 
   constructor(table: string) {
-    this.table = table;
+    this.table = table.replace(/^mazaya_/, '');
   }
 
   select(cols?: any, opts?: any) {
