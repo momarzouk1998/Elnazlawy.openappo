@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     }
 
     const token = await createSession(user.id);
+    const isSecure = request.url.startsWith('https:');
     const response = NextResponse.json({
       data: {
         user: { id: user.id, email: user.email, role: user.role },
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       },
       error: null,
     });
-    response.headers.append('Set-Cookie', getSessionCookie(token));
+    response.headers.append('Set-Cookie', getSessionCookie(token, isSecure));
     return response;
   } catch (e: any) {
     return NextResponse.json({ data: null, error: { message: e.message } }, { status: 500 });

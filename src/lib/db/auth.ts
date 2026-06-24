@@ -28,12 +28,12 @@ export async function verifySession(token: string): Promise<{ userId: number } |
   }
 }
 
-export function getSessionCookie(token: string): string {
-  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}; Secure`;
+export function getSessionCookie(token: string, secure = true): string {
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 3600}${secure ? '; Secure' : ''}`;
 }
 
-export function clearSessionCookie(): string {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure`;
+export function clearSessionCookie(secure = true): string {
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`;
 }
 
 export { COOKIE_NAME };
