@@ -6,6 +6,7 @@ interface Order { col: string; ascending: boolean }
 interface Join { alias: string; table: string; columns: string; fkCol: string }
 
 const JOIN_RE = /(\w+):(\w+)\((\*|\w+(?:,\s*\w+)*)\)/g;
+const MAZAYA_JOIN_RE = /mazaya_(\w+)\((\*|\w+(?:,\s*\w+)*)\)/g;
 
 export function parseColumns(colSpec: string): { columns: string; joins: Join[] } {
   const joins: Join[] = [];
@@ -16,12 +17,21 @@ export function parseColumns(colSpec: string): { columns: string; joins: Join[] 
 
   for (const part of parts) {
     const match = part.match(/(\w+):(\w+)\((\*|\w+(?:,\s*\w+)*)\)/);
+    const mazayaMatch = part.match(/mazaya_(\w+)\((\*|\w+(?:,\s*\w+)*)\)/);
     if (match) {
       joins.push({
         alias: match[1],
         table: match[2],
         columns: match[3],
         fkCol: `${match[1]}_id`,
+      });
+    } else if (mazayaMatch) {
+      const tableName = mazayaMatch[1];
+      joins.push({
+        alias: `mazaya_${tableName}`,
+        table: tableName,
+        columns: mazayaMatch[2],
+        fkCol: `${tableName.replace(/(?:es|s)$/, '')}_id`,
       });
     } else if (part === '*') {
       mainCols.push('*');
