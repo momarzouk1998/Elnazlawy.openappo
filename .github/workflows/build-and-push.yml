@@ -48,3 +48,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            IMAGE="ghcr.io/${{ github.repository }}:latest"
+            CONTAINER="furniture-xhl2yk"
+
+            docker pull "$IMAGE"
+
+            docker inspect "$CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' > /tmp/$CONTAINER.env 2>/dev/null
+            NETWORK=$(docker inspect "$CONTAINER" --format '{{range $net, $v := .NetworkSettings.Networks}}{{$net}}{{end}}' 2>/dev/null || echo "bridge")
+
+            docker stop "$CONTAINER" || true
+            docker rm "$CONTAINER" || true
+
+            docker run -d --name "$CONTAINER" --restart unless-stopped \
+              --network "$NETWORK" \
+              -p 3000:3000 \
+              --env-file /tmp/$CONTAINER.env \
+              "$IMAGE"
+
+            rm -f /tmp/$CONTAINER.env
+
