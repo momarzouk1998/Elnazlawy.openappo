@@ -116,6 +116,7 @@ export function createClient() {
       signOut: async () => {
         try {
           await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST' });
+          if (typeof localStorage !== 'undefined') localStorage.removeItem('mazaya_user');
           return { error: null };
         } catch {
           return { error: null };
@@ -124,8 +125,21 @@ export function createClient() {
 
       getUser: async () => {
         try {
-          const res = await fetch(`${baseUrl}/api/auth/user`);
-          return res.json();
+          const res = await fetch(`${baseUrl}/api/auth/user`, { redirect: 'manual' });
+          if (res.status === 307) {
+            const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('mazaya_user') : null;
+            if (stored) return { data: { user: JSON.parse(stored) }, error: null };
+            return { data: { user: null }, error: null };
+          }
+          const json = await res.json();
+          if (typeof localStorage !== 'undefined') {
+            if (json.data?.user) {
+              localStorage.setItem('mazaya_user', JSON.stringify(json.data.user));
+            } else {
+              localStorage.removeItem('mazaya_user');
+            }
+          }
+          return json;
         } catch (e: any) {
           return { data: { user: null }, error: { message: e.message } };
         }
