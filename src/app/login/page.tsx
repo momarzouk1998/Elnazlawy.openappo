@@ -28,8 +28,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      // Supabase Auth بيشتغل بـ email دائماً. لو المُدخل مش email (مثلاً username أو phone)
-      // بنضيف @mazaya.local عشان نوصل لنفس الـ Auth user.
+      // لو المُدخل مش email (مثلاً username أو phone) بنضيف @mazaya.local
       const isEmail = identifier.includes("@");
       const email = isEmail ? identifier : `${identifier}@mazaya.local`;
 
@@ -38,13 +37,8 @@ export default function LoginPage() {
       console.log("[login] result:", { hasUser: !!data?.user, error: err?.message });
 
       if (err) {
-        // رسائل خطأ أوضح من Supabase:
         if (err.message.includes("Invalid login credentials")) {
-          setError("❌ البريد/الهاتف أو كلمة السر غير صحيحة. تأكد من البيانات ومن إنشاء الحساب في Supabase Auth أولاً.");
-        } else if (err.message.includes("Email not confirmed")) {
-          setError("📧 الحساب مش مفعّل. روح Supabase Dashboard → Authentication → Users → اختار المستخدم → Confirm email.");
-        } else if (err.message.includes("fetch")) {
-          setError("🌐 مشكلة في الاتصال بـ Supabase. تأكد من NEXT_PUBLIC_SUPABASE_URL في Environment Variables.");
+          setError("❌ البريد/الهاتف أو كلمة السر غير صحيحة");
         } else {
           setError(`❌ ${err.message}`);
         }
