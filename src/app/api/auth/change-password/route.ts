@@ -1,10 +1,7 @@
-// POST /api/auth/change-password
-// Body: { current_password: string, new_password: string }
-// يتطلب session فعّال
-// Uses Supabase Admin API to update the password
-
 import { NextResponse, type NextRequest } from "next/server";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/auth-server";
+import { query } from '@/lib/db/pool';
+import { verifyPassword, hashPassword } from '@/lib/db/auth';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,30 +16,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "كلمة السر الجديدة لازم تكون مختلفة عن الحالية" }, { status: 400 });
     }
 
-    // 1) اتأكد إن فيه session فعّال + الباسورد الحالي صحيح
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
+    const profile = await getCurrentProfile();
+    if (!profile) {
       return NextResponse.json({ error: "مش مسجل دخول" }, { status: 401 });
     }
 
-    // Re-authenticate to verify current password
-    const { error: signInErr } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: current_password,
-    });
-    if (signInErr) {
+    const r = await query('SELECT password_hash FROM mazaya.users WHERE id = $1', [profile.id]);
+    if (r.rows.length === 0) {
+      return NextResponse.json({ error: "المستخدم مش موجود" }, { status: 404 });
+    }
+
+    const valid = await verifyPassword(current_password, r.rows[0].password_hash);
+    if (!valid) {
       return NextResponse.json({ error: "كلمة السر الحالية غير صحيحة" }, { status: 400 });
     }
 
-    // 2) حدّث الباسورد عبر Admin API
-    const admin = createAdminClient();
-    const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
-      password: new_password,
-    });
-    if (updateErr) {
-      return NextResponse.json({ error: updateErr.message }, { status: 500 });
-    }
+    const newHash = await hashPassword(new_password);
+    await query('UPDATE mazaya.users SET password_hash = $1 WHERE id = $2', [newHash, profile.id]);
 
     return NextResponse.json({ ok: true, message: "تم تغيير كلمة السر بنجاح" });
   } catch (e: any) {

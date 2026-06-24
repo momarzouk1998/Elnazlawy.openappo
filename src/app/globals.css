@@ -1,6 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-brand-black: #1A1A1A;
+  --color-brand-orange: #F2994A;
+  --color-brand-orange-dark: #D87C2E;
+  --color-brand-orange-light: #FFF3E6;
+  --color-brand-cream: #FAFAF7;
+  --font-family-sans: "Cairo", system-ui, sans-serif;
+}
 
 :root {
   --font-cairo: "Cairo", system-ui, sans-serif;
@@ -35,7 +42,8 @@ body {
     @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange transition-all;
   }
   .card {
-    @apply bg-white rounded-xl shadow-card p-5 border border-gray-100;
+    @apply bg-white rounded-xl p-5 border border-gray-100;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px 0 rgba(0,0,0,0.04);
   }
   .table-header {
     @apply bg-gray-50 text-gray-700 text-sm font-semibold uppercase tracking-wide;
@@ -45,6 +53,12 @@ body {
   }
 }
 
+.shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px 0 rgba(0,0,0,0.04);
+}
+.shadow-elevated {
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+}
 .bg-grid {
   background-image:
     linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),

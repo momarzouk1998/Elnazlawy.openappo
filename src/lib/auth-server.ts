@@ -1,41 +1,19 @@
-// Server-only auth helpers — تستخدم next/cookies و supabase server client
-import { createClient, createAdminClient } from "@/lib/supabase/server";
-import type { CurrentProfile } from "@/lib/auth";
+import { cookies } from 'next/headers';
+import { query } from '@/lib/db/pool';
+import { COOKIE_NAME, verifySession } from '@/lib/db/auth';
+import type { CurrentProfile } from '@/lib/auth';
 
 export async function getCurrentProfile(): Promise<CurrentProfile | null> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get(COOKIE_NAME)?.value;
+  if (!sessionCookie) return null;
 
-  const { data, error } = await supabase
-    .from("mazaya_users")
-    .select("*")
-    .eq("auth_id", user.id)
-    .single();
+  const payload = await verifySession(sessionCookie);
+  if (!payload) return null;
 
-  // Self-healing: لو الـ profile مش متربط بالـ auth_id، نحاول نربطه تلقائياً
-  if (!data && !error?.message.includes("multiple")) {
-    console.log("[auth] profile not found for auth_id:", user.id, "email:", user.email);
-    // محاولة إصلاح تلقائي عبر Admin API
-    if (user.email) {
-      try {
-        const admin = createAdminClient();
-        const { data: profiles } = await admin
-          .from("mazaya_users")
-          .select("*")
-          .or(`email_or_phone.eq.${user.email},username.eq.${user.email.split("@")[0]}`)
-          .limit(1);
-        if (profiles && profiles.length > 0) {
-          await admin.from("mazaya_users").update({ auth_id: user.id }).eq("id", profiles[0].id);
-          console.log("[auth] self-healed: linked profile", profiles[0].username, "to auth_id", user.id);
-          return profiles[0] as CurrentProfile;
-        }
-      } catch (e) {
-        console.error("[auth] self-heal failed:", e);
-      }
-    }
-  }
-  return data as CurrentProfile | null;
+  const r = await query('SELECT * FROM mazaya.users WHERE id = $1', [payload.userId]);
+  if (r.rows.length === 0) return null;
+  return r.rows[0] as CurrentProfile;
 }
 
 export async function requireAdmin() {

@@ -33,7 +33,7 @@ export default function NewInventoryForm({ category }: Props) {
       setSuppliers(s ?? []);
       const listKey = category === "boards" ? "board_material" : "accessory_type";
       const { data: ml } = await supabase.from("mazaya_lookup_lists").select("value").eq("list_key", listKey).eq("is_active", true).order("sort_order");
-      setTypes((ml ?? []).map(m => m.value));
+      setTypes((ml ?? []).map((m: any) => m.value));
     })();
   });
 

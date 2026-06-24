@@ -37,6 +37,7 @@ class BrowserDbQuery implements PromiseLike<DbResult> {
   }
   limit(n: number) { this.limitCount = n; return this; }
   single() { this.isSingle = true; return this; }
+  maybeSingle() { this.isSingle = true; return this; }
 
   insert(data: any) { this.method = 'insert'; this.insertData = data; return this; }
   update(data: any) { this.method = 'update'; this.insertData = data; return this; }
