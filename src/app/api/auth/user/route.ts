@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db/pool';
 import { COOKIE_NAME, verifySession } from '@/lib/db/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const cookieHeader = request.headers.get('cookie') || '';
   const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));

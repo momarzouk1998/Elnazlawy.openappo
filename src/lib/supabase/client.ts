@@ -126,7 +126,7 @@ export function createClient() {
       getUser: async () => {
         try {
           const res = await fetch(`${baseUrl}/api/auth/user`, { redirect: 'manual' });
-          if (res.status === 307) {
+          if (!res.ok || res.type === 'opaqueredirect' || res.status >= 300) {
             const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('mazaya_user') : null;
             if (stored) return { data: { user: JSON.parse(stored) }, error: null };
             return { data: { user: null }, error: null };
@@ -141,6 +141,8 @@ export function createClient() {
           }
           return json;
         } catch (e: any) {
+          const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('mazaya_user') : null;
+          if (stored) return { data: { user: JSON.parse(stored) }, error: null };
           return { data: { user: null }, error: { message: e.message } };
         }
       },
