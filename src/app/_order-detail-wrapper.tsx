@@ -97,15 +97,15 @@ export default function OrderDetailPage() {
       {/* المواد */}
       <h3 className="font-bold text-lg mt-6 mb-3">📦 المواد المستخدمة</h3>
       <DataTable
-        rows={materials}
+        rows={materials as any[]}
         emptyMessage="لا توجد مواد"
         columns={[
-          { key: "name", label: "الصنف", render: r => r.mazaya_boards_inventory?.item_name || r.mazaya_accessories_inventory?.item_name || "-" },
-          { key: "code", label: "الكود", render: r => r.mazaya_boards_inventory?.code || r.mazaya_accessories_inventory?.code || "-" },
-          { key: "type", label: "النوع", render: r => r.board_id ? "لوح" : "اكسسوار" },
+          { key: "name", label: "الصنف", render: (r: any) => r.mazaya_boards_inventory?.item_name || r.mazaya_accessories_inventory?.item_name || "-" },
+          { key: "code", label: "الكود", render: (r: any) => r.mazaya_boards_inventory?.code || r.mazaya_accessories_inventory?.code || "-" },
+          { key: "type", label: "النوع", render: (r: any) => r.board_id ? "لوح" : "اكسسوار" },
           { key: "quantity_used", label: "الكمية" },
-          { key: "unit_price_snapshot", label: "السعر", render: r => formatCurrency(r.unit_price_snapshot) },
-          { key: "line_total", label: "الإجمالي", render: r => <span className="font-bold">{formatCurrency(r.line_total)}</span> },
+          { key: "unit_price_snapshot", label: "السعر", render: (r: any) => formatCurrency(r.unit_price_snapshot) },
+          { key: "line_total", label: "الإجمالي", render: (r: any) => <span className="font-bold">{formatCurrency(r.line_total)}</span> },
         ]}
       />
 
