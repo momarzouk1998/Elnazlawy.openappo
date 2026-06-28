@@ -5,10 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    // Simple DB connectivity check
+    await prisma.$queryRawUnsafe('SELECT 1');
+
     return NextResponse.json({
       ok: true,
-      data: { status: 'healthy', timestamp: new Date().toISOString() },
+      data: {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+      },
     });
   } catch (e: any) {
     return NextResponse.json(

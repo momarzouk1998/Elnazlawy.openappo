@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
 
     const entries = await prisma.audit_log.findMany({
       where,
+      include: { user: { select: { username: true } } },
       orderBy: { created_at: 'desc' },
       skip: offset,
       take: limit,
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
 
     const mappedEntries = entries.map(entry => ({
       ...entry,
-      username: null,
+      username: entry.user?.username || null,
+      user: undefined,
     }));
 
     return NextResponse.json({

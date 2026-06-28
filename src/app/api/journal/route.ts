@@ -18,22 +18,9 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    const entryTypeRevMap: Record<string, string> = {
-      purchase: 'مشتريات',
-      income: 'دفعة واردة من معرض',
-      expense: 'دفعة صادرة لمورد',
-      transfer: 'تحويل تمريري',
-      overhead: 'نثريات',
-      incoming_from_branch: 'دفعة واردة من معرض',
-      outgoing_to_supplier: 'دفعة صادرة لمورد',
-    };
-    const paymentMethodRevMap: Record<string, string> = {
-      cash: 'نقدي',
-      transfer: 'تحويل',
-    };
     const where: any = {};
-    if (entry_type) where.entry_type = entryTypeRevMap[entry_type] || entry_type;
-    if (payment_method) where.payment_method = paymentMethodRevMap[payment_method] || payment_method;
+    if (entry_type) where.entry_type = entry_type;
+    if (payment_method) where.payment_method = payment_method;
     if (date_from || date_to) {
       where.date = {};
       if (date_from) where.date.gte = new Date(date_from);
@@ -49,11 +36,11 @@ export async function GET(request: NextRequest) {
 
     if (entry_type) {
       conditions.push(`je.entry_type = $${paramIdx++}`);
-      rawParams.push(entryTypeRevMap[entry_type] || entry_type);
+      rawParams.push(entry_type);
     }
     if (payment_method) {
       conditions.push(`je.payment_method = $${paramIdx++}`);
-      rawParams.push(paymentMethodRevMap[payment_method] || payment_method);
+      rawParams.push(payment_method);
     }
     if (date_from) {
       conditions.push(`je.date >= $${paramIdx++}`);
@@ -126,7 +113,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validEntryTypes = ['purchase', 'income', 'expense', 'transfer', 'overhead', 'incoming_from_branch', 'outgoing_to_supplier'];
+    const validEntryTypes = ['purchase', 'incoming_from_branch', 'outgoing_to_supplier', 'transfer', 'overhead'];
     if (!entry_type || !validEntryTypes.includes(entry_type)) {
       return NextResponse.json(
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'نوع القيد غير صالح' } },
@@ -148,27 +135,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const entryTypeMap: Record<string, string> = {
-      purchase: 'مشتريات',
-      income: 'دفعة واردة من معرض',
-      expense: 'دفعة صادرة لمورد',
-      transfer: 'تحويل تمريري',
-      overhead: 'نثريات',
-      incoming_from_branch: 'دفعة واردة من معرض',
-      outgoing_to_supplier: 'دفعة صادرة لمورد',
-    };
-    const paymentMethodMap: Record<string, string> = {
-      cash: 'نقدي',
-      transfer: 'تحويل',
-    };
-
     const entry = await prisma.journal_entries.create({
       data: {
         date: date ? new Date(date) : new Date(),
-        entry_type: entryTypeMap[entry_type] || entry_type,
+        entry_type,
         description: description.trim(),
         amount,
-        payment_method: payment_method ? (paymentMethodMap[payment_method] || payment_method) : null,
+        payment_method: payment_method || null,
         party_type: party_type || null,
         party_id: party_id || null,
         order_id: order_id || null,
