@@ -4,10 +4,22 @@ const globalPool = globalThis as any;
 let pool: Pool;
 
 if (process.env.NODE_ENV === 'production') {
-  pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+  // Production: optimized for low-RAM server (2GB droplet)
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,                          // Fewer connections on shared 2GB server
+    idleTimeoutMillis: 30000,         // Close idle connections after 30s
+    connectionTimeoutMillis: 10000,   // 10s timeout for new connections
+  });
 } else {
+  // Development: singleton to avoid exhausting connections during hot-reload
   if (!globalPool.__dbPool) {
-    globalPool.__dbPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    globalPool.__dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
   }
   pool = globalPool.__dbPool;
 }
