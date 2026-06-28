@@ -11,7 +11,7 @@ export async function GET(
     await requireAdmin();
     const { id } = await params;
 
-    const materialType = await prisma.material_types.findFirst({ where: { id: parseInt(id) } });
+    const materialType = await prisma.material_types.findFirst({ where: { id: id } });
 
     if (!materialType) {
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function PATCH(
     const admin = await requireAdmin();
     const { id } = await params;
 
-    const existingType = await prisma.material_types.findFirst({ where: { id: parseInt(id) } });
+    const existingType = await prisma.material_types.findFirst({ where: { id: id } });
     if (!existingType) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'نوع المادة غير موجود' } },
@@ -51,7 +51,7 @@ export async function PATCH(
     // Validate name uniqueness if updating name
     if (name && name.trim() !== '') {
       const nameCheck = await prisma.material_types.findFirst({
-        where: { name: name.trim(), NOT: { id: parseInt(id) } },
+        where: { name: name.trim(), NOT: { id: id } },
         select: { id: true },
       });
       if (nameCheck) {
@@ -67,7 +67,7 @@ export async function PATCH(
     if (is_active !== undefined) updateData.is_active = is_active;
 
     const materialType = await prisma.material_types.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: updateData,
     });
 
@@ -75,7 +75,7 @@ export async function PATCH(
       user_id: admin.id,
       action: 'update',
       table_name: 'material_types',
-      row_id: parseInt(id),
+      row_id: id,
       before: existingType,
       after: materialType,
     });
@@ -97,7 +97,7 @@ export async function DELETE(
     const admin = await requireAdmin();
     const { id } = await params;
 
-    const existingType = await prisma.material_types.findFirst({ where: { id: parseInt(id) } });
+    const existingType = await prisma.material_types.findFirst({ where: { id: id } });
     if (!existingType) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'نوع المادة غير موجود' } },
@@ -129,13 +129,13 @@ export async function DELETE(
       );
     }
 
-    await prisma.material_types.delete({ where: { id: parseInt(id) } });
+    await prisma.material_types.delete({ where: { id: id } });
 
     auditLog({
       user_id: admin.id,
       action: 'delete',
       table_name: 'material_types',
-      row_id: parseInt(id),
+      row_id: id,
       before: existingType,
     });
 

@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const item = await prisma.branches.findUnique({ where: { id: parseInt(id) } });
+    const item = await prisma.branches.findUnique({ where: { id } });
     if (!item) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'المعرض غير موجود' } }, { status: 404 });
     }
@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const branchId = parseInt(id);
+    const branchId = id;
     const before = await prisma.branches.findUnique({ where: { id: branchId } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'المعرض غير موجود' } }, { status: 404 });
@@ -54,7 +54,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const branchId = parseInt(id);
+    const branchId = id;
 
     const [userCount, orderCount, customerCount] = await Promise.all([
       prisma.users.count({ where: { branch_id: branchId } }),

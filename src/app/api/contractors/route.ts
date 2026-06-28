@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search, mode: 'insensitive' } },
-        { specialty: { contains: search, mode: 'insensitive' } },
+        { type: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -43,14 +43,14 @@ export async function POST(request: Request) {
   try {
     const user = await requireAuth();
     const body = await request.json();
-    const { name, specialty, phone, notes } = body;
+    const { name, type, phone, notes } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم المقاول مطلوب' } }, { status: 400 });
     }
 
     const item = await prisma.contractors.create({
-      data: { name: name.trim(), specialty: specialty || null, phone: phone || null, notes: notes || null },
+      data: { name: name.trim(), type: type || 'أخرى', phone: phone || null, notes: notes || null },
     });
 
     auditLog({ user_id: user.id, action: 'create', table_name: 'contractors', row_id: item.id, after: item as any });

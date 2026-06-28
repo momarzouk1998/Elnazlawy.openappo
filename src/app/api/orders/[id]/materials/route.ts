@@ -10,7 +10,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
 
     const order = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },
@@ -23,20 +23,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const r = await prisma.$queryRaw<any[]>`
       SELECT om.*,
         CASE
-          WHEN om.inventory_table = 'boards_inventory' THEN bi.item_name
-          WHEN om.inventory_table = 'accessories_inventory' THEN ai.item_name
+          WHEN om.item_category = 'boards_inventory' THEN bi.item_name
+          WHEN om.item_category = 'accessories_inventory' THEN ai.item_name
         END as item_name,
         CASE
-          WHEN om.inventory_table = 'boards_inventory' THEN bi.code
-          WHEN om.inventory_table = 'accessories_inventory' THEN ai.code
+          WHEN om.item_category = 'boards_inventory' THEN bi.code
+          WHEN om.item_category = 'accessories_inventory' THEN ai.code
         END as item_code,
         CASE
-          WHEN om.inventory_table = 'boards_inventory' THEN bi.quantity_remaining
-          WHEN om.inventory_table = 'accessories_inventory' THEN ai.quantity_remaining
+          WHEN om.item_category = 'boards_inventory' THEN bi.quantity_remaining
+          WHEN om.item_category = 'accessories_inventory' THEN ai.quantity_remaining
         END as available_quantity
       FROM mazaya.order_materials om
-      LEFT JOIN mazaya.boards_inventory bi ON om.inventory_table = 'boards_inventory' AND om.item_id = bi.id
-      LEFT JOIN mazaya.accessories_inventory ai ON om.inventory_table = 'accessories_inventory' AND om.item_id = ai.id
+      LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
+      LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
       WHERE om.order_id = ${orderId}
       ORDER BY om.created_at DESC
     `;
@@ -53,9 +53,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
     const body = await request.json();
-    const { inventory_table, item_id, quantity_used, unit_price_snapshot } = body;
+    const { item_category, item_id, quantity_used, unit_price_snapshot } = body;
 
     const order = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },
@@ -65,7 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الأوردر غير موجود' } }, { status: 404 });
     }
 
-    if (!inventory_table || !['boards_inventory', 'accessories_inventory'].includes(inventory_table)) {
+    if (!item_category || !['boards_inventory', 'accessories_inventory'].includes(item_category)) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'نوع المخزون غير صالح' } }, { status: 400 });
     }
     if (!item_id) {
@@ -78,16 +78,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر الوحدة مطلوب' } }, { status: 400 });
     }
 
-    const itemIdNum = parseInt(item_id);
-
     let invItem: any[];
-    if (inventory_table === 'boards_inventory') {
+    if (item_category === 'boards_inventory') {
       invItem = await prisma.$queryRaw<any[]>`
-        SELECT id, quantity_remaining FROM mazaya.boards_inventory WHERE id = ${itemIdNum} AND deleted_at IS NULL
+        SELECT id, quantity_remaining FROM mazaya.boards_inventory WHERE id = ${item_id} AND deleted_at IS NULL
       `;
     } else {
       invItem = await prisma.$queryRaw<any[]>`
-        SELECT id, quantity_remaining FROM mazaya.accessories_inventory WHERE id = ${itemIdNum} AND deleted_at IS NULL
+        SELECT id, quantity_remaining FROM mazaya.accessories_inventory WHERE id = ${item_id} AND deleted_at IS NULL
       `;
     }
     if (invItem.length === 0) {
@@ -105,8 +103,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const r = await prisma.order_materials.create({
       data: {
         order_id: orderId,
-        inventory_table,
-        item_id: itemIdNum,
+        item_category,
+        item_id,
         quantity_used,
         unit_price_snapshot,
       },
@@ -126,15 +124,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
     const { searchParams } = new URL(request.url);
-    const materialIdStr = searchParams.get('material_id');
+    const materialId = searchParams.get('material_id');
 
-    if (!materialIdStr) {
+    if (!materialId) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'معرف المادة مطلوب' } }, { status: 400 });
     }
-
-    const materialId = parseInt(materialIdStr);
 
     const before = await prisma.order_materials.findFirst({
       where: { id: materialId, order_id: orderId },

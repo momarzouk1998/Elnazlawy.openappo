@@ -8,7 +8,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const user = await requireAuth();
     const { id } = await params;
     const item = await prisma.customers.findFirst({
-      where: { id: parseInt(id), deleted_at: null },
+      where: { id, deleted_at: null },
       include: { branch: { select: { name: true } } },
     });
     if (!item) {
@@ -26,8 +26,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const intId = parseInt(id);
-    const before = await prisma.customers.findFirst({ where: { id: intId, deleted_at: null } });
+    const before = await prisma.customers.findFirst({ where: { id, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'العميل غير موجود' } }, { status: 404 });
     }
@@ -37,7 +36,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        data[key] = key === 'branch_id' ? parseInt(body[key]) : body[key];
+        data[key] = body[key];
       }
     }
     if (Object.keys(data).length === 0) {
@@ -45,8 +44,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     data.updated_at = new Date();
 
-    const item = await prisma.customers.update({ where: { id: intId }, data });
-    auditLog({ user_id: user.id, action: 'update', table_name: 'customers', row_id: intId, before: before as any, after: item as any });
+    const item = await prisma.customers.update({ where: { id }, data });
+    auditLog({ user_id: user.id, action: 'update', table_name: 'customers', row_id: id, before: before as any, after: item as any });
 
     return NextResponse.json({ ok: true, data: item });
   } catch (e: any) {
@@ -60,14 +59,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const intId = parseInt(id);
-    const before = await prisma.customers.findFirst({ where: { id: intId, deleted_at: null } });
+    const before = await prisma.customers.findFirst({ where: { id, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'العميل غير موجود' } }, { status: 404 });
     }
 
     // Check for orders referencing this customer
-    const order = await prisma.orders.findFirst({ where: { customer_id: intId, deleted_at: null }, select: { id: true } });
+    const order = await prisma.orders.findFirst({ where: { customer_id: id, deleted_at: null }, select: { id: true } });
     if (order) {
       return NextResponse.json(
         { ok: false, error: { code: 'REFERENCE_ERROR', message: 'لا يمكن حذف هذا العميل لوجود أوردرات مرتبطة به' } },
@@ -75,8 +73,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       );
     }
 
-    await prisma.customers.update({ where: { id: intId }, data: { deleted_at: new Date() } });
-    auditLog({ user_id: user.id, action: 'delete', table_name: 'customers', row_id: intId, before: before as any });
+    await prisma.customers.update({ where: { id }, data: { deleted_at: new Date() } });
+    auditLog({ user_id: user.id, action: 'delete', table_name: 'customers', row_id: id, before: before as any });
 
     return NextResponse.json({ ok: true, data: { message: 'تم الحذف' } });
   } catch (e: any) {

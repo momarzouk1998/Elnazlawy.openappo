@@ -10,7 +10,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
 
     const order = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },
@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
     const body = await request.json();
     const { contractor_id, description, cost, notes } = body;
 
@@ -60,8 +60,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       data: {
         order_id: orderId,
         contractor_id: contractor_id || null,
-        description: description.trim(),
-        cost: cost || null,
+        work_type: description.trim(),
+        amount: cost || null,
         notes: notes || null,
       },
     });
@@ -80,7 +80,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
     const { searchParams } = new URL(request.url);
     const workIdStr = searchParams.get('work_id');
 
@@ -88,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'معرف العمل مطلوب' } }, { status: 400 });
     }
 
-    const workId = parseInt(workIdStr);
+    const workId = workIdStr;
 
     const before = await prisma.order_external_work.findFirst({
       where: { id: workId, order_id: orderId },
@@ -98,17 +98,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json();
-    const allowed = ['contractor_id', 'description', 'cost', 'notes'];
+    const allowed = ['contractor_id', 'work_type', 'amount', 'notes'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
         data[key] = body[key];
       }
     }
+    // Map frontend field names to Prisma model field names
+    if (body.description !== undefined) data.work_type = body.description;
+    if (body.cost !== undefined) data.amount = body.cost;
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'لا توجد بيانات للتعديل' } }, { status: 400 });
     }
-    data.updated_at = new Date();
 
     const r = await prisma.order_external_work.update({
       where: { id: workId },
@@ -129,7 +131,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id: orderIdStr } = await params;
-    const orderId = parseInt(orderIdStr);
+    const orderId = orderIdStr;
     const { searchParams } = new URL(request.url);
     const workIdStr = searchParams.get('work_id');
 
@@ -137,7 +139,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'معرف العمل مطلوب' } }, { status: 400 });
     }
 
-    const workId = parseInt(workIdStr);
+    const workId = workIdStr;
 
     const before = await prisma.order_external_work.findFirst({
       where: { id: workId, order_id: orderId },

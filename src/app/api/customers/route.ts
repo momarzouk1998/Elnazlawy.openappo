@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       ];
     }
     if (branch_id) {
-      where.branch_id = parseInt(branch_id);
+      where.branch_id = branch_id;
     }
     // Branch users only see their own branch customers
     if (user.role !== 'admin' && user.branch_id) {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     const item = await prisma.customers.create({
-      data: { name: name.trim(), branch_id: branch_id ? parseInt(branch_id) : null, phone: phone || null, address: address || null, notes: notes || null },
+      data: { name: name.trim(), branch_id: branch_id || null, phone: phone || null, address: address || null, notes: notes || null },
     });
 
     auditLog({ user_id: user.id, action: 'create', table_name: 'customers', row_id: item.id, after: item as any });

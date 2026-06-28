@@ -10,9 +10,8 @@ export async function GET(
   try {
     await requireAuth();
     const { id } = await params;
-    const parsedId = parseInt(id);
 
-    const expense = await prisma.overhead_expenses.findFirst({ where: { id: parsedId } });
+    const expense = await prisma.overhead_expenses.findFirst({ where: { id } });
 
     if (!expense) {
       return NextResponse.json(
@@ -37,9 +36,8 @@ export async function PATCH(
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const parsedId = parseInt(id);
 
-    const existing = await prisma.overhead_expenses.findFirst({ where: { id: parsedId } });
+    const existing = await prisma.overhead_expenses.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'المصروف غير موجود' } },
@@ -67,7 +65,7 @@ export async function PATCH(
     data.updated_at = new Date();
 
     const expense = await prisma.overhead_expenses.update({
-      where: { id: parsedId },
+      where: { id },
       data,
     });
 
@@ -75,7 +73,7 @@ export async function PATCH(
       user_id: user.id,
       action: 'update',
       table_name: 'overhead_expenses',
-      row_id: parsedId,
+      row_id: id,
       before: existing,
       after: expense,
     });
@@ -96,9 +94,8 @@ export async function DELETE(
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const parsedId = parseInt(id);
 
-    const existing = await prisma.overhead_expenses.findFirst({ where: { id: parsedId } });
+    const existing = await prisma.overhead_expenses.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'المصروف غير موجود' } },
@@ -117,13 +114,13 @@ export async function DELETE(
       });
     }
 
-    await prisma.overhead_expenses.delete({ where: { id: parsedId } });
+    await prisma.overhead_expenses.delete({ where: { id } });
 
     auditLog({
       user_id: user.id,
       action: 'delete',
       table_name: 'overhead_expenses',
-      row_id: parsedId,
+      row_id: id,
       before: existing,
     });
 

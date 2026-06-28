@@ -52,9 +52,8 @@ export async function PATCH(
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const parsedId = parseInt(id);
 
-    const existing = await prisma.journal_entries.findFirst({ where: { id: parsedId } });
+    const existing = await prisma.journal_entries.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'القيد غير موجود' } },
@@ -80,7 +79,7 @@ export async function PATCH(
       );
     }
 
-    if (payment_method && !['cash', 'transfer'].includes(payment_method)) {
+    if (payment_method && !['نقدي', 'تحويل'].includes(payment_method)) {
       return NextResponse.json(
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'طريقة الدفع غير صالحة' } },
         { status: 400 }
@@ -92,14 +91,14 @@ export async function PATCH(
     if (entry_type !== undefined) data.entry_type = entry_type;
     if (description !== undefined) data.description = description.trim();
     if (amount !== undefined) data.amount = amount;
-    if (payment_method !== undefined) data.payment_method = payment_method || null;
+    if (payment_method !== undefined) data.payment_method = payment_method || 'نقدي';
     if (party_type !== undefined) data.party_type = party_type || null;
-    if (party_id !== undefined) data.party_id = party_id ? parseInt(party_id) : null;
-    if (order_id !== undefined) data.order_id = order_id ? parseInt(order_id) : null;
+    if (party_id !== undefined) data.party_id = party_id || null;
+    if (order_id !== undefined) data.order_id = order_id || null;
     data.updated_at = new Date();
 
     const entry = await prisma.journal_entries.update({
-      where: { id: parsedId },
+      where: { id },
       data,
     });
 
@@ -107,7 +106,7 @@ export async function PATCH(
       user_id: user.id,
       action: 'update',
       table_name: 'journal_entries',
-      row_id: parsedId,
+      row_id: id,
       before: existing,
       after: entry,
     });
@@ -128,9 +127,8 @@ export async function DELETE(
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const parsedId = parseInt(id);
 
-    const existing = await prisma.journal_entries.findFirst({ where: { id: parsedId } });
+    const existing = await prisma.journal_entries.findFirst({ where: { id } });
     if (!existing) {
       return NextResponse.json(
         { ok: false, error: { code: 'NOT_FOUND', message: 'القيد غير موجود' } },
@@ -138,7 +136,7 @@ export async function DELETE(
       );
     }
 
-    const refCheck = await prisma.overhead_expenses.findFirst({ where: { journal_entry_id: parsedId } });
+    const refCheck = await prisma.overhead_expenses.findFirst({ where: { journal_entry_id: id } });
     if (refCheck) {
       return NextResponse.json(
         { ok: false, error: { code: 'CONFLICT', message: 'لا يمكن حذف القيد لأنه مرتبط بمصروفات عامة' } },
@@ -146,13 +144,13 @@ export async function DELETE(
       );
     }
 
-    await prisma.journal_entries.delete({ where: { id: parsedId } });
+    await prisma.journal_entries.delete({ where: { id } });
 
     auditLog({
       user_id: user.id,
       action: 'delete',
       table_name: 'journal_entries',
-      row_id: parsedId,
+      row_id: id,
       before: existing,
     });
 

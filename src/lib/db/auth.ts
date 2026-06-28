@@ -18,7 +18,7 @@ export async function signSession(user: {
   id: number;
   username: string;
   role: string;
-  branch_id: number | null;
+  branch_id: string | null;
 }): Promise<string> {
   return new SignJWT({
     sub: String(user.id),
@@ -33,14 +33,14 @@ export async function signSession(user: {
 
 export async function verifySession(
   token: string
-): Promise<{ sub: number; username: string; role: string; branch_id: number | null } | null> {
+): Promise<{ sub: number; username: string; role: string;   branch_id: string | null } | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return {
       sub: Number(payload.sub) || 0,
       username: (payload.username as string) || '',
       role: (payload.role as string) || '',
-      branch_id: Number(payload.branch_id) || null,
+      branch_id: (payload.branch_id as string) || null,
     };
   } catch {
     return null;

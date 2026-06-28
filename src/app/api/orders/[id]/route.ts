@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const orderId = parseInt(id);
+    const orderId = id;
 
     const order = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },
@@ -21,16 +21,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       prisma.$queryRaw<any[]>`
         SELECT om.*,
           CASE
-            WHEN om.inventory_table = 'boards_inventory' THEN bi.item_name
-            WHEN om.inventory_table = 'accessories_inventory' THEN ai.item_name
+            WHEN om.item_category = 'boards_inventory' THEN bi.item_name
+            WHEN om.item_category = 'accessories_inventory' THEN ai.item_name
           END as item_name,
           CASE
-            WHEN om.inventory_table = 'boards_inventory' THEN bi.code
-            WHEN om.inventory_table = 'accessories_inventory' THEN ai.code
+            WHEN om.item_category = 'boards_inventory' THEN bi.code
+            WHEN om.item_category = 'accessories_inventory' THEN ai.code
           END as item_code
         FROM mazaya.order_materials om
-        LEFT JOIN mazaya.boards_inventory bi ON om.inventory_table = 'boards_inventory' AND om.item_id = bi.id
-        LEFT JOIN mazaya.accessories_inventory ai ON om.inventory_table = 'accessories_inventory' AND om.item_id = ai.id
+        LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
+        LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
         WHERE om.order_id = ${orderId}
       `,
       prisma.$queryRaw<any[]>`
@@ -41,8 +41,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       `,
       prisma.$queryRaw<any[]>`
         SELECT
-          COALESCE(SUM(CASE WHEN om.inventory_table = 'boards_inventory' THEN om.line_total ELSE 0 END), 0) as boards_cost,
-          COALESCE(SUM(CASE WHEN om.inventory_table = 'accessories_inventory' THEN om.line_total ELSE 0 END), 0) as accessories_cost
+          COALESCE(SUM(CASE WHEN om.item_category = 'boards_inventory' THEN om.line_total ELSE 0 END), 0) as boards_cost,
+          COALESCE(SUM(CASE WHEN om.item_category = 'accessories_inventory' THEN om.line_total ELSE 0 END), 0) as accessories_cost
         FROM mazaya.order_materials om
         WHERE om.order_id = ${orderId}
       `,
@@ -74,7 +74,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const orderId = parseInt(id);
+    const orderId = id;
 
     const before = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },
@@ -114,7 +114,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const orderId = parseInt(id);
+    const orderId = id;
 
     const before = await prisma.orders.findFirst({
       where: { id: orderId, deleted_at: null },

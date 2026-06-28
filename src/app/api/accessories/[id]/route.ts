@@ -8,7 +8,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const user = await requireAuth();
     const { id } = await params;
     const item = await prisma.accessories_inventory.findFirst({
-      where: { id: parseInt(id), deleted_at: null },
+      where: { id, deleted_at: null },
       include: { supplier: true },
     });
     if (!item) {
@@ -26,14 +26,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const accId = parseInt(id);
-    const before = await prisma.accessories_inventory.findFirst({ where: { id: accId, deleted_at: null } });
+    const before = await prisma.accessories_inventory.findFirst({ where: { id, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الصنف غير موجود' } }, { status: 404 });
     }
 
     const body = await request.json();
-    const allowed = ['item_name', 'material_type', 'code', 'supplier_id', 'unit_price', 'quantity_in', 'date_added', 'linked_order_id', 'notes', 'used_price'];
+    const allowed = ['item_name', 'accessory_type', 'code', 'supplier_id', 'unit_price', 'quantity_in', 'date_added', 'linked_order_id', 'notes', 'used_price'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) data[key] = body[key];
@@ -43,8 +42,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     data.updated_at = new Date();
 
-    const item = await prisma.accessories_inventory.update({ where: { id: accId }, data });
-    auditLog({ user_id: user.id, action: 'update', table_name: 'accessories_inventory', row_id: accId, before, after: item });
+    const item = await prisma.accessories_inventory.update({ where: { id }, data });
+    auditLog({ user_id: user.id, action: 'update', table_name: 'accessories_inventory', row_id: id, before, after: item });
 
     return NextResponse.json({ ok: true, data: item });
   } catch (e: any) {
@@ -58,14 +57,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const accId = parseInt(id);
-    const before = await prisma.accessories_inventory.findFirst({ where: { id: accId, deleted_at: null } });
+    const before = await prisma.accessories_inventory.findFirst({ where: { id, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الصنف غير موجود' } }, { status: 404 });
     }
 
-    await prisma.accessories_inventory.update({ where: { id: accId }, data: { deleted_at: new Date() } });
-    auditLog({ user_id: user.id, action: 'delete', table_name: 'accessories_inventory', row_id: accId, before });
+    await prisma.accessories_inventory.update({ where: { id }, data: { deleted_at: new Date() } });
+    auditLog({ user_id: user.id, action: 'delete', table_name: 'accessories_inventory', row_id: id, before });
 
     return NextResponse.json({ ok: true, data: { message: 'تم الحذف' } });
   } catch (e: any) {

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       ];
     }
     if (material_type) where.material_type = material_type;
-    if (supplier_id) where.supplier_id = parseInt(supplier_id);
+    if (supplier_id) where.supplier_id = supplier_id;
 
     const [total, data] = await Promise.all([
       prisma.boards_inventory.count({ where }),
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     const existing = await prisma.boards_inventory.findFirst({
-      where: { supplier_id: supplier_id ? parseInt(supplier_id) : null, code: code.trim(), deleted_at: null },
+      where: { supplier_id: supplier_id || null, code: code.trim(), deleted_at: null },
       select: { id: true },
     });
     if (existing) {
@@ -74,13 +74,13 @@ export async function POST(request: Request) {
     const item = await prisma.boards_inventory.create({
       data: {
         item_name: item_name.trim(),
-        material_type: material_type || null,
+        material_type: material_type || '',
         code: code.trim(),
-        supplier_id: supplier_id ? parseInt(supplier_id) : null,
+        supplier_id: supplier_id || null,
         unit_price,
         quantity_in: quantity_in || 0,
         date_added: date_added ? new Date(date_added) : new Date(),
-        linked_order_id: linked_order_id ? parseInt(linked_order_id) : null,
+        linked_order_id: linked_order_id || null,
         notes: notes || null,
         created_by: user.id,
       },

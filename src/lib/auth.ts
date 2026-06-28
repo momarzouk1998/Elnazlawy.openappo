@@ -6,7 +6,7 @@ export interface CurrentProfile {
   username: string;
   full_name: string;
   role: 'admin' | 'branch_user';
-  branch_id: number | null;
+  branch_id: string | null;
   visible_modules: string[];
   permissions: Record<string, string[]>;
   is_active: boolean;

@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
         amount,
         payment_method: payment_method || null,
         party_type: party_type || null,
-        party_id: party_id ? parseInt(party_id) : null,
-        order_id: order_id ? parseInt(order_id) : null,
+        party_id: party_id || null,
+        order_id: order_id || null,
         created_by: user.id,
       },
     });

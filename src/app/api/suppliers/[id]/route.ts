@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const item = await prisma.suppliers.findFirst({ where: { id: parseInt(id), deleted_at: null } });
+    const item = await prisma.suppliers.findFirst({ where: { id, deleted_at: null } });
     if (!item) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: '\u0627\u0644\u0645\u0648\u0631\u062f \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' } }, { status: 404 });
     }
@@ -22,7 +22,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const intId = parseInt(id);
+    const intId = id;
     const before = await prisma.suppliers.findFirst({ where: { id: intId, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: '\u0627\u0644\u0645\u0648\u0631\u062f \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' } }, { status: 404 });
@@ -56,7 +56,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   try {
     const user = await requireAuth();
     const { id } = await params;
-    const intId = parseInt(id);
+    const intId = id;
     const before = await prisma.suppliers.findFirst({ where: { id: intId, deleted_at: null } });
     if (!before) {
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: '\u0627\u0644\u0645\u0648\u0631\u062f \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f' } }, { status: 404 });

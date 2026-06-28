@@ -28,10 +28,10 @@ export async function GET(request: Request) {
     if (user.role !== 'admin' && user.branch_id) {
       where.branch_id = user.branch_id;
     } else if (branch_id) {
-      where.branch_id = parseInt(branch_id);
+      where.branch_id = branch_id;
     }
     if (customer_id) {
-      where.customer_id = parseInt(customer_id);
+      where.customer_id = customer_id;
     }
 
     const [countResult, data] = await Promise.all([
