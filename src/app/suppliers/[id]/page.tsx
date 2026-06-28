@@ -9,7 +9,7 @@ import { formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from "@/lib/format"
 
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useUserStore();
+  const { user, initialized } = useUserStore();
   const { data: supplier, loading } = useApi<any>(`/api/suppliers/${id}`);
   const { data: boardsData } = useApi<{ items: any[] }>('/api/boards?limit=500&supplier_id=' + id);
   const { data: accData } = useApi<{ items: any[] }>('/api/accessories?limit=500&supplier_id=' + id);
@@ -19,6 +19,7 @@ export default function SupplierDetailPage() {
   const accessories = accData?.items?.filter((a: any) => a.supplier_id === parseInt(id)) || [];
   const purchases = journalData?.entries || [];
 
+  if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
   if (!supplier && !loading) return <DashboardLayout profile={user}><div className="card">المورد غير موجود</div></DashboardLayout>;
 

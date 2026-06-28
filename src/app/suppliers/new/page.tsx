@@ -11,7 +11,7 @@ import { PAYMENT_METHOD_LABELS } from "@/lib/format";
 
 export default function NewSupplierPage() {
   const router = useRouter();
-  const { user } = useUserStore();
+  const { user, initialized } = useUserStore();
   const [form, setForm] = useState({ name: "", payment_type: "both", phone: "", notes: "" });
   const [error, setError] = useState<string | null>(null);
   const { mutate, loading } = useApiMutation();
@@ -26,6 +26,7 @@ export default function NewSupplierPage() {
     router.refresh();
   }
 
+  if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
 
   return (

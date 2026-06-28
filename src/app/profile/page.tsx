@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { formatDate } from "@/lib/format";
 
 export default function ProfilePage() {
-  const { user } = useUserStore();
+  const { user, initialized } = useUserStore();
 
   // password change form
   const [currentPw, setCurrentPw] = useState("");
@@ -60,9 +60,8 @@ export default function ProfilePage() {
     }
   }
 
-  if (!user) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-500">جاري التحميل...</div>;
-  }
+  if (!initialized) return <div className="min-h-screen flex items-center justify-center text-gray-500">جاري التحميل...</div>;
+  if (!user) return null;
 
   const roleLabel = user.role === "admin" ? "مدير المصنع" : "موظف";
   const roleColor = user.role === "admin" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800";

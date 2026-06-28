@@ -14,7 +14,7 @@ import { PAYMENT_METHOD_LABELS } from "@/lib/format";
 
 export default function SuppliersPage() {
   const router = useRouter();
-  const { user } = useUserStore();
+  const { user, initialized } = useUserStore();
   const { data, loading, refetch } = useApi<{ items: any[]; total: number }>('/api/suppliers?limit=500');
   const rows = data?.items || [];
   const [search, setSearch] = useState("");
@@ -26,6 +26,7 @@ export default function SuppliersPage() {
     return matchSearch && matchPay;
   }), [rows, search, paymentFilter]);
 
+  if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
 
   return (

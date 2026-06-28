@@ -10,7 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 
 export default function InventoryDetailPage() {
   const params = useParams<{ id: string }>();
-  const { user } = useUserStore();
+  const { user, initialized } = useUserStore();
   const [table, setTable] = useState<"boards" | "accessories">("boards");
 
   // Try boards first
@@ -59,6 +59,7 @@ export default function InventoryDetailPage() {
       .catch(() => {});
   }, [item, params.id, table]);
 
+  if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
   if (!item && !loading) return <DashboardLayout profile={user}><div className="card">الصنف غير موجود</div></DashboardLayout>;
 

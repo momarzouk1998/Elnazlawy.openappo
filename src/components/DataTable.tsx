@@ -40,7 +40,7 @@ export function DataTable<T extends { id?: number | string }>({ columns, rows, e
             ) : rows.map((row, i) => (
               <tr key={row.id ?? i} className="hover:bg-gray-50 transition">
                 {columns.map(c => (
-                  <td key={c.key} className={`px-4 py-3 text-gray-800 ${c.className || ""}`}>
+                  <td key={c.key} className={`px-4 py-3 text-gray-800 whitespace-nowrap ${c.className || ""}`}>
                     {c.render ? c.render(row) : (row as any)[c.key] ?? "-"}
                   </td>
                 ))}
