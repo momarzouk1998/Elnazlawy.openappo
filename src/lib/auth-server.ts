@@ -12,7 +12,7 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
   if (!payload) return null;
 
   const r = await query(
-    `SELECT id, COALESCE(username, name) AS username, email_or_phone, email, role, branch_id,
+    `SELECT id, name AS username, email AS email_or_phone, role, branch_id,
             COALESCE(visible_modules, '{}') AS visible_modules,
             COALESCE(is_active, true) AS is_active
      FROM mazaya.users WHERE id = $1`,
