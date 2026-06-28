@@ -43,8 +43,8 @@ export default async function DashboardPage() {
   ).length;
 
   // Balance — new entry_type names: income→incoming_from_branch, expense→outgoing_to_supplier
-  const income = (journal ?? []).filter((j: any) => j.entry_type === "incoming_from_branch").reduce((s: number, j: any) => s + j.amount, 0);
-  const spent = (journal ?? []).filter((j: any) => j.entry_type === "outgoing_to_supplier" || j.entry_type === "purchase" || j.entry_type === "overhead").reduce((s: number, j: any) => s + j.amount, 0);
+  const income = (journal ?? []).filter((j: any) => j.entry_type === "دفعة واردة من معرض").reduce((s: number, j: any) => s + j.amount, 0);
+  const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + j.amount, 0);
   const balance = income - spent;
 
   // Weekly chart (last 7 days)
@@ -58,8 +58,8 @@ export default async function DashboardPage() {
   for (const j of (journal ?? []) as any[]) {
     const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '');
     if (weekly[k]) {
-      if (j.entry_type === "incoming_from_branch") weekly[k].income += j.amount;
-      if (["outgoing_to_supplier", "purchase", "overhead"].includes(j.entry_type)) weekly[k].expense += j.amount;
+      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += j.amount;
+      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += j.amount;
       weekly[k].net = weekly[k].income - weekly[k].expense;
     }
   }
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
                   <span className="text-sm text-gray-700 truncate">{j.description}</span>
                 </div>
                 <div className="text-left flex-shrink-0">
-                  <div className={`font-bold ${j.entry_type === "incoming_from_branch" ? "text-green-600" : "text-red-600"}`}>
+	                  <div className={`font-bold ${j.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>
                     {formatCurrency(j.amount)}
                   </div>
                   <div className="text-xs text-gray-400">{j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '')}</div>

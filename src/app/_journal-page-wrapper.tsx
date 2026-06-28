@@ -19,7 +19,7 @@ const journalFields: FieldDef[] = [
   { name: "entry_type", label: "نوع الحركة", options: Object.entries(ENTRY_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l })), required: true },
   { name: "description", label: "البيان", required: true },
   { name: "amount", label: "المبلغ", type: "number", required: true },
-  { name: "payment_method", label: "طريقة الدفع", options: [{ value: "cash", label: "نقدي" }, { value: "transfer", label: "تحويل" }] },
+  { name: "payment_method", label: "طريقة الدفع", options: [{ value: "نقدي", label: "نقدي" }, { value: "تحويل", label: "تحويل" }] },
   { name: "notes", label: "ملاحظات", rows: 2 },
 ];
 
@@ -46,10 +46,10 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
   const today = new Date();
   const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
   const weekRows = filtered.filter(r => new Date(r.date) >= weekStart);
-  const weekIncome = weekRows.filter(r => r.entry_type === "income" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
-  const weekExpense = weekRows.filter(r => ["expense", "purchase", "overhead"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
-  const totalIncome = filtered.filter(r => r.entry_type === "income" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
-  const totalExpense = filtered.filter(r => ["expense", "purchase", "overhead"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
+  const weekIncome = weekRows.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
+  const weekExpense = weekRows.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
+  const totalIncome = filtered.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
+  const totalExpense = filtered.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
 
   if (!profile) return null;
   const canSee = canSeeModule(profile, "journal");
@@ -113,7 +113,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 { key: "description", label: "البيان" },
                 { key: "party", label: "الجهة", render: r => r.party_name || "-" },
                 { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
-                { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "income" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
+                { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
                 { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/journal" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
               ]}
             />
@@ -134,8 +134,8 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                     const d = new Date(); d.setDate(d.getDate() - (6 - i));
                     const key = d.toISOString().slice(0, 10);
                     const dayRows = weekRows.filter(r => r.date === key);
-                    const inc = dayRows.filter(r => r.entry_type === "income" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
-                    const exp = dayRows.filter(r => ["expense", "purchase", "overhead"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
+	                    const inc = dayRows.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + r.amount, 0);
+	                    const exp = dayRows.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + r.amount, 0);
                     const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
                     return (
                       <tr key={key} className="border-b">

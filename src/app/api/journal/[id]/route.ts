@@ -71,7 +71,7 @@ export async function PATCH(
       );
     }
 
-    const validEntryTypes = ['purchase', 'incoming_from_branch', 'outgoing_to_supplier', 'transfer', 'overhead'];
+    const validEntryTypes = ['مشتريات', 'دفعة واردة من معرض', 'دفعة صادرة لمورد', 'تحويل تمريري', 'نثريات', 'purchase', 'incoming_from_branch', 'outgoing_to_supplier', 'transfer', 'overhead', 'income', 'expense'];
     if (entry_type && !validEntryTypes.includes(entry_type)) {
       return NextResponse.json(
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'نوع القيد غير صالح' } },

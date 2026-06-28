@@ -59,12 +59,12 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
     })();
   }, [loaded]);
 
-  const [orderTypes] = useState([{ value: "new", label: "تصنيع جديد" }, { value: "maintenance", label: "صيانة" }]);
+  const [orderTypes] = useState([{ value: "تصنيع جديد", label: "تصنيع جديد" }, { value: "صيانة", label: "صيانة" }]);
   const [statuses] = useState([
-    { value: "open", label: "مفتوح" },
-    { value: "in_progress", label: "قيد التنفيذ" },
-    { value: "completed", label: "مكتمل" },
-    { value: "delivered", label: "تم التسليم" },
+    { value: "مفتوح", label: "مفتوح" },
+    { value: "قيد التنفيذ", label: "قيد التنفيذ" },
+    { value: "مكتمل", label: "مكتمل" },
+    { value: "تم التسليم", label: "تم التسليم" },
   ]);
 
   // Header
@@ -72,11 +72,11 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
     order_name: "",
     customer_id: "",
     branch_id: "",
-    order_type: "new",
+    order_type: "تصنيع جديد",
     parent_order_id: "",
     start_date: new Date().toISOString().slice(0, 10),
     end_date: "",
-    status: "open",
+    status: "مفتوح",
     notes: "",
   });
 
@@ -278,7 +278,7 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select label="نوع الأوردر" value={order.order_type} onChange={e => setOrder({ ...order, order_type: e.target.value })} options={orderTypes} />
-            {order.order_type === "maintenance" && (
+            {order.order_type === "صيانة" && (
               <Select label="الأوردر الأصلي" value={order.parent_order_id} onChange={e => setOrder({ ...order, parent_order_id: e.target.value })}
                 options={[{ value: "", label: "— اختر —" }, ...allOrders.map(o => ({ value: String(o.id), label: o.order_name }))]} />
             )}

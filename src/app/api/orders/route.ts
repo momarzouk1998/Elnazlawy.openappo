@@ -72,18 +72,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الأوردر مطلوب' } }, { status: 400 });
     }
 
-    const validStatuses = ['open', 'in_progress', 'completed', 'delivered'];
-    const validTypes = ['new', 'maintenance'];
+    const validStatuses = ['open', 'in_progress', 'completed', 'delivered', 'مفتوح', 'قيد التنفيذ', 'مكتمل', 'تم التسليم'];
+    const validTypes = ['new', 'maintenance', 'تصنيع جديد', 'صيانة'];
 
     const r = await prisma.orders.create({
       data: {
         order_name: order_name.trim(),
         customer_id: customer_id || null,
         branch_id: branch_id || null,
-        order_type: validTypes.includes(order_type) ? order_type : 'new',
+        order_type: validTypes.includes(order_type) ? order_type : 'تصنيع جديد',
         start_date: start_date || null,
         end_date: end_date || null,
-        status: validStatuses.includes(status) ? status : 'open',
+        status: validStatuses.includes(status) ? status : 'مفتوح',
         installation_cost: installation_cost || 0,
         internal_transport_cost: internal_transport_cost || 0,
         external_transport_cost: external_transport_cost || 0,

@@ -14,7 +14,7 @@ export default function BranchDetailPage() {
   const { data: branchResponse, loading } = useApi<any>(`/api/branches/${id}`);
   const { data: customersResponse } = useApi<{ items: any[] }>(`/api/customers?branch_id=${id}&limit=500`);
   const { data: ordersResponse } = useApi<{ items: any[] }>(`/api/orders?branch_id=${id}&limit=500`);
-  const { data: journalResponse } = useApi<{ items: any[] }>(`/api/journal?branch_id=${id}&entry_type=income&limit=500`);
+  const { data: journalResponse } = useApi<{ items: any[] }>(`/api/journal?branch_id=${id}&entry_type=دفعة واردة من معرض&limit=500`);
 
   const branch = branchResponse?.data ?? branchResponse;
   const customers = customersResponse?.items ?? [];

@@ -27,12 +27,12 @@ export interface Order {
   order_name: string;
   customer_id: number | null;
   branch_id: number | null;
-  order_type: "new" | "maintenance";
+  order_type: string;
   parent_order_id: number | null;
   start_date: string | null;
   end_date: string | null;
   duration_days: number | null;
-  status: "open" | "in_progress" | "completed" | "delivered";
+  status: string;
   notes: string | null;
 }
 export interface Board {
@@ -110,7 +110,7 @@ export interface OrderExternalWork {
 export interface JournalEntry {
   id: number;
   date: string;
-  entry_type: "purchase" | "incoming_from_branch" | "outgoing_to_supplier" | "transfer" | "overhead";
+  entry_type: string;
   description: string;
   amount: number;
   payment_method: string | null;

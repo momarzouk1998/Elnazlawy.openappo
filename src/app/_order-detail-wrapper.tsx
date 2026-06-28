@@ -18,14 +18,24 @@ export default function OrderDetailPage() {
 
   const { data: order, loading, refetch: refetchOrder } = useApi<any>(`/api/orders/${id}`);
   const { data: materialsData } = useApi<any[]>(`/api/orders/${id}/materials`);
-  const { data: costsData } = useApi<any>(`/api/orders/${id}/costs`);
   const { data: externalData } = useApi<any[]>(`/api/orders/${id}/external-work`);
-  const { data: journalData } = useApi<any[]>(`/api/journal?order_id=${id}&limit=500`);
+  const { data: journalResp } = useApi<{ entries: any[] } | any[]>(`/api/journal?order_id=${id}&limit=500`);
 
-  const materials = materialsData ?? [];
-  const costs = costsData;
-  const external = externalData ?? [];
-  const transfers = journalData ?? [];
+  const materials = materialsData ?? (order?.materials ?? []);
+  const costs = order ? {
+    boards_cost: order.boards_cost ?? 0,
+    accessories_cost: order.accessories_cost ?? 0,
+    installation_cost: order.installation_cost ?? 0,
+    installation_travel_days: 0,
+    internal_transport_cost: order.internal_transport_cost ?? 0,
+    external_transport_cost: order.external_transport_cost ?? 0,
+    factory_commission: order.factory_commission ?? 0,
+    order_total: order.order_total ?? 0,
+  } : null;
+  const external = externalData ?? (order?.external_work ?? []);
+  const transfers = Array.isArray(journalResp)
+    ? journalResp
+    : (journalResp?.entries ?? []);
 
   async function setStatus(status: string) {
     await mutate('PATCH', `/api/orders/${id}`, { status });
@@ -44,7 +54,7 @@ export default function OrderDetailPage() {
 
   const isAdmin = profile.role === "admin";
   const showTransfers = canSeeModule(profile, "journal");
-  const transfersSum = transfers.filter(t => t.entry_type === "income" && !t.is_passthrough).reduce((s, t) => s + t.amount, 0);
+  const transfersSum = transfers.filter(t => t.entry_type === "دفعة واردة من معرض" && !t.is_passthrough).reduce((s, t) => s + t.amount, 0);
   const orderTotal = costs?.order_total ?? 0;
   const balance = transfersSum - orderTotal;
 
@@ -52,7 +62,7 @@ export default function OrderDetailPage() {
     <DashboardLayout profile={profile}>
       <PageHeader
         title={order?.order_name ?? "..."}
-        subtitle={`${ORDER_TYPE_LABELS[order?.order_type ?? "new"]} • ${order?.mazaya_customers?.name ?? "—"} • ${order?.mazaya_branches?.name ?? "—"}`}
+	        subtitle={`${ORDER_TYPE_LABELS[order?.order_type ?? "تصنيع جديد"]} • ${order?.mazaya_customers?.name ?? "—"} • ${order?.mazaya_branches?.name ?? "—"}`}
         backHref="/orders"
         actions={isAdmin ? (
           <>

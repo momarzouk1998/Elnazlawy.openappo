@@ -52,7 +52,7 @@ export default function ReportsPage() {
     } else if (type === "suppliers") {
       const [{ data: s }, { data: p }] = await Promise.all([
         mutate('GET', '/api/suppliers?limit=500'),
-        mutate('GET', '/api/journal?limit=500&entry_type=purchase'),
+        mutate('GET', '/api/journal?limit=500&entry_type=مشتريات'),
       ]);
       const suppliers = s?.items ?? s ?? [];
       const purchases = p?.entries ?? p ?? [];

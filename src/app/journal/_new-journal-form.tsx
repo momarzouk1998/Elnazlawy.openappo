@@ -24,10 +24,10 @@ export default function NewJournalForm() {
 
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
-    entry_type: "income",
+    entry_type: "دفعة واردة من معرض",
     description: "",
     amount: "",
-    payment_method: "cash",
+    payment_method: "نقدي",
     supplier_id: "", branch_id: "", contractor_id: "", order_id: "",
     is_passthrough: false,
     notes: "",
@@ -56,7 +56,7 @@ export default function NewJournalForm() {
   }
 
   if (!profile) return null;
-  const isPass = form.entry_type === "transfer";
+  const isPass = form.entry_type === "تحويل تمريري";
 
   return (
     <DashboardLayout profile={profile}>
@@ -74,15 +74,15 @@ export default function NewJournalForm() {
             options={Object.entries(PAYMENT_METHOD_LABELS).filter(([k]) => k !== "both").map(([k, v]) => ({ value: k, label: v }))} />
         </div>
 
-        {form.entry_type === "income" && (
+        {form.entry_type === "دفعة واردة من معرض" && (
           <Select label="المعرض" value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })}
             options={[{ value: "", label: "— اختر —" }, ...branches.map((b: any) => ({ value: String(b.id), label: b.name }))]} />
         )}
-        {(form.entry_type === "expense" || form.entry_type === "purchase") && (
+        {(form.entry_type === "مشتريات" || form.entry_type === "دفعة صادرة لمورد") && (
           <Select label="المورد" value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}
             options={[{ value: "", label: "— اختر —" }, ...suppliers.map((s: any) => ({ value: String(s.id), label: s.name }))]} />
         )}
-        {form.entry_type === "transfer" && (
+        {form.entry_type === "تحويل تمريري" && (
           <>
             <Select label="من (المعرض)" value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })}
               options={[{ value: "", label: "— اختر —" }, ...branches.map((b: any) => ({ value: String(b.id), label: b.name }))]} />
@@ -97,7 +97,7 @@ export default function NewJournalForm() {
             </label>
           </>
         )}
-        {form.entry_type === "overhead" && <div className="bg-purple-50 text-purple-700 text-sm p-3 rounded-lg">💡 الأفضل تسجيل النثريات من صفحة "النثريات" — هتتربط هنا تلقائياً.</div>}
+        {form.entry_type === "نثريات" && <div className="bg-purple-50 text-purple-700 text-sm p-3 rounded-lg">💡 الأفضل تسجيل النثريات من صفحة "النثريات" — هتتربط هنا تلقائياً.</div>}
 
         <Select label="الأوردر المرتبط (اختياري)" value={form.order_id} onChange={e => setForm({ ...form, order_id: e.target.value })}
           options={[{ value: "", label: "— بدون —" }, ...orders.map((o: any) => ({ value: String(o.id), label: o.order_name }))]} />
