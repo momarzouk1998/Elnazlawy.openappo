@@ -34,7 +34,8 @@ yarn-error.log*
 
 # github / deploy credentials
 .github-config.json
-.github/
+.github/workflows/*.key
+.github/workflows/*.pem
 *.pem
 id_ed25519*
 
