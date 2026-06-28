@@ -20,13 +20,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الأوردر غير موجود' } }, { status: 404 });
     }
 
-    const r = await prisma.$queryRaw<any[]>`
+    const r = await prisma.$queryRawUnsafe<any[]>(`
       SELECT oew.*, co.name as contractor_name
       FROM mazaya.order_external_work oew
       LEFT JOIN mazaya.contractors co ON oew.contractor_id = co.id
-      WHERE oew.order_id = ${orderId}
+      WHERE oew.order_id = $1::uuid
       ORDER BY oew.created_at DESC
-    `;
+    `, orderId);
 
     return NextResponse.json({ ok: true, data: r });
   } catch (e: any) {

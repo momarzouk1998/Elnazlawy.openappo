@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const [materialsR, extWorkR, totalsR] = await Promise.all([
-      prisma.$queryRaw<any[]>`
+      prisma.$queryRawUnsafe<any[]>(`
         SELECT om.*,
           CASE
             WHEN om.item_category = 'boards_inventory' THEN bi.item_name
@@ -31,21 +31,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         FROM mazaya.order_materials om
         LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
         LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
-        WHERE om.order_id = ${orderId}
-      `,
-      prisma.$queryRaw<any[]>`
+        WHERE om.order_id = $1::uuid
+      `, orderId),
+      prisma.$queryRawUnsafe<any[]>(`
         SELECT oew.*, co.name as contractor_name
         FROM mazaya.order_external_work oew
         LEFT JOIN mazaya.contractors co ON oew.contractor_id = co.id
-        WHERE oew.order_id = ${orderId}
-      `,
-      prisma.$queryRaw<any[]>`
+        WHERE oew.order_id = $1::uuid
+      `, orderId),
+      prisma.$queryRawUnsafe<any[]>(`
         SELECT
           COALESCE(SUM(CASE WHEN om.item_category = 'boards_inventory' THEN om.line_total ELSE 0 END), 0) as boards_cost,
           COALESCE(SUM(CASE WHEN om.item_category = 'accessories_inventory' THEN om.line_total ELSE 0 END), 0) as accessories_cost
         FROM mazaya.order_materials om
-        WHERE om.order_id = ${orderId}
-      `,
+        WHERE om.order_id = $1::uuid
+      `, orderId),
     ]);
 
     const totals = totalsR[0];

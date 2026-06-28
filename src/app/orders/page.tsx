@@ -71,11 +71,11 @@ export default function OrdersPage() {
           </select>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
             <option value="">كل الحالات</option>
-            {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(STATUS_LABELS).filter(([k, v], i, arr) => arr.findIndex(([, w]) => w === v) === i).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
             <option value="">كل الأنواع</option>
-            {Object.entries(ORDER_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(ORDER_TYPE_LABELS).filter(([k, v], i, arr) => arr.findIndex(([, w]) => w === v) === i).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="من تاريخ" />
           <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="إلى تاريخ" />

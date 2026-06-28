@@ -20,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الأوردر غير موجود' } }, { status: 404 });
     }
 
-    const r = await prisma.$queryRaw<any[]>`
+    const r = await prisma.$queryRawUnsafe<any[]>(`
       SELECT om.*,
         CASE
           WHEN om.item_category = 'boards_inventory' THEN bi.item_name
@@ -37,9 +37,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       FROM mazaya.order_materials om
       LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
       LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
-      WHERE om.order_id = ${orderId}
+      WHERE om.order_id = $1::uuid
       ORDER BY om.created_at DESC
-    `;
+    `, orderId);
 
     return NextResponse.json({ ok: true, data: r });
   } catch (e: any) {

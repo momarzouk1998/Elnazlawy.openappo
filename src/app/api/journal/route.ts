@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       rawParams.push(`%${search}%`);
     }
     if (order_id) {
-      conditions.push(`je.order_id = $${paramIdx++}`);
+      conditions.push(`je.order_id = $${paramIdx++}::uuid`);
       rawParams.push(order_id);
     }
 
