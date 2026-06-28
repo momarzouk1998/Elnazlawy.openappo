@@ -54,7 +54,7 @@ export default function OrderDetailPage() {
 
   const isAdmin = profile.role === "admin";
   const showTransfers = canSeeModule(profile, "journal");
-  const transfersSum = transfers.filter(t => t.entry_type === "دفعة واردة من معرض" && !t.is_passthrough).reduce((s, t) => s + t.amount, 0);
+  const transfersSum = transfers.filter(t => t.entry_type === "دفعة واردة من معرض" && !t.is_passthrough).reduce((s, t) => s + Number(t.amount), 0);
   const orderTotal = costs?.order_total ?? 0;
   const balance = transfersSum - orderTotal;
 

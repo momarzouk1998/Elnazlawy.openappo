@@ -24,7 +24,7 @@ export default function BranchDetailPage() {
   if (!profile) return null;
   if (!branch && !loading) return <DashboardLayout profile={profile}><div className="card">المعرض غير موجود</div></DashboardLayout>;
 
-  const totalIncome = incomes.reduce((s, i) => s + (i.is_passthrough ? 0 : i.amount), 0);
+  const totalIncome = incomes.reduce((s, i) => s + (i.is_passthrough ? 0 : Number(i.amount)), 0);
 
   return (
     <DashboardLayout profile={profile}>

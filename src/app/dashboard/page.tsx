@@ -43,8 +43,8 @@ export default async function DashboardPage() {
   ).length;
 
   // Balance — new entry_type names: income→incoming_from_branch, expense→outgoing_to_supplier
-  const income = (journal ?? []).filter((j: any) => j.entry_type === "دفعة واردة من معرض").reduce((s: number, j: any) => s + j.amount, 0);
-  const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + j.amount, 0);
+  const income = (journal ?? []).filter((j: any) => j.entry_type === "دفعة واردة من معرض").reduce((s: number, j: any) => s + Number(j.amount), 0);
+  const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + Number(j.amount), 0);
   const balance = income - spent;
 
   // Weekly chart (last 7 days)
@@ -58,8 +58,8 @@ export default async function DashboardPage() {
   for (const j of (journal ?? []) as any[]) {
     const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '');
     if (weekly[k]) {
-      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += j.amount;
-      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += j.amount;
+      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += Number(j.amount);
+      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += Number(j.amount);
       weekly[k].net = weekly[k].income - weekly[k].expense;
     }
   }
