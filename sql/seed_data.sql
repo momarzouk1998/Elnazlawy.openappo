@@ -27,7 +27,8 @@ ON CONFLICT DO NOTHING;
 
 -- Admin user (password: admin123 — bcrypt hash cost=10)
 INSERT INTO mazaya.users (username, full_name, password_hash, role, is_active) VALUES
-  ('admin', 'محمد مروك — مدير المصنع', '$2a$10$OqRNT2xxgiYk0WDSfYZcmu2Edlx5Y6F0/KNp6eeCjWRIbfkgvwdf.', 'admin', TRUE)
+  ('admin', 'محمد مروك — مدير المصنع', '$2a$10$vcURtrOyZn.1IgR7Z67g6Or3i.EVEmMRaR0C7HWoKD4WSj/BESxBG', 'admin', TRUE)
+ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 ON CONFLICT (username) DO NOTHING;
 
 -- Contractors (المقاولين الخارجيين)
