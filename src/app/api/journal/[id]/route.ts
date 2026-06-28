@@ -71,15 +71,28 @@ export async function PATCH(
       );
     }
 
-    const validEntryTypes = ['purchase', 'incoming_from_branch', 'outgoing_to_supplier', 'transfer', 'overhead'];
-    if (entry_type && !validEntryTypes.includes(entry_type)) {
+    const entryTypeMap: Record<string, string> = {
+      purchase: 'مشتريات',
+      income: 'دفعة واردة من معرض',
+      expense: 'دفعة صادرة لمورد',
+      transfer: 'تحويل تمريري',
+      overhead: 'نثريات',
+      incoming_from_branch: 'دفعة واردة من معرض',
+      outgoing_to_supplier: 'دفعة صادرة لمورد',
+    };
+    const paymentMethodMap: Record<string, string> = {
+      cash: 'نقدي',
+      transfer: 'تحويل',
+    };
+
+    if (entry_type && !(entry_type in entryTypeMap)) {
       return NextResponse.json(
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'نوع القيد غير صالح' } },
         { status: 400 }
       );
     }
 
-    if (payment_method && !['نقدي', 'تحويل'].includes(payment_method)) {
+    if (payment_method && !(payment_method in paymentMethodMap) && !['نقدي', 'تحويل'].includes(payment_method)) {
       return NextResponse.json(
         { ok: false, error: { code: 'VALIDATION_ERROR', message: 'طريقة الدفع غير صالحة' } },
         { status: 400 }
@@ -88,10 +101,10 @@ export async function PATCH(
 
     const data: any = {};
     if (date !== undefined) data.date = new Date(date);
-    if (entry_type !== undefined) data.entry_type = entry_type;
+    if (entry_type !== undefined) data.entry_type = entryTypeMap[entry_type] || entry_type;
     if (description !== undefined) data.description = description.trim();
     if (amount !== undefined) data.amount = amount;
-    if (payment_method !== undefined) data.payment_method = payment_method || 'نقدي';
+    if (payment_method !== undefined) data.payment_method = paymentMethodMap[payment_method] || payment_method || 'نقدي';
     if (party_type !== undefined) data.party_type = party_type || null;
     if (party_id !== undefined) data.party_id = party_id || null;
     if (order_id !== undefined) data.order_id = order_id || null;

@@ -23,7 +23,13 @@ export async function GET(request: Request) {
       where.order_name = { contains: search, mode: 'insensitive' };
     }
     if (status) {
-      where.status = status;
+      const statusMapRev: Record<string, string> = {
+        open: 'مفتوح',
+        in_progress: 'قيد التنفيذ',
+        completed: 'مكتمل',
+        delivered: 'تم التسليم',
+      };
+      where.status = statusMapRev[status] || status;
     }
     if (user.role !== 'admin' && user.branch_id) {
       where.branch_id = user.branch_id;
@@ -72,18 +78,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الأوردر مطلوب' } }, { status: 400 });
     }
 
-    const validStatuses = ['open', 'in_progress', 'completed', 'delivered'];
-    const validTypes = ['new', 'maintenance'];
+    const orderTypeMap: Record<string, string> = {
+      new: 'تصنيع جديد',
+      maintenance: 'صيانة',
+    };
+    const statusMap: Record<string, string> = {
+      open: 'مفتوح',
+      in_progress: 'قيد التنفيذ',
+      completed: 'مكتمل',
+      delivered: 'تم التسليم',
+    };
 
     const r = await prisma.orders.create({
       data: {
         order_name: order_name.trim(),
         customer_id: customer_id || null,
         branch_id: branch_id || null,
-        order_type: validTypes.includes(order_type) ? order_type : 'new',
-        start_date: start_date || null,
-        end_date: end_date || null,
-        status: validStatuses.includes(status) ? status : 'open',
+        order_type: orderTypeMap[order_type] || 'تصنيع جديد',
+        start_date: start_date ? new Date(start_date) : new Date(),
+        end_date: end_date ? new Date(end_date) : null,
+        status: statusMap[status] || 'مفتوح',
         installation_cost: installation_cost || 0,
         internal_transport_cost: internal_transport_cost || 0,
         external_transport_cost: external_transport_cost || 0,

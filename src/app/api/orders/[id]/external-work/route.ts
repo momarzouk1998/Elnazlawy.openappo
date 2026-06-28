@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       SELECT oew.*, co.name as contractor_name
       FROM mazaya.order_external_work oew
       LEFT JOIN mazaya.contractors co ON oew.contractor_id = co.id
-      WHERE oew.order_id = ${orderId}
+      WHERE oew.order_id = ${orderId}::uuid
       ORDER BY oew.created_at DESC
     `;
 

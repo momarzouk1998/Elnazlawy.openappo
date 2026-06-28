@@ -29,15 +29,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json();
+    const paymentTypeMap: Record<string, string> = {
+      cash: 'نقدي',
+      transfer: 'آجل',
+      both: 'نقدي وآجل',
+    };
     const allowed = ['name', 'payment_type', 'phone', 'notes'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        data[key] = body[key];
+        if (key === 'payment_type') {
+          data[key] = paymentTypeMap[body[key]] || body[key];
+        } else {
+          data[key] = body[key];
+        }
       }
     }
     if (Object.keys(data).length === 0) {
-      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: '\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u0644\u0644\u062a\u0639\u062f\u064a\u0644' } }, { status: 400 });
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'لا توجد بيانات للتعديل' } }, { status: 400 });
     }
     data.updated_at = new Date();
 

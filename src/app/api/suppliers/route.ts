@@ -48,8 +48,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: '\u0627\u0633\u0645 \u0627\u0644\u0645\u0648\u0631\u062f \u0645\u0637\u0644\u0648\u0628' } }, { status: 400 });
     }
 
-    const validPaymentTypes = ['cash', 'transfer', 'both'];
-    const pt = validPaymentTypes.includes(payment_type) ? payment_type : 'both';
+    const paymentTypeMap: Record<string, string> = {
+      cash: 'نقدي',
+      transfer: 'آجل',
+      both: 'نقدي وآجل',
+    };
+    const pt = paymentTypeMap[payment_type] || 'نقدي وآجل';
 
     const item = await prisma.suppliers.create({
       data: { name: name.trim(), payment_type: pt, phone: phone || null, notes: notes || null },

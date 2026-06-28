@@ -31,20 +31,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         FROM mazaya.order_materials om
         LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
         LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
-        WHERE om.order_id = ${orderId}
+        WHERE om.order_id = ${orderId}::uuid
       `,
       prisma.$queryRaw<any[]>`
         SELECT oew.*, co.name as contractor_name
         FROM mazaya.order_external_work oew
         LEFT JOIN mazaya.contractors co ON oew.contractor_id = co.id
-        WHERE oew.order_id = ${orderId}
+        WHERE oew.order_id = ${orderId}::uuid
       `,
       prisma.$queryRaw<any[]>`
         SELECT
           COALESCE(SUM(CASE WHEN om.item_category = 'boards_inventory' THEN om.line_total ELSE 0 END), 0) as boards_cost,
           COALESCE(SUM(CASE WHEN om.item_category = 'accessories_inventory' THEN om.line_total ELSE 0 END), 0) as accessories_cost
         FROM mazaya.order_materials om
-        WHERE om.order_id = ${orderId}
+        WHERE om.order_id = ${orderId}::uuid
       `,
     ]);
 
@@ -84,11 +84,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json();
+    const orderTypeMap: Record<string, string> = {
+      new: 'تصنيع جديد',
+      maintenance: 'صيانة',
+    };
+    const statusMap: Record<string, string> = {
+      open: 'مفتوح',
+      in_progress: 'قيد التنفيذ',
+      completed: 'مكتمل',
+      delivered: 'تم التسليم',
+    };
     const allowed = ['order_name', 'customer_id', 'branch_id', 'order_type', 'start_date', 'end_date', 'status', 'installation_cost', 'internal_transport_cost', 'external_transport_cost', 'factory_commission', 'notes'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        data[key] = body[key];
+        if (key === 'order_type') {
+          data[key] = orderTypeMap[body[key]] || body[key];
+        } else if (key === 'status') {
+          data[key] = statusMap[body[key]] || body[key];
+        } else if (key === 'start_date' || key === 'end_date') {
+          data[key] = body[key] ? new Date(body[key]) : null;
+        } else {
+          data[key] = body[key];
+        }
       }
     }
     if (Object.keys(data).length === 0) {

@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       FROM mazaya.order_materials om
       LEFT JOIN mazaya.boards_inventory bi ON om.item_category = 'boards_inventory' AND om.item_id = bi.id
       LEFT JOIN mazaya.accessories_inventory ai ON om.item_category = 'accessories_inventory' AND om.item_id = ai.id
-      WHERE om.order_id = ${orderId}
+      WHERE om.order_id = ${orderId}::uuid
       ORDER BY om.created_at DESC
     `;
 
