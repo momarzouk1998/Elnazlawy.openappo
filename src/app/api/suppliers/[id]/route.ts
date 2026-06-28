@@ -31,8 +31,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json();
     const paymentTypeMap: Record<string, string> = {
       cash: 'نقدي',
-      transfer: 'آجل',
-      both: 'نقدي وآجل',
+      transfer: 'تحويل',
+      both: 'كلاهما',
     };
     const allowed = ['name', 'payment_type', 'phone', 'notes'];
     const data: any = {};

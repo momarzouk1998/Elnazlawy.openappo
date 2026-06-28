@@ -29,21 +29,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json();
-    const contractorTypeMap: Record<string, string> = {
-      general: 'أخرى',
-      aluminum: 'ألوميتال',
-      upholstery: 'تنجيد',
-      transport: 'نقل',
-    };
     const allowed = ['name', 'type', 'phone', 'notes'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        if (key === 'type') {
-          data[key] = contractorTypeMap[body[key]] || body[key];
-        } else {
-          data[key] = body[key];
-        }
+        data[key] = body[key];
       }
     }
     if (Object.keys(data).length === 0) {

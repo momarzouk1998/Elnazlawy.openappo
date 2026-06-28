@@ -50,10 +50,10 @@ export async function POST(request: Request) {
 
     const paymentTypeMap: Record<string, string> = {
       cash: 'نقدي',
-      transfer: 'آجل',
-      both: 'نقدي وآجل',
+      transfer: 'تحويل',
+      both: 'كلاهما',
     };
-    const pt = paymentTypeMap[payment_type] || 'نقدي وآجل';
+    const pt = paymentTypeMap[payment_type] || 'كلاهما';
 
     const item = await prisma.suppliers.create({
       data: { name: name.trim(), payment_type: pt, phone: phone || null, notes: notes || null },

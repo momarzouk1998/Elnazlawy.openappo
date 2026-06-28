@@ -49,14 +49,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم المقاول مطلوب' } }, { status: 400 });
     }
 
-    const contractorTypeMap: Record<string, string> = {
-      general: 'أخرى',
-      aluminum: 'ألوميتال',
-      upholstery: 'تنجيد',
-      transport: 'نقل',
-    };
     const item = await prisma.contractors.create({
-      data: { name: name.trim(), type: contractorTypeMap[type] || type || 'أخرى', phone: phone || null, notes: notes || null },
+      data: { name: name.trim(), type: type || 'أخرى', phone: phone || null, notes: notes || null },
     });
 
     auditLog({ user_id: user.id, action: 'create', table_name: 'contractors', row_id: item.id, after: item as any });
