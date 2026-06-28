@@ -35,10 +35,10 @@ export default async function DashboardPage() {
   const inventoryValue = (boards ?? []).reduce((s, b) => s + (b.unit_price * b.quantity_remaining), 0)
                        + (accessories ?? []).reduce((s, a) => s + (a.unit_price * a.quantity_remaining), 0);
 
-  const openOrders = (orders ?? []).filter(o => o.status === "open" || o.status === "in_progress").length;
+  const openOrders = (orders ?? []).filter(o => o.status === "مفتوح" || o.status === "قيد التنفيذ").length;
   const monthStart = new Date(); monthStart.setDate(1);
   const completedThisMonth = (orders ?? []).filter(o =>
-    (o.status === "completed" || o.status === "delivered") &&
+    (o.status === "مكتمل" || o.status === "تم التسليم") &&
     new Date(o.created_at) >= monthStart
   ).length;
 
@@ -65,11 +65,11 @@ export default async function DashboardPage() {
   }
 
   // Status pie
-  const statusCounts: Record<string, number> = { open: 0, in_progress: 0, completed: 0, delivered: 0 };
+  const statusCounts: Record<string, number> = {};
   for (const o of (orders ?? [])) statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
   const statusData: { name: string; value: number }[] = Object.entries(statusCounts)
     .filter(([_, v]) => v > 0)
-    .map(([k, v]) => ({ name: STATUS_LABELS[k] ?? k, value: v }));
+    .map(([k, v]) => ({ name: k, value: v }));
 
   const recentJournal = (journal ?? []).slice(0, 5) as any[];
 
