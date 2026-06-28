@@ -131,12 +131,12 @@ export default function OrderDetailPage() {
         <>
           <h3 className="font-bold text-lg mt-6 mb-3">🔨 أعمال خارجية (تتبع فقط)</h3>
           <DataTable
-            rows={external}
+            rows={external as any[]}
             emptyMessage="—"
             columns={[
-              { key: "type", label: "النوع", render: r => r.work_type },
-              { key: "contractor", label: "المقاول", render: r => r.mazaya_contractors?.name ?? "-" },
-              { key: "amount", label: "القيمة", render: r => formatCurrency(r.amount) },
+              { key: "type", label: "النوع", render: (r: any) => r.work_type },
+              { key: "contractor", label: "المقاول", render: (r: any) => r.mazaya_contractors?.name ?? "-" },
+              { key: "amount", label: "القيمة", render: (r: any) => formatCurrency(r.amount) },
               { key: "notes", label: "ملاحظات" },
             ]}
           />
@@ -153,14 +153,14 @@ export default function OrderDetailPage() {
             <div className="card"><div className="text-xs text-gray-500">الفرق</div><div className={`font-bold text-lg ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>{formatCurrency(balance)}</div></div>
           </div>
           <DataTable
-            rows={transfers}
+            rows={transfers as any[]}
             emptyMessage="لا توجد تحويلات"
             columns={[
-              { key: "entry_date", label: "التاريخ", render: r => formatDate(r.entry_date) },
+              { key: "entry_date", label: "التاريخ", render: (r: any) => formatDate(r.entry_date) },
               { key: "description", label: "البيان" },
               { key: "entry_type", label: "النوع" },
               { key: "payment_method", label: "الطريقة" },
-              { key: "amount", label: "المبلغ", render: r => <span className="font-bold">{formatCurrency(r.amount)}</span> },
+              { key: "amount", label: "المبلغ", render: (r: any) => <span className="font-bold">{formatCurrency(r.amount)}</span> },
             ]}
           />
         </>
