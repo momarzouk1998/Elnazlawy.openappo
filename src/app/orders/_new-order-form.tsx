@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
+import { useApiMutation } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -16,18 +18,47 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
   const router = useRouter();
   const params = useParams<{ id?: string }>();
   const editingId = existingOrderId ?? (params?.id ? Number(params.id) : undefined);
+  const { user: profile } = useUserStore();
 
-  const [profile, setProfile] = useState<any>(null);
   const [tab, setTab] = useState<Tab>("info");
-  const [saving, setSaving] = useState(false);
+  const { mutate, loading: saving } = useApiMutation();
   const [error, setError] = useState<string | null>(null);
 
   // Refs
-  const [branches, setBranches] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [allOrders, setAllOrders] = useState<any[]>([]);
-  const [contractors, setContractors] = useState<any[]>([]);
+  const { data: branchesData } = useApi<{ items: any[] }>('/api/branches?limit=500');
+  const { data: customersData } = useApi<{ items: any[] }>('/api/customers?limit=500');
+  const { data: allOrdersData } = useApi<{ items: any[] }>('/api/orders?limit=200');
+  const { data: contractorsData } = useApi<{ items: any[] }>('/api/contractors?limit=500');
+  const { data: boardsData } = useApi<{ items: any[] }>('/api/boards?limit=500');
+  const { data: accessoriesData } = useApi<{ items: any[] }>('/api/accessories?limit=500');
+
+  const branches: any[] = (branchesData as any)?.items ?? branchesData ?? [];
+  const customers: any[] = (customersData as any)?.items ?? customersData ?? [];
+  const allOrders: any[] = (allOrdersData as any)?.items ?? allOrdersData ?? [];
+  const contractors: any[] = (contractorsData as any)?.items ?? contractorsData ?? [];
+  const boardsRaw: any[] = (boardsData as any)?.items ?? boardsData ?? [];
+  const accessoriesRaw: any[] = (accessoriesData as any)?.items ?? accessoriesData ?? [];
+
+  // External work types — fetched once
   const [externalWorkTypes, setExternalWorkTypes] = useState<string[]>([]);
+  const [weekOverhead, setWeekOverhead] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (loaded) return;
+    setLoaded(true);
+    (async () => {
+      const [mtRes, ovRes] = await Promise.all([
+        fetch('/api/material-types?list_key=external_work_type').then(r => r.json()),
+        fetch('/api/overhead?limit=500').then(r => r.json()),
+      ]);
+      setExternalWorkTypes((mtRes?.data?.items ?? mtRes?.data ?? []).map((m: any) => m.value));
+      const ovItems = ovRes?.data?.items ?? ovRes?.data ?? [];
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      setWeekOverhead(ovItems.filter((x: any) => x.date >= weekAgo).reduce((s: number, x: any) => s + x.amount, 0));
+    })();
+  }, [loaded]);
+
   const [orderTypes] = useState([{ value: "new", label: "تصنيع جديد" }, { value: "maintenance", label: "صيانة" }]);
   const [statuses] = useState([
     { value: "open", label: "مفتوح" },
@@ -50,7 +81,12 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
   });
 
   // Materials
-  const [items, setItems] = useState<Item[]>([]);
+  const items: Item[] = useMemo(() => [
+    ...(boardsRaw.map((b: any) => ({ id: b.id, name: b.item_name, code: b.code, remaining: b.quantity_remaining ?? 0, price: b.unit_price, category: "board" as const }))),
+    ...(accessoriesRaw.map((a: any) => ({ id: a.id, name: a.item_name, code: a.code, remaining: a.quantity_remaining ?? 0, price: a.unit_price, category: "accessory" as const }))),
+  ], [boardsRaw, accessoriesRaw]);
+
+  const [items2, setItems2] = useState<Item[]>([]);
   const [searchItem, setSearchItem] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "board" | "accessory">("all");
   const [usedItems, setUsedItems] = useState<{ id: number; category: "board" | "accessory"; quantity: number; unit_price: number; name: string }[]>([]);
@@ -67,74 +103,47 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
   // External work
   const [externalWorks, setExternalWorks] = useState<{ id?: number; work_type: string; contractor_id: string; amount: number; notes: string }[]>([]);
 
-  // Overhead hint (sum of last 7 days)
-  const [weekOverhead, setWeekOverhead] = useState(0);
-
+  // Load editing data
   useEffect(() => {
+    if (!editingId) return;
     (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-
-      const [{ data: b }, { data: c }, { data: o }, { data: ct }, { data: ml }, { data: ov }] = await Promise.all([
-        supabase.from("mazaya_branches").select("*").order("name"),
-        supabase.from("mazaya_customers").select("*").order("name"),
-        supabase.from("mazaya_orders").select("id, order_name").order("id", { ascending: false }).limit(200),
-        supabase.from("mazaya_contractors").select("*").order("name"),
-        supabase.from("mazaya_lookup_lists").select("value").eq("list_key", "external_work_type").eq("is_active", true).order("sort_order"),
-        supabase.from("mazaya_overhead_expenses").select("amount, expense_date").gte("expense_date", new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)),
+      const [ordRes, matsRes, cstRes, extRes] = await Promise.all([
+        fetch(`/api/orders/${editingId}`).then(r => r.json()),
+        fetch(`/api/orders/${editingId}/materials`).then(r => r.json()),
+        fetch(`/api/orders/${editingId}`).then(r => r.json()),
+        fetch(`/api/orders/${editingId}/external-work`).then(r => r.json()),
       ]);
-      setBranches(b ?? []); setCustomers(c ?? []); setAllOrders(o ?? []); setContractors(ct ?? []);
-      setExternalWorkTypes((ml ?? []).map(m => m.value));
-      setWeekOverhead((ov ?? []).reduce((s, x) => s + x.amount, 0));
-
-      // Items: boards + accessories
-      const [{ data: bb }, { data: aa }] = await Promise.all([
-        supabase.from("mazaya_boards_inventory").select("id, item_name, code, quantity_remaining, unit_price"),
-        supabase.from("mazaya_accessories_inventory").select("id, item_name, code, quantity_remaining, unit_price"),
-      ]);
-      const merged: Item[] = [
-        ...((bb ?? []).map(b => ({ id: b.id, name: b.item_name, code: b.code, remaining: b.quantity_remaining, price: b.unit_price, category: "board" as const }))),
-        ...((aa ?? []).map(a => ({ id: a.id, name: a.item_name, code: a.code, remaining: a.quantity_remaining, price: a.unit_price, category: "accessory" as const }))),
-      ];
-      setItems(merged);
-
-      // Editing?
-      if (editingId) {
-        const { data: ord } = await supabase.from("mazaya_orders").select("*").eq("id", editingId).single();
-        if (ord) setOrder({
-          order_name: ord.order_name, customer_id: String(ord.customer_id ?? ""),
-          branch_id: String(ord.branch_id ?? ""), order_type: ord.order_type,
-          parent_order_id: String(ord.parent_order_id ?? ""),
-          start_date: ord.start_date ?? "", end_date: ord.end_date ?? "",
-          status: ord.status, notes: ord.notes ?? "",
-        });
-        const { data: mats } = await supabase.from("mazaya_order_materials").select("*").eq("order_id", editingId);
-        setUsedItems((mats ?? []).map(m => ({
-          id: m.board_id ?? m.accessory_id,
-          category: m.board_id ? "board" : "accessory",
-          quantity: m.quantity_used,
-          unit_price: m.unit_price_snapshot,
-          name: merged.find(x => x.id === (m.board_id ?? m.accessory_id))?.name ?? "-",
-        })));
-        const { data: cst } = await supabase.from("mazaya_order_costs").select("*").eq("order_id", editingId).maybeSingle();
-        if (cst) setCosts({
-          installation_cost: cst.installation_cost || 0,
-          installation_travel_days: cst.installation_travel_days || 0,
-          internal_transport_cost: cst.internal_transport_cost || 0,
-          external_transport_cost: cst.external_transport_cost || 0,
-          factory_commission: cst.factory_commission || 0,
-        });
-        const { data: ext } = await supabase.from("mazaya_order_external_work").select("*").eq("order_id", editingId);
-        setExternalWorks((ext ?? []).map(e => ({
-          id: e.id, work_type: e.work_type ?? "", contractor_id: String(e.contractor_id ?? ""),
-          amount: e.amount || 0, notes: e.notes ?? "",
-        })));
-      }
+      const ord = ordRes?.data;
+      if (ord) setOrder({
+        order_name: ord.order_name, customer_id: String(ord.customer_id ?? ""),
+        branch_id: String(ord.branch_id ?? ""), order_type: ord.order_type,
+        parent_order_id: String(ord.parent_order_id ?? ""),
+        start_date: ord.start_date ?? "", end_date: ord.end_date ?? "",
+        status: ord.status, notes: ord.notes ?? "",
+      });
+      const mats = matsRes?.data ?? [];
+      setUsedItems((mats).map((m: any) => ({
+        id: m.item_id ?? m.board_id ?? m.accessory_id,
+        category: m.inventory_table === 'accessories_inventory' ? "accessory" : "board",
+        quantity: m.quantity_used,
+        unit_price: m.unit_price_snapshot,
+        name: m.item_name ?? "-",
+      })));
+      const cst = cstRes?.data?.costs;
+      if (cst) setCosts({
+        installation_cost: cst.installation_cost || 0,
+        installation_travel_days: cst.installation_travel_days || 0,
+        internal_transport_cost: cst.internal_transport_cost || 0,
+        external_transport_cost: cst.external_transport_cost || 0,
+        factory_commission: cst.factory_commission || 0,
+      });
+      const ext = extRes?.data ?? [];
+      setExternalWorks((ext).map((e: any) => ({
+        id: e.id, work_type: e.work_type ?? "", contractor_id: String(e.contractor_id ?? ""),
+        amount: e.amount || 0, notes: e.notes ?? "",
+      })));
     })();
-  }, [editingId, router]);
+  }, [editingId]);
 
   // Customer → auto-fill branch
   function setCustomer(id: string) {
@@ -169,8 +178,7 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
   async function onSubmit() {
     setError(null);
     if (!order.order_name.trim()) { setError("اسم الأوردر مطلوب"); setTab("info"); return; }
-    setSaving(true);
-    const supabase = createClient();
+
     const payload: any = {
       order_name: order.order_name,
       customer_id: order.customer_id ? Number(order.customer_id) : null,
@@ -185,35 +193,34 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
 
     let orderId: number;
     if (editingId) {
-      const { error } = await supabase.from("mazaya_orders").update(payload).eq("id", editingId);
-      if (error) { setError(error.message); setSaving(false); return; }
+      const { error: err } = await mutate('PUT', `/api/orders/${editingId}`, payload);
+      if (err) { setError(err); return; }
       orderId = editingId;
-      // reset materials (triggers will restore inventory)
-      await supabase.from("mazaya_order_materials").delete().eq("order_id", orderId);
+      await fetch(`/api/orders/${orderId}/materials`, { method: 'DELETE' });
     } else {
-      const { data, error } = await supabase.from("mazaya_orders").insert([payload]).select("id").single();
-      if (error || !data) { setError(error?.message ?? "خطأ في الحفظ"); setSaving(false); return; }
-      orderId = data.id;
+      const { error: err, data: newOrder } = await mutate('POST', '/api/orders', payload);
+      if (err) { setError(err); return; }
+      orderId = newOrder?.id;
+      if (!orderId) { setError("خطأ في الحفظ"); return; }
     }
 
     // Materials
     if (usedItems.length > 0) {
       const mats = usedItems.map(u => ({
         order_id: orderId,
-        board_id: u.category === "board" ? u.id : null,
-        accessory_id: u.category === "accessory" ? u.id : null,
+        inventory_table: u.category === "board" ? 'boards_inventory' : 'accessories_inventory',
+        item_id: u.id,
         quantity_used: u.quantity,
         unit_price_snapshot: u.unit_price,
       }));
-      const { error: mErr } = await supabase.from("mazaya_order_materials").insert(mats);
-      if (mErr) { setError("خطأ في المواد: " + mErr.message); setSaving(false); return; }
+      await mutate('POST', `/api/orders/${orderId}/materials`, mats);
     }
 
     // Costs (upsert)
-    await supabase.from("mazaya_order_costs").upsert([{ order_id: orderId, ...costs }], { onConflict: "order_id" });
+    await mutate('PUT', `/api/orders/${orderId}`, { costs });
 
-    // External works (replace all)
-    if (editingId) await supabase.from("mazaya_order_external_work").delete().eq("order_id", orderId);
+    // External works
+    if (editingId) await fetch(`/api/orders/${orderId}/external-work`, { method: 'DELETE' });
     if (externalWorks.length > 0) {
       const ext = externalWorks.filter(e => e.work_type && e.contractor_id).map(e => ({
         order_id: orderId,
@@ -222,10 +229,9 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
         amount: e.amount,
         notes: e.notes || null,
       }));
-      if (ext.length > 0) await supabase.from("mazaya_order_external_work").insert(ext);
+      await mutate('POST', `/api/orders/${orderId}/external-work`, ext);
     }
 
-    setSaving(false);
     router.push(`/orders/${orderId}`);
     router.refresh();
   }
@@ -266,15 +272,15 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
           <Input label="اسم الأوردر *" value={order.order_name} onChange={e => setOrder({ ...order, order_name: e.target.value })} placeholder="مثال: أوضة نوم محمد" required />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select label="العميل" value={order.customer_id} onChange={e => setCustomer(e.target.value)}
-              options={[{ value: "", label: "— بدون عميل —" }, ...customers.map(c => ({ value: c.id, label: c.name }))]} />
+              options={[{ value: "", label: "— بدون عميل —" }, ...customers.map(c => ({ value: String(c.id), label: c.name }))]} />
             <Select label="المعرض" value={order.branch_id} onChange={e => setOrder({ ...order, branch_id: e.target.value })}
-              options={[{ value: "", label: "— اختر —" }, ...branches.map(b => ({ value: b.id, label: b.name }))]} />
+              options={[{ value: "", label: "— اختر —" }, ...branches.map(b => ({ value: String(b.id), label: b.name }))]} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select label="نوع الأوردر" value={order.order_type} onChange={e => setOrder({ ...order, order_type: e.target.value })} options={orderTypes} />
             {order.order_type === "maintenance" && (
               <Select label="الأوردر الأصلي" value={order.parent_order_id} onChange={e => setOrder({ ...order, parent_order_id: e.target.value })}
-                options={[{ value: "", label: "— اختر —" }, ...allOrders.map(o => ({ value: o.id, label: o.order_name }))]} />
+                options={[{ value: "", label: "— اختر —" }, ...allOrders.map(o => ({ value: String(o.id), label: o.order_name }))]} />
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -416,7 +422,7 @@ export default function NewOrderForm({ existingOrderId }: { existingOrderId?: nu
                     <label className="text-xs text-gray-500">المقاول</label>
                     <select value={e.contractor_id} onChange={ev => setExternalWorks(s => s.map((x, j) => j === i ? { ...x, contractor_id: ev.target.value } : x))} className="w-full px-2 py-1.5 border rounded text-sm">
                       <option value="">— اختر —</option>
-                      {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {contractors.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="md:col-span-2">

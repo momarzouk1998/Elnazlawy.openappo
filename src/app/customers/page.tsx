@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -20,38 +21,28 @@ const customerFields: FieldDef[] = [
 
 export default function CustomersPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading } = useApi<{ items: any[] }>('/api/customers?limit=500');
+  const { data: branchesData } = useApi<{ items: any[] }>('/api/branches?limit=500');
+  const { data: ordersData } = useApi<{ items: any[] }>('/api/orders?limit=500');
+  const rows = data?.items ?? [];
+  const branches = branchesData?.items ?? [];
+  const orders = ordersData?.items ?? [];
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      if (!prof.visible_modules.includes("customers")) { router.push("/dashboard"); return; }
-      setProfile(prof);
-      const [{ data: c }, { data: b }, { data: o }] = await Promise.all([
-        supabase.from("mazaya_customers").select("*, mazaya_branches(name)").order("name"),
-        supabase.from("mazaya_branches").select("id, name").order("name"),
-        supabase.from("mazaya_orders").select("id, customer_id"),
-      ]);
-      const counts: Record<number, number> = {};
-      (o ?? []).forEach((x: any) => { if (x.customer_id) counts[x.customer_id] = (counts[x.customer_id] || 0) + 1; });
-      setBranches(b ?? []);
-      setRows((c ?? []).map((x: any) => ({ ...x, branch_name: x.mazaya_branches?.name, orders_count: counts[x.id] || 0 })));
-      setLoading(false);
-    })();
-  }, [router]);
+  const ordersCountMap = useMemo(() => {
+    const m: Record<number, number> = {};
+    (orders).forEach((o: any) => { if (o.customer_id) m[o.customer_id] = (m[o.customer_id] || 0) + 1; });
+    return m;
+  }, [orders]);
 
-  const filtered = useMemo(() => rows.filter(c =>
+  const enriched = useMemo(() => (rows).map((x: any) => ({ ...x, branch_name: x.branch_name ?? "", orders_count: ordersCountMap[x.id] || 0 })), [rows, ordersCountMap]);
+
+  const filtered = useMemo(() => enriched.filter(c =>
     (!search || c.name.toLowerCase().includes(search.toLowerCase()) || (c.phone ?? "").includes(search)) &&
     (!branchFilter || String(c.branch_id) === branchFilter)
-  ), [rows, search, branchFilter]);
+  ), [enriched, search, branchFilter]);
 
   if (!profile) return null;
 
@@ -74,7 +65,7 @@ export default function CustomersPage() {
           <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث بالاسم أو رقم الهاتف..." /></div>
           <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white">
             <option value="">كل المعارض</option>
-            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            {branches.map(b => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
           </select>
           <div className="text-sm text-gray-500 mr-auto">النتائج: <strong>{filtered.length}</strong></div>
         </FilterBar>
@@ -90,7 +81,7 @@ export default function CustomersPage() {
           { key: "phone", label: "رقم التواصل" },
           { key: "orders_count", label: "عدد الأوردرات" },
           { key: "address", label: "العنوان" },
-          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_customers" fields={customerFields} entityLabel="العميل" deleteHint="لا يمكن حذف هذا العميل لوجود أوردرات أو سجلات يومية مرتبطة به" /> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/customers" fields={customerFields} entityLabel="العميل" deleteHint="لا يمكن حذف هذا العميل لوجود أوردرات أو سجلات يومية مرتبطة به" /> },
         ]}
       />
     </DashboardLayout>

@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi, useApiMutation } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -11,39 +12,26 @@ import { Select } from "@/components/ui/Input";
 
 export default function MaterialTypesPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading, refetch } = useApi<{ items: any[] }>('/api/material-types?limit=500');
+  const { mutate } = useApiMutation();
+  const rows = data?.items ?? [];
   const [filter, setFilter] = useState<string>("all");
-  const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState({ list_key: "board_material", value: "" });
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return router.push("/login");
-    const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-    setProfile(prof);
-    const { data } = await supabase.from("mazaya_lookup_lists").select("*").order("list_key").order("sort_order");
-    setRows(data ?? []); setLoading(false);
-  }
 
   async function addItem() {
     if (!newItem.value.trim()) return;
     setSaving(true);
-    const supabase = createClient();
-    await supabase.from("mazaya_lookup_lists").insert([{ ...newItem, is_active: true, sort_order: 99 }]);
+    await mutate('POST', '/api/material-types', { ...newItem, is_active: true, sort_order: 99 });
     setNewItem({ ...newItem, value: "" });
-    await load();
+    await refetch();
     setSaving(false);
   }
 
   async function toggleActive(r: any) {
-    const supabase = createClient();
-    await supabase.from("mazaya_lookup_lists").update({ is_active: !r.is_active }).eq("id", r.id);
-    load();
+    await mutate('PATCH', '/api/material-types/' + r.id, { is_active: !r.is_active });
+    refetch();
   }
 
   const filtered = filter === "all" ? rows : rows.filter(r => r.list_key === filter);

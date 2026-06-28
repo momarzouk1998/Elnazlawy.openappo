@@ -1,14 +1,13 @@
 "use client";
-// CellActions: combines Edit/Delete buttons + inline modal for editing any row.
+// RowEditor: combines Edit/Delete buttons + inline modal for editing any row.
 // Usage:
 //   <RowEditor
 //     row={row}
-//     table="mazaya_suppliers"
+//     apiBase="/api/suppliers"
 //     fields={[{ name: "name", label: "الاسم", required: true }, ...]}
 //     onChanged={() => load()}
 //   />
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "./Button";
 import { Input, Select, Textarea } from "./Input";
 
@@ -18,18 +17,18 @@ export type FieldDef =
 
 interface Props {
   row: any;
-  table: string;
+  apiBase: string;
   fields: FieldDef[];
   entityLabel?: string;
   onChanged?: () => void;
   refreshPage?: boolean;
   confirmDelete?: (row: any) => string | null; // return null to skip confirmation
-  deleteHint?: string; // تظهر لو الـ delete فشل (مثل: مرتبط ببيانات تانية)
+  deleteHint?: string;
   extraButtons?: React.ReactNode;
 }
 
 export default function RowEditor({
-  row, table, fields, entityLabel = "السجل", onChanged,
+  row, apiBase, fields, entityLabel = "السجل", onChanged,
   refreshPage = true, confirmDelete, deleteHint,
   extraButtons,
 }: Props) {
@@ -61,7 +60,6 @@ export default function RowEditor({
     setError(null);
     setSaving(true);
     try {
-      const supabase = createClient();
       const payload: any = {};
       fields.forEach(f => {
         const v = form[f.name];
@@ -70,8 +68,13 @@ export default function RowEditor({
         else if (v === "" || v == null) payload[f.name] = null;
         else payload[f.name] = v;
       });
-      const { error } = await supabase.from(table).update(payload).eq("id", row.id);
-      if (error) throw new Error(error.message);
+      const res = await fetch(`${apiBase}/${row.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error?.message || `HTTP ${res.status}`);
       setOpen(false);
       refresh();
     } catch (e: any) {
@@ -83,15 +86,15 @@ export default function RowEditor({
 
   async function remove() {
     const msg = confirmDelete ? confirmDelete(row) : `هل تريد حذف ${entityLabel} "${row.name ?? row.item_name ?? row.username ?? row.id}"؟\nلا يمكن التراجع عن هذا الإجراء.`;
-    if (msg === null) return; // skip confirmation
+    if (msg === null) return;
     if (msg !== "OK" && !confirm(msg)) return;
     setDeleting(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from(table).delete().eq("id", row.id);
-      if (error) {
-        if (deleteHint) alert(`${deleteHint}\n\nالتفاصيل: ${error.message}`);
-        else alert("❌ " + error.message);
+      const res = await fetch(`${apiBase}/${row.id}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (deleteHint) alert(`${deleteHint}\n\nالتفاصيل: ${json?.error?.message || res.status}`);
+        else alert("❌ " + (json?.error?.message || "خطأ في الحذف"));
         return;
       }
       refresh();

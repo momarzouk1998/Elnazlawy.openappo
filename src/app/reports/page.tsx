@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { useUserStore } from "@/store/user-store";
+import { useApiMutation } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -11,78 +11,58 @@ import { formatCurrency } from "@/lib/format";
 type ReportType = "inventory" | "orders" | "cashflow" | "suppliers" | "overhead";
 
 export default function ReportsPage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { user: profile } = useUserStore();
   const [type, setType] = useState<ReportType>("inventory");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-    })();
-  }, [router]);
+  const { mutate } = useApiMutation();
 
   async function generate() {
     setLoading(true);
-    const supabase = createClient();
     let result: any[] = [];
     if (type === "inventory") {
       const [{ data: b }, { data: a }] = await Promise.all([
-        supabase.from("mazaya_boards_inventory").select("*, mazaya_suppliers(name)"),
-        supabase.from("mazaya_accessories_inventory").select("*, mazaya_suppliers(name)"),
+        mutate('GET', '/api/boards?limit=500'),
+        mutate('GET', '/api/accessories?limit=500'),
       ]);
+      const boards = b?.items ?? b ?? [];
+      const accessories = a?.items ?? a ?? [];
       result = [
-        ...((b ?? []).map((x: any) => ({ الفئة: "لوح", الاسم: x.item_name, الكود: x.code, المورد: x.mazaya_suppliers?.name ?? "", "سعر الوحدة": x.unit_price, الداخل: x.quantity_in, المستخدم: x.quantity_used, المتبقي: x.quantity_remaining, "قيمة المتبقي": x.unit_price * x.quantity_remaining }))),
-        ...((a ?? []).map((x: any) => ({ الفئة: "اكسسوار", الاسم: x.item_name, الكود: x.code, المورد: x.mazaya_suppliers?.name ?? "", "سعر الوحدة": x.unit_price, الداخل: x.quantity_in, المستخدم: x.quantity_used, المتبقي: x.quantity_remaining, "قيمة المتبقي": x.unit_price * x.quantity_remaining }))),
+        ...((boards).map((x: any) => ({ الفئة: "لوح", الاسم: x.item_name, الكود: x.code, المورد: x.supplier_name ?? "", "سعر الوحدة": x.unit_price, الداخل: x.quantity_in, المستخدم: x.quantity_used ?? 0, المتبقي: x.quantity_remaining ?? 0, "قيمة المتبقي": x.unit_price * (x.quantity_remaining ?? 0) }))),
+        ...((accessories).map((x: any) => ({ الفئة: "اكسسوار", الاسم: x.item_name, الكود: x.code, المورد: x.supplier_name ?? "", "سعر الوحدة": x.unit_price, الداخل: x.quantity_in, المستخدم: x.quantity_used ?? 0, المتبقي: x.quantity_remaining ?? 0, "قيمة المتبقي": x.unit_price * (x.quantity_remaining ?? 0) }))),
       ];
     } else if (type === "orders") {
-      let q = supabase.from("mazaya_orders").select("*, mazaya_customers(name), mazaya_branches(name), mazaya_order_costs(*)").order("start_date", { ascending: false });
-      if (fromDate) q = q.gte("start_date", fromDate);
-      if (toDate) q = q.lte("start_date", toDate);
-      const { data: o } = await q;
-      result = (o ?? []).map((x: any) => ({
-        "اسم الأوردر": x.order_name, العميل: x.mazaya_customers?.name ?? "", المعرض: x.mazaya_branches?.name ?? "",
+      const { data: o } = await mutate('GET', `/api/orders?limit=500${fromDate ? '&from_date=' + fromDate : ''}${toDate ? '&to_date=' + toDate : ''}`);
+      const orders = o?.items ?? o ?? [];
+      result = (orders).map((x: any) => ({
+        "اسم الأوردر": x.order_name, العميل: x.customer_name ?? "", المعرض: x.branch_name ?? "",
         الحالة: x.status, "تاريخ البدء": x.start_date, "تاريخ الانتهاء": x.end_date, المدة: x.duration_days,
-        "تكلفة ألواح": x.mazaya_order_costs?.[0]?.boards_cost ?? 0,
-        "تكلفة اكسسوارات": x.mazaya_order_costs?.[0]?.accessories_cost ?? 0,
-        تركيبات: x.mazaya_order_costs?.[0]?.installation_cost ?? 0,
-        "نقل داخلي": x.mazaya_order_costs?.[0]?.internal_transport_cost ?? 0,
-        "نقل خارجي": x.mazaya_order_costs?.[0]?.external_transport_cost ?? 0,
-        "عمولة المصنع": x.mazaya_order_costs?.[0]?.factory_commission ?? 0,
-        الإجمالي: x.mazaya_order_costs?.[0]?.order_total ?? 0,
+        الإجمالي: x.total ?? 0,
       }));
     } else if (type === "cashflow") {
-      let q = supabase.from("mazaya_journal_entries").select("*, mazaya_suppliers(name), mazaya_branches(name)").order("entry_date", { ascending: false });
-      if (fromDate) q = q.gte("entry_date", fromDate);
-      if (toDate) q = q.lte("entry_date", toDate);
-      const { data: j } = await q;
-      result = (j ?? []).map((x: any) => ({
-        التاريخ: x.entry_date, النوع: x.entry_type, البيان: x.description,
-        "طريقة الدفع": x.payment_method, المورد: x.mazaya_suppliers?.name ?? "",
-        المعرض: x.mazaya_branches?.name ?? "", تمريري: x.is_passthrough ? "نعم" : "لا",
+      const { data: j } = await mutate('GET', `/api/journal?limit=500${fromDate ? '&from_date=' + fromDate : ''}${toDate ? '&to_date=' + toDate : ''}`);
+      const entries = j?.entries ?? j ?? [];
+      result = (entries).map((x: any) => ({
+        التاريخ: x.date, النوع: x.entry_type, البيان: x.description,
+        "طريقة الدفع": x.payment_method,
         المبلغ: x.amount,
       }));
     } else if (type === "suppliers") {
       const [{ data: s }, { data: p }] = await Promise.all([
-        supabase.from("mazaya_suppliers").select("*"),
-        supabase.from("mazaya_journal_entries").select("supplier_id, amount").eq("entry_type", "purchase"),
+        mutate('GET', '/api/suppliers?limit=500'),
+        mutate('GET', '/api/journal?limit=500&entry_type=purchase'),
       ]);
+      const suppliers = s?.items ?? s ?? [];
+      const purchases = p?.entries ?? p ?? [];
       const totals: Record<number, number> = {};
-      (p ?? []).forEach((x: any) => { if (x.supplier_id) totals[x.supplier_id] = (totals[x.supplier_id] || 0) + x.amount; });
-      result = (s ?? []).map((x: any) => ({ الاسم: x.name, "نوع التعامل": x.payment_type, الهاتف: x.phone ?? "", "إجمالي المشتريات": totals[x.id] || 0 }));
+      (purchases).forEach((x: any) => { if (x.party_id) totals[x.party_id] = (totals[x.party_id] || 0) + x.amount; });
+      result = (suppliers).map((x: any) => ({ الاسم: x.name, "نوع التعامل": x.payment_type, الهاتف: x.phone ?? "", "إجمالي المشتريات": totals[x.id] || 0 }));
     } else if (type === "overhead") {
-      let q = supabase.from("mazaya_overhead_expenses").select("*").order("expense_date", { ascending: false });
-      if (fromDate) q = q.gte("expense_date", fromDate);
-      if (toDate) q = q.lte("expense_date", toDate);
-      const { data: o } = await q;
-      result = (o ?? []).map((x: any) => ({ التاريخ: x.expense_date, البيان: x.description, المبلغ: x.amount, ملاحظات: x.notes ?? "" }));
+      const { data: o } = await mutate('GET', `/api/overhead?limit=500${fromDate ? '&from_date=' + fromDate : ''}${toDate ? '&to_date=' + toDate : ''}`);
+      const items = o?.items ?? o ?? [];
+      result = (items).map((x: any) => ({ التاريخ: x.date, البيان: x.description, المبلغ: x.amount, ملاحظات: x.notes ?? "" }));
     }
     setData(result);
     setLoading(false);

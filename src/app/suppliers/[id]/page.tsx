@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useParams } from "next/navigation";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -10,41 +9,24 @@ import { formatCurrency, formatDate, PAYMENT_METHOD_LABELS } from "@/lib/format"
 
 export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [supplier, setSupplier] = useState<any>(null);
-  const [boards, setBoards] = useState<any[]>([]);
-  const [accessories, setAccessories] = useState<any[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useUserStore();
+  const { data: supplier, loading } = useApi<any>(`/api/suppliers/${id}`);
+  const { data: boardsData } = useApi<{ items: any[] }>('/api/boards?limit=500&supplier_id=' + id);
+  const { data: accData } = useApi<{ items: any[] }>('/api/accessories?limit=500&supplier_id=' + id);
+  const { data: journalData } = useApi<{ entries: any[] }>('/api/journal?limit=500&party_type=supplier&party_id=' + id);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
+  const boards = boardsData?.items?.filter((b: any) => b.supplier_id === parseInt(id)) || [];
+  const accessories = accData?.items?.filter((a: any) => a.supplier_id === parseInt(id)) || [];
+  const purchases = journalData?.entries || [];
 
-      const [{ data: s }, { data: b }, { data: a }, { data: j }] = await Promise.all([
-        supabase.from("mazaya_suppliers").select("*").eq("id", id).single(),
-        supabase.from("mazaya_boards_inventory").select("*").eq("supplier_id", id).order("item_name"),
-        supabase.from("mazaya_accessories_inventory").select("*").eq("supplier_id", id).order("item_name"),
-        supabase.from("mazaya_journal_entries").select("*").eq("supplier_id", id).eq("entry_type", "expense").order("entry_date", { ascending: false }),
-      ]);
-      setSupplier(s); setBoards(b ?? []); setAccessories(a ?? []); setPurchases(j ?? []);
-      setLoading(false);
-    })();
-  }, [id, router]);
+  if (!user) return null;
+  if (!supplier && !loading) return <DashboardLayout profile={user}><div className="card">المورد غير موجود</div></DashboardLayout>;
 
-  if (!profile) return null;
-  if (!supplier && !loading) return <DashboardLayout profile={profile}><div className="card">المورد غير موجود</div></DashboardLayout>;
-
-  const totalPurchases = purchases.reduce((s, p) => s + p.amount, 0);
-  const totalItemsValue = [...boards, ...accessories].reduce((s, it) => s + (it.unit_price * it.quantity_remaining), 0);
+  const totalPurchases = purchases.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0);
+  const totalItemsValue = [...boards, ...accessories].reduce((s: number, it: any) => s + (it.unit_price * it.quantity_remaining), 0);
 
   return (
-    <DashboardLayout profile={profile}>
+    <DashboardLayout profile={user}>
       <PageHeader
         title={supplier?.name ?? "..."}
         subtitle={`${boards.length + accessories.length} صنف • ${PAYMENT_METHOD_LABELS[supplier?.payment_type ?? "both"]}`}
@@ -78,7 +60,7 @@ export default function SupplierDetailPage() {
           { key: "item_name", label: "الاسم" },
           { key: "code", label: "الكود" },
           { key: "material_type", label: "النوع" },
-          { key: "unit_price", label: "السعر", render: r => formatCurrency(r.unit_price) },
+          { key: "unit_price", label: "السعر", render: (r: any) => formatCurrency(r.unit_price) },
           { key: "quantity_remaining", label: "المتبقي" },
         ]}
       />
@@ -90,8 +72,8 @@ export default function SupplierDetailPage() {
         columns={[
           { key: "item_name", label: "الاسم" },
           { key: "code", label: "الكود" },
-          { key: "type", label: "النوع" },
-          { key: "unit_price", label: "السعر", render: r => formatCurrency(r.unit_price) },
+          { key: "material_type", label: "النوع" },
+          { key: "unit_price", label: "السعر", render: (r: any) => formatCurrency(r.unit_price) },
           { key: "quantity_remaining", label: "المتبقي" },
         ]}
       />
@@ -101,9 +83,9 @@ export default function SupplierDetailPage() {
         rows={purchases}
         emptyMessage="لا توجد مدفوعات"
         columns={[
-          { key: "entry_date", label: "التاريخ", render: r => formatDate(r.entry_date) },
+          { key: "date", label: "التاريخ", render: (r: any) => formatDate(r.date) },
           { key: "description", label: "البيان" },
-          { key: "amount", label: "المبلغ", render: r => <span className="font-bold text-red-600">{formatCurrency(r.amount)}</span> },
+          { key: "amount", label: "المبلغ", render: (r: any) => <span className="font-bold text-red-600">{formatCurrency(r.amount)}</span> },
         ]}
       />
     </DashboardLayout>

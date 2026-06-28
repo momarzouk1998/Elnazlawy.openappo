@@ -1,50 +1,123 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db/pool';
-import { hashPassword, COOKIE_NAME, verifySession } from '@/lib/db/auth';
+import { requireAdmin, hasPermission } from '@/lib/auth-server';
+import prisma from '@/lib/db/prisma';
+import { hashPassword } from '@/lib/db/auth';
+import { auditLog } from '@/lib/audit';
+
+export async function GET(request: Request) {
+  try {
+    const admin = await requireAdmin();
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const search = searchParams.get('search') || '';
+    const role = searchParams.get('role') || '';
+
+    const offset = (page - 1) * limit;
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { username: { contains: search, mode: 'insensitive' } },
+        { full_name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (role) {
+      where.role = role;
+    }
+
+    const total = await prisma.users.count({ where });
+
+    const users = await prisma.users.findMany({
+      where,
+      select: { id: true, username: true, full_name: true, role: true, branch_id: true, visible_modules: true, permissions: true, is_active: true, last_login_at: true, created_at: true },
+      orderBy: { created_at: 'desc' },
+      skip: offset,
+      take: limit,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        users,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      },
+    });
+  } catch (e: any) {
+    if (e.status === 401) {
+      return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'غير مسجل الدخول' } }, { status: 401 });
+    }
+    if (e.status === 403) {
+      return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'غير مصرح' } }, { status: 403 });
+    }
+    console.error('List users error:', e);
+    return NextResponse.json(
+      { ok: false, error: { code: 'INTERNAL_ERROR', message: e?.message || 'حدث خطأ' } },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: Request) {
   try {
-    const cookieHeader = request.headers.get('cookie') || '';
-    const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
-    if (!match) {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    const admin = await requireAdmin();
+
+    const { username, full_name, password, role, branch_id, visible_modules, permissions } = await request.json();
+
+    if (!username || !full_name || !password) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم المستخدم والاسم الكامل وكلمة المرور مطلوبون' } },
+        { status: 400 }
+      );
     }
 
-    const payload = await verifySession(match[1]);
-    if (!payload) {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    if (password.length < 6) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'VALIDATION_ERROR', message: 'كلمة المرور لازم 6 حروف على الأقل' } },
+        { status: 400 }
+      );
     }
 
-    const adminCheck = await query('SELECT role FROM mazaya.users WHERE id = $1', [payload.userId]);
-    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 403 });
-    }
-
-    const { email, password, name, role } = await request.json();
-    if (!email || !password || !name) {
-      return NextResponse.json({ error: 'البريد الإلكتروني وكلمة المرور والاسم مطلوبون' }, { status: 400 });
-    }
-
-    const existing = await query('SELECT id FROM mazaya.users WHERE email = $1', [email]);
-    if (existing.rows.length > 0) {
-      return NextResponse.json({ error: 'User already registered' }, { status: 409 });
+    // Check username uniqueness
+    const existing = await prisma.users.findFirst({ where: { username }, select: { id: true } });
+    if (existing) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'CONFLICT', message: 'اسم المستخدم مستخدم بالفعل' } },
+        { status: 409 }
+      );
     }
 
     const passwordHash = await hashPassword(password);
-    const r = await query(
-      'INSERT INTO mazaya.users (email, password_hash, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
-      [email, passwordHash, name, role || 'admin']
-    );
-    const userId = r.rows[0].id;
+    const validRoles = ['admin', 'branch_user'];
+    const userRole = validRoles.includes(role) ? role : 'branch_user';
 
-    await query(
-      'INSERT INTO mazaya.admin_permissions (user_id) VALUES ($1) ON CONFLICT DO NOTHING',
-      [userId]
-    );
+    const newUser = await prisma.users.create({
+      data: {
+        username,
+        full_name,
+        password_hash: passwordHash,
+        role: userRole,
+        branch_id: branch_id || null,
+        visible_modules: visible_modules || ['dashboard', 'orders'],
+        permissions: permissions || {},
+      },
+      select: { id: true, username: true, full_name: true, role: true, branch_id: true, is_active: true, created_at: true },
+    });
+    auditLog({ user_id: admin.id, action: 'create', table_name: 'users', row_id: newUser.id, after: newUser });
 
-    return NextResponse.json({ success: true, user: { id: userId, email } });
-  } catch (err: any) {
-    console.error('Create user error:', err);
-    return NextResponse.json({ error: err.message || 'حدث خطأ في الخادم' }, { status: 500 });
+    return NextResponse.json({ ok: true, data: newUser }, { status: 201 });
+  } catch (e: any) {
+    if (e.status === 401) {
+      return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'غير مسجل الدخول' } }, { status: 401 });
+    }
+    if (e.status === 403) {
+      return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'غير مصرح' } }, { status: 403 });
+    }
+    console.error('Create user error:', e);
+    return NextResponse.json(
+      { ok: false, error: { code: 'INTERNAL_ERROR', message: e?.message || 'حدث خطأ' } },
+      { status: 500 }
+    );
   }
 }

@@ -1,36 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { useUserStore } from "@/store/user-store";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatDate } from "@/lib/format";
 
-interface SessionInfo {
-  email: string;
-  created_at: string;
-  last_sign_in_at: string | null;
-  phone: string;
-}
-
-interface ProfileData {
-  username: string;
-  email_or_phone: string;
-  role: "admin" | "branch_user";
-  branch_name: string | null;
-  visible_modules: string[];
-  is_active: boolean;
-  notes: string | null;
-  created_at: string;
-}
-
 export default function ProfilePage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<CurrentProfile | null>(null);
-  const [authInfo, setAuthInfo] = useState<SessionInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useUserStore();
 
   // password change form
   const [currentPw, setCurrentPw] = useState("");
@@ -40,32 +18,10 @@ export default function ProfilePage() {
   const [changing, setChanging] = useState(false);
   const [pwMessage, setPwMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-
-      setAuthInfo({
-        email: user.email ?? "",
-        created_at: user.created_at ?? "",
-        last_sign_in_at: user.last_sign_in_at ?? null,
-        phone: user.phone ?? "",
-      });
-
-      // جلب الـ profile من جدول mazaya_users عبر الـ API
-      const r = await fetch("/api/auth/whoami");
-      const j = await r.json();
-      if (j.profile) setProfile(j.profile);
-      setLoading(false);
-    })();
-  }, [router]);
-
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
     setPwMessage(null);
 
-    // Client-side validation
     if (!currentPw || !newPw || !confirmPw) {
       setPwMessage({ type: "error", text: "❌ كل الحقول مطلوبة" });
       return;
@@ -92,7 +48,7 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setPwMessage({ type: "error", text: `❌ ${data.error}` });
+        setPwMessage({ type: "error", text: `❌ ${data?.error?.message || data?.error || "خطأ"}` });
         return;
       }
       setPwMessage({ type: "success", text: "✅ تم تغيير كلمة السر بنجاح! السجل هيفضل مفتوح." });
@@ -104,17 +60,15 @@ export default function ProfilePage() {
     }
   }
 
-  if (!profile || !authInfo) {
-    return loading ? null : (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">جاري التحميل...</div>
-    );
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center text-gray-500">جاري التحميل...</div>;
   }
 
-  const roleLabel = profile.role === "admin" ? "مدير المصنع" : "موظف";
-  const roleColor = profile.role === "admin" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800";
+  const roleLabel = user.role === "admin" ? "مدير المصنع" : "موظف";
+  const roleColor = user.role === "admin" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800";
 
   return (
-    <DashboardLayout profile={profile}>
+    <DashboardLayout profile={user}>
       <PageHeader
         title="الملف الشخصي"
         subtitle="إدارة بيانات حسابك وكلمة المرور"
@@ -128,16 +82,13 @@ export default function ProfilePage() {
         <div className="card">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-orange to-brand-orange-dark flex items-center justify-center text-white text-2xl font-extrabold shadow-md">
-              {profile.username.charAt(0).toUpperCase()}
+              {user.username.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="font-bold text-xl text-brand-black">{profile.username}</h2>
+              <h2 className="font-bold text-xl text-brand-black">{user.full_name || user.username}</h2>
               <div className="mt-1 flex items-center gap-2">
                 <span className={`badge ${roleColor}`}>{roleLabel}</span>
-                {profile.branch_name && (
-                  <span className="badge bg-gray-100 text-gray-700">🏪 {profile.branch_name}</span>
-                )}
-                {!profile.is_active && (
+                {!user.is_active && (
                   <span className="badge bg-red-100 text-red-800">🔒 معطل</span>
                 )}
               </div>
@@ -146,16 +97,13 @@ export default function ProfilePage() {
 
           <h3 className="font-bold text-sm text-gray-700 mb-3 border-b pb-2">معلومات الحساب</h3>
           <div className="space-y-2.5 text-sm">
-            <Row label="اسم المستخدم" value={profile.username} />
-            <Row label="البريد الإلكتروني" value={profile.email_or_phone} />
-            <Row label="تاريخ إنشاء الحساب" value={formatDate(profile.created_at)} />
-            <Row label="آخر تسجيل دخول" value={authInfo.last_sign_in_at ? formatDate(authInfo.last_sign_in_at) : "—"} />
-            <Row label="ملاحظات" value={profile.notes || "—"} />
+            <Row label="اسم المستخدم" value={user.username} />
+            <Row label="الاسم الكامل" value={user.full_name || "—"} />
             <div>
               <span className="text-gray-500">الصفحات المرئية:</span>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {profile.visible_modules.length > 0 ? (
-                  profile.visible_modules.map(m => (
+                {user.visible_modules.length > 0 ? (
+                  user.visible_modules.map(m => (
                     <span key={m} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md">
                       ✓ {moduleLabel(m)}
                     </span>
@@ -263,13 +211,13 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Recent activity */}
+      {/* Additional info */}
       <div className="card mt-6 max-w-5xl">
         <h3 className="font-bold mb-3">📊 معلومات إضافية</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-          <Mini label="آخر دخول" value={authInfo.last_sign_in_at ? formatDate(authInfo.last_sign_in_at) : "—"} icon="🕒" />
-          <Mini label="عدد الصفحات المرئية" value={profile.visible_modules.length} icon="📋" />
-          <Mini label="معرّف المستخدم" value={`#${profile.id}`} icon="🆔" />
+          <Mini label="عدد الصفحات المرئية" value={user.visible_modules.length} icon="📋" />
+          <Mini label="نوع الحساب" value={user.role === "admin" ? "مدير" : "موظف"} icon="👤" />
+          <Mini label="معرّف المستخدم" value={`#${user.id}`} icon="🆔" />
         </div>
       </div>
     </DashboardLayout>
@@ -347,19 +295,4 @@ function moduleLabel(key: string): string {
     material_types: "قوائم الاختيارات",
   };
   return labels[key] ?? key;
-}
-
-// Re-declare CurrentProfile type (imported from auth.ts server-safe via client route)
-interface CurrentProfile {
-  id: number;
-  auth_id: string;
-  username: string;
-  email_or_phone: string;
-  role: "admin" | "branch_user";
-  branch_id: number | null;
-  branch_name?: string | null;
-  visible_modules: string[];
-  is_active: boolean;
-  notes: string | null;
-  created_at: string;
 }

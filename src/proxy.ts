@@ -1,36 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { COOKIE_NAME, verifySession } from '@/lib/db/auth';
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next();
-  const sessionCookie = request.cookies.get(COOKIE_NAME)?.value;
-
-  let userId: number | null = null;
-  if (sessionCookie) {
-    const payload = await verifySession(sessionCookie);
-    if (payload) userId = payload.userId;
-  }
-
   const { pathname } = request.nextUrl;
-  const publicPaths = ['/login', '/register', '/auth', '/api/auth'];
-  const isPublicPath = publicPaths.some((p) => pathname.startsWith(p));
 
-  if (isPublicPath) {
-    if (userId) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+  // Public paths — no auth needed
+  const publicPaths = ['/login', '/register'];
+  if (publicPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+    // If already logged in, redirect to dashboard
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    if (token) {
+      const payload = await verifySession(token);
+      if (payload) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
     }
-    return response;
+    return NextResponse.next();
   }
 
-  if (!userId) {
+  // Allow API auth routes (login, logout, etc.) + static files
+  if (
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/health') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/icons') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/sw.js' ||
+    pathname === '/manifest.json' ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Check session for all other routes
+  const token = request.cookies.get(COOKIE_NAME)?.value;
+  if (!token) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  return response;
+  const payload = await verifySession(token);
+  if (!payload) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };

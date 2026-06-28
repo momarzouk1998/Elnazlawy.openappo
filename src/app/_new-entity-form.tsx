@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -18,36 +18,30 @@ interface Props {
 
 export default function NewEntityForm({ title, backHref, table, fields, successRedirect, defaultValues = {} }: Props) {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { user: profile } = useUserStore();
   const [form, setForm] = useState<Record<string, any>>(
     Object.fromEntries(fields.map(f => [f.name, defaultValues[f.name] ?? ""]))
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-    })();
-  });
-
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true); setError(null);
-    const supabase = createClient();
     const payload: any = {};
     fields.forEach(f => {
       const v = form[f.name];
       if (v === "" || v == null) { if (!f.required) payload[f.name] = null; }
       else payload[f.name] = f.type === "number" ? Number(v) : v;
     });
-    const { error } = await supabase.from(table).insert([payload]);
+    const res = await fetch(`/api/${table.replace('mazaya_', '')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json();
     setSaving(false);
-    if (error) { setError(error.message); return; }
+    if (!res.ok) { setError(result?.error?.message || 'حدث خطأ'); return; }
     router.push(successRedirect || backHref);
     router.refresh();
   }

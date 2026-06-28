@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -20,39 +20,27 @@ const branchFields: FieldDef[] = [
 ];
 
 export default function BranchesPage() {
-  const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading } = useApi<{ items: any[] }>('/api/branches?limit=500');
+  const { data: customersData } = useApi<{ items: any[] }>('/api/customers?limit=500');
+  const { data: ordersData } = useApi<{ items: any[] }>('/api/orders?limit=500');
+  const { data: journalData } = useApi<{ items: any[] }>('/api/journal?limit=500');
+  const rows = data?.items ?? [];
+  const customers = customersData?.items ?? [];
+  const orders = ordersData?.items ?? [];
+  const journal = journalData?.items ?? [];
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      if (!prof.visible_modules.includes("branches")) { router.push("/dashboard"); return; }
-      setProfile(prof);
+  const enriched = useMemo(() => rows.map((br: any) => {
+    const customersCount = customers.filter((c: any) => c.branch_id === br.id).length;
+    const ordersCount = orders.filter((o: any) => o.branch_id === br.id).length;
+    const totalIncome = journal.filter((x: any) => x.branch_id === br.id && !x.is_passthrough).reduce((s: number, x: any) => s + x.amount, 0);
+    return { ...br, customers_count: customersCount, orders_count: ordersCount, total_income: totalIncome };
+  }), [rows, customers, orders, journal]);
 
-      const [{ data: b }, { data: cust }, { data: orders }, { data: j }] = await Promise.all([
-        supabase.from("mazaya_branches").select("*").order("name"),
-        supabase.from("mazaya_customers").select("id, branch_id"),
-        supabase.from("mazaya_orders").select("branch_id, status"),
-        supabase.from("mazaya_journal_entries").select("branch_id, amount, entry_type, is_passthrough").eq("entry_type", "income"),
-      ]);
-      const enriched = (b ?? []).map((br: any) => {
-        const customers = (cust ?? []).filter((c: any) => c.branch_id === br.id).length;
-        const ordersCount = (orders ?? []).filter((o: any) => o.branch_id === br.id).length;
-        const totalIncome = (j ?? []).filter((x: any) => x.branch_id === br.id && !x.is_passthrough).reduce((s: number, x: any) => s + x.amount, 0);
-        return { ...br, customers_count: customers, orders_count: ordersCount, total_income: totalIncome };
-      });
-      setRows(enriched);
-      setLoading(false);
-    })();
-  }, [router]);
-
-  const filtered = useMemo(() => rows.filter(b => !search || b.name.toLowerCase().includes(search.toLowerCase()) || (b.location ?? "").toLowerCase().includes(search.toLowerCase())), [rows, search]);
+  const filtered = useMemo(() => enriched.filter(b =>
+    !search || b.name.toLowerCase().includes(search.toLowerCase()) || (b.location ?? "").toLowerCase().includes(search.toLowerCase())
+  ), [enriched, search]);
 
   if (!profile) return null;
 
@@ -84,7 +72,7 @@ export default function BranchesPage() {
           { key: "customers_count", label: "عدد العملاء" },
           { key: "orders_count", label: "عدد الأوردرات" },
           { key: "total_income", label: "إجمالي التحويلات", render: r => <span className="font-bold text-green-600">{formatCurrency(r.total_income)}</span> },
-          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_branches" fields={branchFields} entityLabel="المعرض" deleteHint="لا يمكن حذف هذا المعرض لوجود عملاء أو أوردرات أو تحويلات مرتبطة به" /> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/branches" fields={branchFields} entityLabel="المعرض" deleteHint="لا يمكن حذف هذا المعرض لوجود عملاء أو أوردرات أو تحويلات مرتبطة به" /> },
         ]}
       />
     </DashboardLayout>

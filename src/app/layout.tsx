@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { UserInitializer } from "@/components/UserInitializer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen">
+        <UserInitializer />
         {children}
         <script dangerouslySetInnerHTML={{__html:`
           if ('serviceWorker' in navigator) {

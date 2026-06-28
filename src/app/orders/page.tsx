@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -20,9 +21,11 @@ interface Order {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<Order[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading } = useApi<{ items: any[] }>('/api/orders?limit=500');
+  const { data: branchesData } = useApi<{ items: any[] }>('/api/branches?limit=500');
+  const rows = data?.items ?? [];
+  const branches = branchesData?.items ?? [];
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -31,32 +34,6 @@ export default function OrdersPage() {
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-      setBranches([]); // populated below
-      const [{ data: b }, { data: o }] = await Promise.all([
-        supabase.from("mazaya_branches").select("*").order("name"),
-        supabase.from("mazaya_orders").select("*, mazaya_customers(name), mazaya_branches(name), mazaya_order_costs(order_total)").order("start_date", { ascending: false }),
-      ]);
-      setBranches(b ?? []);
-      const enriched: Order[] = (o ?? []).map((x: any) => ({
-        id: x.id, order_name: x.order_name, status: x.status, order_type: x.order_type,
-        customer_id: x.customer_id, branch_id: x.branch_id,
-        start_date: x.start_date, end_date: x.end_date, duration_days: x.duration_days,
-        total: x.mazaya_order_costs?.[0]?.order_total || 0,
-        customer_name: x.mazaya_customers?.name, branch_name: x.mazaya_branches?.name,
-      }));
-      setRows(enriched);
-      setLoading(false);
-    })();
-  }, [router]);
 
   const filtered = useMemo(() => {
     return rows.filter(o => {

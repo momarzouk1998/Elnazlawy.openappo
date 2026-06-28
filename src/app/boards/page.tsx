@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -31,37 +32,18 @@ interface Board {
 
 export default function BoardsPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<Board[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
-  const [materialTypes, setMaterialTypes] = useState<string[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading } = useApi<{ items: any[] }>('/api/boards?limit=500');
+  const { data: suppliersData } = useApi<{ items: any[] }>('/api/suppliers?limit=500');
+  const rows = data?.items ?? [];
+  const suppliers = suppliersData?.items ?? [];
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [materialFilter, setMaterialFilter] = useState("");
   const [availableOnly, setAvailableOnly] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      if (!prof.visible_modules.includes("boards_inventory")) { router.push("/dashboard"); return; }
-      setProfile(prof);
-
-      const [{ data: b }, { data: s }, { data: ml }] = await Promise.all([
-        supabase.from("mazaya_boards_inventory").select("*, mazaya_suppliers(name)").order("id", { ascending: false }),
-        supabase.from("mazaya_suppliers").select("id, name").order("name"),
-        supabase.from("mazaya_lookup_lists").select("value").eq("list_key", "board_material").eq("is_active", true).order("sort_order"),
-      ]);
-      setSuppliers(s ?? []);
-      setMaterialTypes((ml ?? []).map(m => m.value));
-      setRows((b ?? []).map((x: any) => ({ ...x, supplier_name: x.mazaya_suppliers?.name })));
-      setLoading(false);
-    })();
-  }, [router]);
+  const materialTypes = useMemo(() => [...new Set(rows.map(r => r.material_type).filter(Boolean))], [rows]);
 
   const filtered = useMemo(() => rows.filter(b => {
     const matchSearch = !search || b.item_name.toLowerCase().includes(search.toLowerCase()) || b.code.toLowerCase().includes(search.toLowerCase());
@@ -76,7 +58,6 @@ export default function BoardsPage() {
     setImporting(true);
     try {
       const data = await importFromExcel<any>(file);
-      const supabase = createClient();
       let ok = 0, fail = 0;
       for (const r of data) {
         const supplierName = String(r["الشركة"] || r["المورد"] || "").trim();
@@ -91,8 +72,12 @@ export default function BoardsPage() {
           notes: String(r["ملاحظات"] || r["notes"] || "").trim() || null,
         };
         if (!payload.item_name || !payload.code) { fail++; continue; }
-        const { error } = await supabase.from("mazaya_boards_inventory").insert([payload]);
-        if (error) fail++; else ok++;
+        const res = await fetch('/api/boards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) ok++; else fail++;
       }
       alert(`تم استيراد ${ok} صنف بنجاح${fail ? `، فشل ${fail}` : ""}`);
       location.reload();
@@ -152,7 +137,7 @@ export default function BoardsPage() {
           { key: "quantity_used", label: "المستخدم" },
           { key: "quantity_remaining", label: "المتبقي", render: r => <span className={r.quantity_remaining > 0 ? "font-bold text-green-600" : "text-gray-400"}>{r.quantity_remaining}</span> },
           { key: "total_price", label: "الإجمالي", render: r => <span className="font-bold">{formatCurrency(r.total_price)}</span> },
-          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_boards_inventory" fields={boardFields} entityLabel="اللوح" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" /> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/boards" fields={boardFields} entityLabel="اللوح" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" /> },
         ]}
       />
     </DashboardLayout>

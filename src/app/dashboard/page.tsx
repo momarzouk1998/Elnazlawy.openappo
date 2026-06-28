@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
-import { getCurrentProfile } from "@/lib/auth-server";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth-server";
+import prisma from "@/lib/db/prisma";
 import { formatCurrency, formatNumber, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, STATUS_LABELS, STATUS_COLORS } from "@/lib/format";
 import Link from "next/link";
 import { WeeklyBarChart, StatusPieChart } from "@/components/DashboardCharts";
@@ -10,26 +10,24 @@ import { WeeklyBarChart, StatusPieChart } from "@/components/DashboardCharts";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const profile = await getCurrentProfile();
+  const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
-  const supabase = await createClient();
-
-  // Fetch metrics — مع error handling لكل query لو في مشكلة في الجدول
-  const safeQuery = async <T,>(p: any): Promise<{ data: T[]; error: string | null }> => {
+  const safeFetch = async <T,>(p: Promise<T[]>): Promise<{ data: T[]; error: string | null }> => {
     try {
-      const r = await p;
-      return { data: (r.data ?? []) as T[], error: r.error?.message ?? null };
+      const data = await p;
+      return { data, error: null };
     } catch (e: any) {
-      return { data: [] as T[], error: e?.message ?? String(e) };
+      return { data: [], error: e?.message ?? String(e) };
     }
   };
+
   const [boardsR, accessoriesR, ordersR, journalR, suppliersR] = await Promise.all([
-    safeQuery<any>(supabase.from("mazaya_boards_inventory").select("unit_price, quantity_remaining")),
-    safeQuery<any>(supabase.from("mazaya_accessories_inventory").select("unit_price, quantity_remaining")),
-    safeQuery<any>(supabase.from("mazaya_orders").select("status, created_at")),
-    safeQuery<any>(supabase.from("mazaya_journal_entries").select("entry_type, amount, date, is_pass_through").order("date", { ascending: false }).limit(200)),
-    safeQuery<any>(supabase.from("mazaya_suppliers").select("id")),
+    safeFetch<any>(prisma.$queryRaw<any[]>`SELECT unit_price, quantity_remaining FROM mazaya.boards_inventory WHERE deleted_at IS NULL`),
+    safeFetch<any>(prisma.$queryRaw<any[]>`SELECT unit_price, quantity_remaining FROM mazaya.accessories_inventory WHERE deleted_at IS NULL`),
+    safeFetch<any>(prisma.orders.findMany({ where: { deleted_at: null }, select: { status: true, created_at: true } })),
+    safeFetch<any>(prisma.journal_entries.findMany({ orderBy: { date: 'desc' }, take: 200, select: { entry_type: true, amount: true, date: true } })),
+    safeFetch<any>(prisma.suppliers.findMany({ where: { deleted_at: null }, select: { id: true } })),
   ]);
   const boards = boardsR.data, accessories = accessoriesR.data, orders = ordersR.data, journal = journalR.data, suppliers = suppliersR.data;
   const queryErrors = [boardsR, accessoriesR, ordersR, journalR, suppliersR].filter(r => r.error).map(r => r.error);
@@ -44,9 +42,9 @@ export default async function DashboardPage() {
     new Date(o.created_at) >= monthStart
   ).length;
 
-  // Balance
-  const income = (journal ?? []).filter((j: any) => j.entry_type === "income" && !j.is_pass_through).reduce((s: number, j: any) => s + j.amount, 0);
-  const spent = (journal ?? []).filter((j: any) => j.entry_type === "expense" || j.entry_type === "purchase" || j.entry_type === "overhead").reduce((s: number, j: any) => s + j.amount, 0);
+  // Balance — new entry_type names: income→incoming_from_branch, expense→outgoing_to_supplier
+  const income = (journal ?? []).filter((j: any) => j.entry_type === "incoming_from_branch").reduce((s: number, j: any) => s + j.amount, 0);
+  const spent = (journal ?? []).filter((j: any) => j.entry_type === "outgoing_to_supplier" || j.entry_type === "purchase" || j.entry_type === "overhead").reduce((s: number, j: any) => s + j.amount, 0);
   const balance = income - spent;
 
   // Weekly chart (last 7 days)
@@ -60,8 +58,8 @@ export default async function DashboardPage() {
   for (const j of (journal ?? []) as any[]) {
     const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '');
     if (weekly[k]) {
-      if (j.entry_type === "income" && !j.is_pass_through) weekly[k].income += j.amount;
-      if (["expense", "purchase", "overhead"].includes(j.entry_type)) weekly[k].expense += j.amount;
+      if (j.entry_type === "incoming_from_branch") weekly[k].income += j.amount;
+      if (["outgoing_to_supplier", "purchase", "overhead"].includes(j.entry_type)) weekly[k].expense += j.amount;
       weekly[k].net = weekly[k].income - weekly[k].expense;
     }
   }
@@ -78,7 +76,7 @@ export default async function DashboardPage() {
   return (
     <DashboardLayout profile={profile}>
       <PageHeader
-        title={`أهلاً ${profile.username} 👋`}
+        title={`أهلاً ${profile.full_name ?? profile.username} 👋`}
         subtitle="نظرة سريعة على المصنع اليوم"
         helpTitle="لوحة التحكم"
         helpDescription="من هنا تقدر تشوف ملخص شامل لكل حاجة: قيمة المخزون، الأوردرات المفتوحة، الرصيد الحالي، وأحدث الحركات المالية. اضغط على أي بطاقة للتفاصيل."
@@ -176,7 +174,7 @@ export default async function DashboardPage() {
                   <span className="text-sm text-gray-700 truncate">{j.description}</span>
                 </div>
                 <div className="text-left flex-shrink-0">
-                  <div className={`font-bold ${j.entry_type === "income" ? "text-green-600" : "text-red-600"}`}>
+                  <div className={`font-bold ${j.entry_type === "incoming_from_branch" ? "text-green-600" : "text-red-600"}`}>
                     {formatCurrency(j.amount)}
                   </div>
                   <div className="text-xs text-gray-400">{j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '')}</div>

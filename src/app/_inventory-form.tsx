@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi, useApiMutation } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Input, Select, Textarea } from "@/components/ui/Input";
@@ -12,7 +13,7 @@ interface Props { category: "boards" | "accessories"; }
 
 export default function NewInventoryForm({ category }: Props) {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { user: profile } = useUserStore();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [form, setForm] = useState({
@@ -23,19 +24,14 @@ export default function NewInventoryForm({ category }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-      const { data: s } = await supabase.from("mazaya_suppliers").select("id, name").order("name");
-      setSuppliers(s ?? []);
-      const listKey = category === "boards" ? "board_material" : "accessory_type";
-      const { data: ml } = await supabase.from("mazaya_lookup_lists").select("value").eq("list_key", listKey).eq("is_active", true).order("sort_order");
-      setTypes((ml ?? []).map((m: any) => m.value));
-    })();
-  });
+    fetch('/api/suppliers?limit=500').then(r => r.json()).then(d => {
+      if (d.ok) setSuppliers(d.data.items ?? []);
+    });
+    const listKey = category === "boards" ? "board_material" : "accessory_type";
+    fetch(`/api/material-types?list_key=${listKey}`).then(r => r.json()).then(d => {
+      if (d.ok) setTypes((d.data.items ?? []).map((m: any) => m.value));
+    });
+  }, [category]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,8 +40,6 @@ export default function NewInventoryForm({ category }: Props) {
       setError("املأ الحقول المطلوبة"); return;
     }
     setSaving(true);
-    const supabase = createClient();
-    const table = category === "boards" ? "mazaya_boards_inventory" : "mazaya_accessories_inventory";
     const payload: any = {
       item_name: form.item_name, code: form.code,
       supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
@@ -55,9 +49,15 @@ export default function NewInventoryForm({ category }: Props) {
     if (category === "boards") payload.material_type = form.type || null;
     else payload.type = form.type || null;
 
-    const { error } = await supabase.from(table).insert([payload]);
+    const apiPath = category === "boards" ? "/api/boards" : "/api/accessories";
+    const res = await fetch(apiPath, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json();
     setSaving(false);
-    if (error) { setError(error.message); return; }
+    if (!res.ok) { setError(result?.error?.message || 'حدث خطأ'); return; }
     router.push(`/${category}`);
     router.refresh();
   }

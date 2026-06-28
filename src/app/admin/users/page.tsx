@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -16,30 +17,20 @@ interface UserRow {
 
 export default function UsersPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const { user: profile } = useUserStore();
+  const { data: usersData, loading, refetch } = useApi<{ items: any[] }>('/api/admin/users?limit=500');
+  const { data: branchesData } = useApi<{ items: any[] }>('/api/branches?limit=500');
   const [users, setUsers] = useState<UserRow[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
 
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return router.push("/login");
-    const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-    if (prof.role !== "admin") { router.push("/dashboard"); return; }
-    setProfile(prof);
-    const [{ data: u }, { data: b }] = await Promise.all([
-      supabase.from("mazaya_users").select("*, mazaya_branches(name)").order("username"),
-      supabase.from("mazaya_branches").select("*").order("name"),
-    ]);
-    setUsers((u ?? []).map((x: any) => ({ ...x, branch_name: x.mazaya_branches?.name })));
-    setBranches(b ?? []);
-    setLoading(false);
-  }
+  useEffect(() => {
+    if (usersData?.items) setUsers(usersData.items as UserRow[]);
+  }, [usersData]);
+  useEffect(() => {
+    if (branchesData?.items) setBranches(branchesData.items);
+  }, [branchesData]);
 
   async function toggleModule(u: UserRow, modKey: string) {
     const newMods = u.visible_modules.includes(modKey)
@@ -149,8 +140,8 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {showAdd && <AddUserModal branches={branches} onClose={() => setShowAdd(false)} onSuccess={() => { setShowAdd(false); load(); }} />}
-      {editing && <EditUserModal user={editing} branches={branches} onClose={() => setEditing(null)} onSuccess={() => { setEditing(null); load(); }} />}
+      {showAdd && <AddUserModal branches={branches} onClose={() => setShowAdd(false)} onSuccess={() => { setShowAdd(false); refetch(); }} />}
+      {editing && <EditUserModal user={editing} branches={branches} onClose={() => setEditing(null)} onSuccess={() => { setEditing(null); refetch(); }} />}
     </DashboardLayout>
   );
 }

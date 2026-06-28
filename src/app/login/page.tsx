@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { useApiMutation } from "@/hooks/useApi";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { mutate, loading } = useApiMutation();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,39 +25,23 @@ export default function LoginPage() {
       setError("من فضلك أدخل اسم المستخدم أو البريد/الهاتف وكلمة السر");
       return;
     }
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      // لو المُدخل مش email (مثلاً username أو phone) بنضيف @mazaya.local
-      const isEmail = identifier.includes("@");
-      const email = isEmail ? identifier : `${identifier}@mazaya.local`;
 
-      console.log("[login] attempting signInWithPassword for:", email);
-      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password });
-      console.log("[login] result:", { hasUser: !!data?.user, error: err?.message });
+    const { error: err } = await mutate('POST', '/api/auth/login', { username: identifier.trim(), password });
 
-      if (err) {
-        if (err.message.includes("Invalid login credentials")) {
-          setError("❌ البريد/الهاتف أو كلمة السر غير صحيحة");
-        } else {
-          setError(`❌ ${err.message}`);
-        }
-        return;
+    if (err) {
+      if (err.includes('Invalid') || err.includes('credentials') || err.includes('كلمة')) {
+        setError("❌ اسم المستخدم أو كلمة السر غير صحيحة");
+      } else {
+        setError(`❌ ${err}`);
       }
-      if (!data?.user) {
-        setError("❌ فشل تسجيل الدخول — لا توجد جلسة. حاول مرة أخرى.");
-        return;
-      }
-      if (remember) localStorage.setItem("mazaya_identifier", identifier);
-      else localStorage.removeItem("mazaya_identifier");
-      if (data?.user) localStorage.setItem("mazaya_user", JSON.stringify(data.user));
-      router.push("/dashboard");
-    } catch (e: any) {
-      console.error("[login] unexpected error:", e);
-      setError(`❌ خطأ غير متوقع: ${e?.message || "حاول مرة أخرى"}`);
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    if (remember) localStorage.setItem("mazaya_identifier", identifier);
+    else localStorage.removeItem("mazaya_identifier");
+
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
@@ -78,13 +62,13 @@ export default function LoginPage() {
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                اسم المستخدم أو البريد أو رقم الهاتف
+                اسم المستخدم
               </label>
               <input
                 type="text"
                 value={identifier}
                 onChange={e => setIdentifier(e.target.value)}
-                placeholder="admin أو email@example.com أو 0123456789"
+                placeholder="admin"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange/30 focus:border-brand-orange"
                 autoComplete="username"
                 required

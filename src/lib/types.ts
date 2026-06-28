@@ -68,11 +68,15 @@ export interface Accessory {
 export interface OrderMaterial {
   id: number;
   order_id: number;
-  board_id: number | null;
-  accessory_id: number | null;
+  inventory_table: 'boards_inventory' | 'accessories_inventory';
+  item_id: number;
   quantity_used: number;
   unit_price_snapshot: number;
   line_total: number;
+  // Joined fields (from API)
+  item_name?: string;
+  item_code?: string;
+  available_quantity?: number;
 }
 export interface OrderCost {
   id: number;
@@ -89,36 +93,41 @@ export interface OrderCost {
 export interface Contractor {
   id: number;
   name: string;
-  type: string | null;
+  specialty: string | null;
   phone: string | null;
   notes: string | null;
 }
 export interface OrderExternalWork {
   id: number;
   order_id: number;
-  work_type: string | null;
   contractor_id: number | null;
-  amount: number | null;
+  description: string | null;
+  cost: number | null;
   notes: string | null;
+  // Joined fields (from API)
+  contractor_name?: string;
 }
 export interface JournalEntry {
   id: number;
-  entry_date: string;
-  entry_type: "purchase" | "income" | "expense" | "transfer" | "overhead";
+  date: string;
+  entry_type: "purchase" | "incoming_from_branch" | "outgoing_to_supplier" | "transfer" | "overhead";
   description: string;
   amount: number;
   payment_method: string | null;
-  supplier_id: number | null;
-  branch_id: number | null;
-  contractor_id: number | null;
+  party_type: string | null;
+  party_id: number | null;
   order_id: number | null;
-  is_passthrough: boolean;
-  notes: string | null;
+  created_by: number | null;
+  // Joined fields (from API)
+  party_name?: string;
 }
 export interface OverheadExpense {
   id: number;
-  expense_date: string;
+  date: string;
+  category: string | null;
   description: string;
   amount: number;
+  payment_method: string | null;
+  journal_entry_id: number | null;
   notes: string | null;
 }

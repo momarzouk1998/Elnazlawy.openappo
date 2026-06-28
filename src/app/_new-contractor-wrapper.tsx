@@ -1,19 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useApi } from "@/hooks/useApi";
 import NewEntityForm from "@/app/_new-entity-form";
 
 export default function NewContractorWrapper() {
   const router = useRouter();
-  const [types, setTypes] = useState<{ value: string; label: string }[]>([]);
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: ml } = await supabase.from("mazaya_lookup_lists").select("value").eq("list_key", "external_work_type").eq("is_active", true).order("sort_order");
-      setTypes((ml ?? []).map((m: any) => ({ value: m.value, label: m.value })));
-    })();
-  }, [router]);
+  const { data: typesData } = useApi<{ items: any[] }>('/api/material-types?list_key=external_work_type');
+  const types = (typesData?.items ?? []).map((m: any) => ({ value: m.value, label: m.value }));
   return (
     <NewEntityForm
       title="مقاول خارجي جديد"

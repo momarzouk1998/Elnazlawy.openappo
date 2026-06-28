@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -12,7 +13,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
 
 const overheadFields: FieldDef[] = [
-  { name: "expense_date", label: "التاريخ", type: "date", required: true },
+  { name: "date", label: "التاريخ", type: "date", required: true },
   { name: "description", label: "البيان", required: true },
   { name: "amount", label: "المبلغ", type: "number", required: true },
   { name: "notes", label: "ملاحظات", rows: 2 },
@@ -20,33 +21,21 @@ const overheadFields: FieldDef[] = [
 
 export default function OverheadPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<any[]>([]);
+  const { user: profile } = useUserStore();
+  const { data, loading } = useApi<{ items: any[] }>('/api/overhead?limit=500');
+  const rows = data?.items ?? [];
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
-      const { data } = await supabase.from("mazaya_overhead_expenses").select("*").order("expense_date", { ascending: false });
-      setRows(data ?? []); setLoading(false);
-    })();
-  }, [router]);
 
   const filtered = useMemo(() => rows.filter(r =>
     (!search || r.description.toLowerCase().includes(search.toLowerCase())) &&
-    (!fromDate || r.expense_date >= fromDate) && (!toDate || r.expense_date <= toDate)
+    (!fromDate || r.date >= fromDate) && (!toDate || r.date <= toDate)
   ), [rows, search, fromDate, toDate]);
 
   const total = filtered.reduce((s, r) => s + r.amount, 0);
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekTotal = filtered.filter(r => new Date(r.expense_date) >= weekAgo).reduce((s, r) => s + r.amount, 0);
+  const weekTotal = filtered.filter(r => new Date(r.date) >= weekAgo).reduce((s, r) => s + r.amount, 0);
 
   if (!profile) return null;
 
@@ -90,11 +79,11 @@ export default function OverheadPage() {
         rows={filtered}
         emptyMessage="لا توجد نثريات"
         columns={[
-          { key: "expense_date", label: "التاريخ", render: r => formatDate(r.expense_date) },
+          { key: "date", label: "التاريخ", render: r => formatDate(r.date) },
           { key: "description", label: "البيان" },
           { key: "amount", label: "المبلغ", render: r => <span className="font-bold text-red-600">{formatCurrency(r.amount)}</span> },
           { key: "notes", label: "ملاحظات" },
-          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_overhead_expenses" fields={overheadFields} entityLabel="النثريات" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بحركة يومية" /> },
+          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/overhead" fields={overheadFields} entityLabel="النثريات" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بحركة يومية" /> },
         ]}
       />
     </DashboardLayout>

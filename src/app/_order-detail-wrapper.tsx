@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useUserStore } from "@/store/user-store";
+import { useApi, useApiMutation } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -13,44 +13,28 @@ import { canSeeModule } from "@/lib/auth";
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [order, setOrder] = useState<any>(null);
-  const [materials, setMaterials] = useState<any[]>([]);
-  const [costs, setCosts] = useState<any>(null);
-  const [external, setExternal] = useState<any[]>([]);
-  const [transfers, setTransfers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user: profile } = useUserStore();
+  const { mutate } = useApiMutation();
 
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      setProfile(prof);
+  const { data: order, loading, refetch: refetchOrder } = useApi<any>(`/api/orders/${id}`);
+  const { data: materialsData } = useApi<any[]>(`/api/orders/${id}/materials`);
+  const { data: costsData } = useApi<any>(`/api/orders/${id}/costs`);
+  const { data: externalData } = useApi<any[]>(`/api/orders/${id}/external-work`);
+  const { data: journalData } = useApi<any[]>(`/api/journal?order_id=${id}&limit=500`);
 
-      const [{ data: o }, { data: m }, { data: c }, { data: e }, { data: j }] = await Promise.all([
-        supabase.from("mazaya_orders").select("*, mazaya_customers(name, phone), mazaya_branches(name)").eq("id", id).single(),
-        supabase.from("mazaya_order_materials").select("*, mazaya_boards_inventory(item_name, code), mazaya_accessories_inventory(item_name, code)").eq("order_id", id),
-        supabase.from("mazaya_order_costs").select("*").eq("order_id", id).maybeSingle(),
-        supabase.from("mazaya_order_external_work").select("*, mazaya_contractors(name)").eq("order_id", id),
-        supabase.from("mazaya_journal_entries").select("*").eq("order_id", id).order("entry_date", { ascending: false }),
-      ]);
-      setOrder(o); setMaterials(m ?? []); setCosts(c); setExternal(e ?? []); setTransfers(j ?? []);
-      setLoading(false);
-    })();
-  }, [id, router]);
+  const materials = materialsData ?? [];
+  const costs = costsData;
+  const external = externalData ?? [];
+  const transfers = journalData ?? [];
 
   async function setStatus(status: string) {
-    const supabase = createClient();
-    await supabase.from("mazaya_orders").update({ status }).eq("id", id);
-    setOrder((o: any) => ({ ...o, status }));
+    await mutate('PATCH', `/api/orders/${id}`, { status });
+    await refetchOrder();
   }
 
   async function deleteOrder() {
     if (!confirm("هل أنت متأكد من حذف هذا الأوردر؟ سيتم إرجاع المواد المستخدمة للمخزون.")) return;
-    const supabase = createClient();
-    await supabase.from("mazaya_orders").delete().eq("id", id);
+    await mutate('DELETE', `/api/orders/${id}`);
     router.push("/orders");
     router.refresh();
   }

@@ -1,19 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useApi } from "@/hooks/useApi";
 import NewEntityForm from "@/app/_new-entity-form";
 
 export default function NewCustomerWrapper() {
   const router = useRouter();
-  const [branches, setBranches] = useState<{ value: string; label: string }[]>([]);
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: b } = await supabase.from("mazaya_branches").select("id, name").order("name");
-      setBranches((b ?? []).map(x => ({ value: String(x.id), label: x.name })));
-    })();
-  }, [router]);
+  const { data: branchesData } = useApi<{ items: any[] }>('/api/branches?limit=500');
+  const branches = (branchesData?.items ?? []).map((x: any) => ({ value: String(x.id), label: x.name }));
   return (
     <NewEntityForm
       title="عميل جديد"

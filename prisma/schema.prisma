@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["mazaya"]
+}
+
+model branches {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique @db.VarChar(200)
+  location   String?  @db.VarChar(300)
+  phone      String?  @db.VarChar(50)
+  notes      String?
+  created_at DateTime? @default(now()) @db.Timestamptz()
+  updated_at DateTime? @default(now()) @db.Timestamptz()
+  users      users[]
+  customers  customers[]
+  orders     orders[]
+
+  @@map("branches")
+  @@schema("mazaya")
+}
+
+model users {
+  id              Int      @id @default(autoincrement())
+  username        String   @unique @db.VarChar(100)
+  full_name       String   @db.VarChar(200)
+  password_hash   String   @db.VarChar(255)
+  role            String   @default("branch_user") @db.VarChar(20)
+  branch_id       Int?
+  visible_modules String[] @default([])
+  permissions     Json?    @default("{}")
+  is_active       Boolean  @default(true)
+  last_login_at   DateTime? @db.Timestamptz()
+  created_at      DateTime? @default(now()) @db.Timestamptz()
+  updated_at      DateTime? @default(now()) @db.Timestamptz()
+  branch          branches? @relation(fields: [branch_id], references: [id])
+  created_orders  orders[]  @relation("orders_created_by")
+  audit_logs      audit_log[]
+  journal_entries journal_entries[] @relation("journal_creator")
+  overhead_expenses overhead_expenses[] @relation("overhead_creator")
+
+  @@map("users")
+  @@schema("mazaya")
+}
+
+model suppliers {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(200)
+  payment_type String   @default("both") @db.VarChar(20)
+  phone        String?  @db.VarChar(50)
+  notes        String?
+  deleted_at   DateTime? @db.Timestamptz()
+  created_at   DateTime? @default(now()) @db.Timestamptz()
+  updated_at   DateTime? @default(now()) @db.Timestamptz()
+  boards       boards_inventory[]
+  accessories  accessories_inventory[]
+
+  @@map("suppliers")
+  @@schema("mazaya")
+}
+
+model customers {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(200)
+  branch_id  Int?
+  phone      String?  @db.VarChar(50)
+  address    String?
+  notes      String?
+  deleted_at DateTime? @db.Timestamptz()
+  created_at DateTime? @default(now()) @db.Timestamptz()
+  updated_at DateTime? @default(now()) @db.Timestamptz()
+  branch     branches? @relation(fields: [branch_id], references: [id])
+  orders     orders[]
+
+  @@map("customers")
+  @@schema("mazaya")
+}
+
+model orders {
+  id                      Int                    @id @default(autoincrement())
+  order_name              String                 @db.VarChar(200)
+  customer_id             Int?
+  branch_id               Int?
+  order_type              String                 @default("new") @db.VarChar(20)
+  parent_order_id         Int?
+  start_date              DateTime?              @db.Date
+  end_date                DateTime?              @db.Date
+  status                  String                 @default("open") @db.VarChar(20)
+  installation_cost       Decimal?               @default(0)
+  internal_transport_cost Decimal?               @default(0)
+  external_transport_cost Decimal?               @default(0)
+  factory_commission      Decimal?               @default(0)
+  notes                   String?
+  deleted_at              DateTime?              @db.Timestamptz()
+  created_by              Int?
+  created_at              DateTime?              @default(now()) @db.Timestamptz()
+  updated_at              DateTime?              @default(now()) @db.Timestamptz()
+  customer                customers?             @relation(fields: [customer_id], references: [id])
+  branch                  branches?              @relation(fields: [branch_id], references: [id])
+  parent_order            orders?                @relation("ParentOrder", fields: [parent_order_id], references: [id])
+  child_orders            orders[]               @relation("ParentOrder")
+  creator                 users?                 @relation("orders_created_by", fields: [created_by], references: [id])
+  materials               order_materials[]
+  external_work           order_external_work[]
+  journal_entries         journal_entries[]
+  linked_boards           boards_inventory[]     @relation("linked_boards")
+  linked_accessories      accessories_inventory[] @relation("linked_accessories")
+
+  @@map("orders")
+  @@schema("mazaya")
+}
+
+model boards_inventory {
+  id                 Int                @id @default(autoincrement())
+  item_name          String             @db.VarChar(300)
+  material_type      String?            @db.VarChar(100)
+  code               String             @db.VarChar(100)
+  supplier_id        Int?
+  unit_price         Decimal
+  quantity_in        Decimal            @default(0)
+  total_price        Decimal?           @ignore
+  date_added         DateTime?          @default(now()) @db.Date
+  linked_order_id    Int?
+  quantity_used      Decimal            @default(0)
+  quantity_remaining Decimal?           @ignore
+  used_price         Decimal?
+  notes              String?
+  deleted_at         DateTime?          @db.Timestamptz()
+  created_by         Int?
+  created_at         DateTime?          @default(now()) @db.Timestamptz()
+  updated_at         DateTime?          @default(now()) @db.Timestamptz()
+  supplier           suppliers?         @relation(fields: [supplier_id], references: [id])
+  linked_order       orders?            @relation("linked_boards", fields: [linked_order_id], references: [id])
+
+  @@unique([supplier_id, code])
+  @@map("boards_inventory")
+  @@schema("mazaya")
+}
+
+model accessories_inventory {
+  id                 Int                @id @default(autoincrement())
+  item_name          String             @db.VarChar(300)
+  material_type      String?            @db.VarChar(100)
+  code               String             @db.VarChar(100)
+  supplier_id        Int?
+  unit_price         Decimal
+  quantity_in        Decimal            @default(0)
+  total_price        Decimal?           @ignore
+  date_added         DateTime?          @default(now()) @db.Date
+  linked_order_id    Int?
+  quantity_used      Decimal            @default(0)
+  quantity_remaining Decimal?           @ignore
+  used_price         Decimal?
+  notes              String?
+  deleted_at         DateTime?          @db.Timestamptz()
+  created_by         Int?
+  created_at         DateTime?          @default(now()) @db.Timestamptz()
+  updated_at         DateTime?          @default(now()) @db.Timestamptz()
+  supplier           suppliers?         @relation(fields: [supplier_id], references: [id])
+  linked_order       orders?            @relation("linked_accessories", fields: [linked_order_id], references: [id])
+
+  @@unique([supplier_id, code])
+  @@map("accessories_inventory")
+  @@schema("mazaya")
+}
+
+model order_materials {
+  id                 Int      @id @default(autoincrement())
+  order_id           Int
+  inventory_table    String   @db.VarChar(30)
+  item_id            Int
+  quantity_used      Decimal
+  unit_price_snapshot Decimal
+  created_at         DateTime? @default(now()) @db.Timestamptz()
+  order              orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("order_materials")
+  @@schema("mazaya")
+}
+
+model contractors {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(200)
+  specialty  String?  @db.VarChar(200)
+  phone      String?  @db.VarChar(50)
+  notes      String?
+  deleted_at DateTime? @db.Timestamptz()
+  created_at DateTime? @default(now()) @db.Timestamptz()
+  updated_at DateTime? @default(now()) @db.Timestamptz()
+
+  @@map("contractors")
+  @@schema("mazaya")
+}
+
+model order_external_work {
+  id            Int      @id @default(autoincrement())
+  order_id      Int
+  contractor_id Int?
+  description   String?  @db.VarChar(300)
+  cost          Decimal?
+  notes         String?
+  created_at    DateTime? @default(now()) @db.Timestamptz()
+  updated_at    DateTime? @default(now()) @db.Timestamptz()
+  order         orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("order_external_work")
+  @@schema("mazaya")
+}
+
+model journal_entries {
+  id             Int       @id @default(autoincrement())
+  date           DateTime? @default(now()) @db.Date
+  entry_type     String    @db.VarChar(30)
+  description    String    @db.VarChar(500)
+  amount         Decimal
+  payment_method String?   @db.VarChar(20)
+  party_type     String?   @db.VarChar(20)
+  party_id       Int?
+  order_id       Int?
+  created_by     Int?
+  created_at     DateTime? @default(now()) @db.Timestamptz()
+  updated_at     DateTime? @default(now()) @db.Timestamptz()
+  order          orders?   @relation(fields: [order_id], references: [id])
+  creator        users?    @relation("journal_creator", fields: [created_by], references: [id])
+  overhead       overhead_expenses?
+
+  @@map("journal_entries")
+  @@schema("mazaya")
+}
+
+model overhead_expenses {
+  id              Int              @id @default(autoincrement())
+  date            DateTime?        @default(now()) @db.Date
+  category        String?          @db.VarChar(100)
+  description     String           @db.VarChar(500)
+  amount          Decimal
+  payment_method  String?          @db.VarChar(20)
+  journal_entry_id Int?            @unique
+  created_by      Int?
+  notes           String?
+  created_at      DateTime?        @default(now()) @db.Timestamptz()
+  updated_at      DateTime?        @default(now()) @db.Timestamptz()
+  journal_entry   journal_entries? @relation(fields: [journal_entry_id], references: [id])
+  creator         users?           @relation("overhead_creator", fields: [created_by], references: [id])
+
+  @@map("overhead_expenses")
+  @@schema("mazaya")
+}
+
+model material_types {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique @db.VarChar(200)
+  category   String    @default("board") @db.VarChar(20)
+  is_active  Boolean   @default(true)
+  created_at DateTime? @default(now()) @db.Timestamptz()
+
+  @@map("material_types")
+  @@schema("mazaya")
+}
+
+model audit_log {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  action     String   @db.VarChar(10)
+  table_name String   @db.VarChar(100)
+  row_id     Int
+  before_json Json?
+  after_json  Json?
+  created_at DateTime? @default(now()) @db.Timestamptz()
+  user       users?   @relation(fields: [user_id], references: [id])
+
+  @@map("audit_log")
+  @@schema("mazaya")
+}

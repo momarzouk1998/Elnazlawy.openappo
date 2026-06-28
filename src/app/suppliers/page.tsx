@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useUserStore } from "@/store/user-store";
+import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
@@ -10,48 +11,14 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { PAYMENT_METHOD_LABELS } from "@/lib/format";
-import { MODULE_KEYS } from "@/lib/auth";
-import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
-
-const supplierFields: FieldDef[] = [
-  { name: "name", label: "اسم الشركة", required: true },
-  { name: "payment_type", label: "نوع التعامل", options: Object.entries(PAYMENT_METHOD_LABELS).map(([v, l]) => ({ value: v, label: l })) },
-  { name: "phone", label: "رقم التواصل" },
-  { name: "notes", label: "ملاحظات", rows: 3 },
-];
-
-interface Supplier { id: number; name: string; payment_type: string; phone: string | null; notes: string | null; items_count?: number; }
 
 export default function SuppliersPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [rows, setRows] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useUserStore();
+  const { data, loading, refetch } = useApi<{ items: any[]; total: number }>('/api/suppliers?limit=500');
+  const rows = data?.items || [];
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
-
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.push("/login");
-      const { data: prof } = await supabase.from("mazaya_users").select("*").eq("auth_id", user.id).single();
-      if (!prof.visible_modules.includes("suppliers")) { router.push("/dashboard"); return; }
-      setProfile(prof);
-
-      const [{ data: suppliers }, { data: boards }, { data: accs }] = await Promise.all([
-        supabase.from("mazaya_suppliers").select("*").order("name"),
-        supabase.from("mazaya_boards_inventory").select("supplier_id"),
-        supabase.from("mazaya_accessories_inventory").select("supplier_id"),
-      ]);
-      const counts: Record<number, number> = {};
-      [...(boards ?? []), ...(accs ?? [])].forEach((r: any) => {
-        if (r.supplier_id) counts[r.supplier_id] = (counts[r.supplier_id] || 0) + 1;
-      });
-      setRows((suppliers ?? []).map(s => ({ ...s, items_count: counts[s.id] || 0 })));
-      setLoading(false);
-    })();
-  }, [router]);
 
   const filtered = useMemo(() => rows.filter(s => {
     const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.phone ?? "").includes(search);
@@ -59,15 +26,15 @@ export default function SuppliersPage() {
     return matchSearch && matchPay;
   }), [rows, search, paymentFilter]);
 
-  if (!profile) return null;
+  if (!user) return null;
 
   return (
-    <DashboardLayout profile={profile}>
+    <DashboardLayout profile={user}>
       <PageHeader
         title="الموردون"
         subtitle="إدارة شركات توريد الخامات"
         helpTitle="الموردون"
-        helpDescription="هنا بتسجل الـ 7 شركات اللي بتشتري منهم ألواح واكسسوارات. كل مورد له كوداته الخاصة (~80 كود) اللي بتيجي من عنده. الأعمدة التلقائية بتعرض عدد الأكواد المسجلة لكل مورد."
+        helpDescription="هنا بتسجل الـ 7 شركات اللي بتشتري منهم ألواح واكسسوارات."
         backHref="/dashboard"
         actions={<>
           <Button variant="secondary" onClick={() => exportToExcel(filtered, "suppliers")}>📥 تصدير Excel</Button>
@@ -93,12 +60,16 @@ export default function SuppliersPage() {
         rows={filtered}
         emptyMessage="لا يوجد موردون. ابدأ بإضافة مورد جديد."
         columns={[
-          { key: "name", label: "اسم الشركة", render: r => <Link href={`/suppliers/${r.id}`} className="font-semibold text-brand-orange hover:underline">{r.name}</Link> },
-          { key: "payment_type", label: "نوع التعامل", render: r => PAYMENT_METHOD_LABELS[r.payment_type] || r.payment_type },
-          { key: "phone", label: "رقم التواصل", render: r => r.phone || "-" },
-          { key: "items_count", label: "عدد الأكواد" },
-          { key: "notes", label: "ملاحظات", render: r => <span className="text-gray-500 text-xs">{r.notes || "-"}</span> },
-          { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} table="mazaya_suppliers" fields={supplierFields} entityLabel="المورد" deleteHint="لا يمكن حذف هذا المورد لوجود أكواد أو مدفوعات مرتبطة به" /> },
+          { key: "name", label: "اسم الشركة", render: (r: any) => <Link href={`/suppliers/${r.id}`} className="font-semibold text-brand-orange hover:underline">{r.name}</Link> },
+          { key: "payment_type", label: "نوع التعامل", render: (r: any) => PAYMENT_METHOD_LABELS[r.payment_type] || r.payment_type },
+          { key: "phone", label: "رقم التواصل", render: (r: any) => r.phone || "-" },
+          { key: "notes", label: "ملاحظات", render: (r: any) => <span className="text-gray-500 text-xs">{r.notes || "-"}</span> },
+          { key: "_actions", label: "إجراءات", render: (r: any) => (
+            <div className="flex items-center justify-center gap-1">
+              <button onClick={() => router.push(`/suppliers/${r.id}`)} className="p-1.5 hover:bg-blue-100 rounded transition text-base" title="عرض">👁️</button>
+              <button onClick={() => router.push(`/suppliers/${r.id}`)} className="p-1.5 hover:bg-blue-100 rounded transition text-base" title="تعديل">✏️</button>
+            </div>
+          )},
         ]}
       />
     </DashboardLayout>
