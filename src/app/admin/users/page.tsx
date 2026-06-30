@@ -31,26 +31,25 @@ export default function UsersPage() {
     const newMods = u.visible_modules.includes(modKey)
       ? u.visible_modules.filter(m => m !== modKey)
       : [...u.visible_modules, modKey];
-    await fetch("/api/auth/admin/update-user", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: u.id, visible_modules: newMods }),
+    await fetch(`/api/admin/users/${u.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visible_modules: newMods }),
     });
     setUsers(s => s.map(x => x.id === u.id ? { ...x, visible_modules: newMods } : x));
   }
 
   async function toggleActive(u: UserRow) {
-    await fetch("/api/auth/admin/update-user", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: u.id, is_active: !u.is_active }),
+    await fetch(`/api/admin/users/${u.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_active: !u.is_active }),
     });
     setUsers(s => s.map(x => x.id === u.id ? { ...x, is_active: !x.is_active } : x));
   }
 
   async function deleteUser(u: UserRow) {
     if (!confirm(`حذف "${u.username}"؟ لا يمكن التراجع.`)) return;
-    await fetch("/api/auth/admin/delete-user", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: u.id, auth_id: u.auth_id }),
+    await fetch(`/api/admin/users/${u.id}`, {
+      method: "DELETE",
     });
     setUsers(s => s.filter(x => x.id !== u.id));
   }
@@ -172,9 +171,9 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
     setError(null);
     if (!form.username || !form.email_or_phone || !form.password) { setError("املأ الحقول المطلوبة"); return; }
     setSaving(true);
-    const res = await fetch("/api/auth/admin/create-user", {
+    const res = await fetch("/api/admin/create-user", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, branch_id: form.branch_id ? Number(form.branch_id) : null }),
+      body: JSON.stringify({ ...form, full_name: form.email_or_phone, branch_id: form.branch_id ? Number(form.branch_id) : null }),
     });
     setSaving(false);
     const j = await res.json();
@@ -229,10 +228,12 @@ function EditUserModal({ user, onClose, onSuccess }: { user: UserRow; onClose: (
 
   async function submit() {
     setError(null); setSaving(true);
-    const payload: any = { user_id: user.id, auth_id: user.auth_id, ...form };
-    if (form.password) payload.password = form.password;
+    const payload: any = { full_name: form.email_or_phone, ...form };
+    delete payload.email_or_phone;
+    delete payload.username;
+    if (!form.password) delete payload.password;
     payload.branch_id = form.branch_id ? Number(form.branch_id) : null;
-    const res = await fetch("/api/auth/admin/update-user", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const res = await fetch(`/api/admin/users/${user.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     setSaving(false);
     const j = await res.json();
     if (!res.ok) { setError(j.error); return; }
