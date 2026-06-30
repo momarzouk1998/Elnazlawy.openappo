@@ -53,11 +53,7 @@ export default function OrdersPage() {
   const activeFiltersCount = [branchFilter, statusFilter, typeFilter, fromDate, toDate].filter(Boolean).length
 
   function clearFilters() {
-    setBranchFilter("")
-    setStatusFilter("")
-    setTypeFilter("")
-    setFromDate("")
-    setToDate("")
+    setBranchFilter(""); setStatusFilter(""); setTypeFilter(""); setFromDate(""); setToDate("")
   }
 
   async function deleteOrder(row: Order) {
@@ -106,7 +102,7 @@ export default function OrdersPage() {
         { key: "branch_name", label: "المعرض" },
         { key: "status", label: "الحالة", render: (r) => <span className={"badge " + STATUS_COLORS[r.status]}>{STATUS_LABELS[r.status]}</span> },
         { key: "start_date", label: "البدء", render: (r) => formatDate(r.start_date) },
-        { key: "duration", label: "المدة", render: (r) => { const computed = daysBetween(r.start_date, r.end_date); const days = r.duration_days ?? computed; return days != null ? days + " يوم" : "-" } },
+        { key: "duration", label: "المدة", render: (r) => { const computed = daysBetween(r.start_date ?? "", r.end_date ?? ""); const days = r.duration_days ?? computed; return days != null ? days + " يوم" : "-" } },
         { key: "total", label: "الإجمالي", render: (r) => <span className="font-bold">{formatCurrency(Number(r.order_total ?? r.total ?? 0))}</span> },
         { key: "_actions", label: "إجراءات", render: (r) => <div className="flex items-center justify-center gap-1"><Link href={"/orders/" + r.id} className="p-1.5 hover:bg-blue-100 rounded text-base" title="عرض">👁️</Link><Link href={"/orders/" + r.id + "/edit"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="تعديل">✏️</Link><Link href={"/orders/" + r.id + "/invoice"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="طباعة فاتورة">🧾</Link>{profile?.role === "admin" && <button onClick={() => deleteOrder(r)} className="p-1.5 hover:bg-red-100 rounded text-base" title="حذف">🗑️</button>}</div> },
       ]} />
