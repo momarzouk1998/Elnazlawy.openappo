@@ -31,10 +31,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const items = Array.isArray(body) ? body : [body]
     const created: any[] = []
     for (const it of items) {
+      const contractorRaw = it.contractor_id
+      const contractorId = contractorRaw == null || contractorRaw === "" ? null : String(contractorRaw)
       const r = await prisma.order_external_work.create({
         data: {
           order_id: orderId,
-          contractor_id: it.contractor_id ? Number(it.contractor_id) : null,
+          contractor_id: contractorId,
           work_type: it.work_type || it.description || "",
           amount: Number(it.amount ?? it.cost ?? 0),
           notes: it.notes || null,
