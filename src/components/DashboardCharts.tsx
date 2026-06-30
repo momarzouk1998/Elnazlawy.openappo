@@ -8,8 +8,8 @@ const PIE_COLORS = ["#F2994A", "#3B82F6", "#10B981", "#6B7280"];
 
 export function WeeklyBarChart({ data }: { data: WeeklyDatum[] }) {
   return (
-    <div className="w-full h-full" style={{ minHeight: 200 }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={200}>
+    <div style={{ width: '100%', height: 288, minHeight: 200 }}>
+      <ResponsiveContainer width="100%" height={288}>
         <BarChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="day" tick={{ fontSize: 11 }} />
@@ -28,8 +28,8 @@ export function WeeklyBarChart({ data }: { data: WeeklyDatum[] }) {
 export function StatusPieChart({ data }: { data: StatusDatum[] }) {
   if (data.length === 0) return <div className="h-full flex items-center justify-center text-gray-400">لا توجد أوردرات</div>;
   return (
-    <div className="w-full h-full" style={{ minHeight: 200 }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={200}>
+    <div style={{ width: '100%', height: 288, minHeight: 200 }}>
+      <ResponsiveContainer width="100%" height={288}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={(e: any) => `${e.name}: ${e.value}`}>
             {data.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
