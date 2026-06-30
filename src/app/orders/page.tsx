@@ -16,7 +16,8 @@ interface Order {
   id: string; order_name: string; status: string; order_type: string
   customer_id: string | null; branch_id: string | null
   start_date: string | null; end_date: string | null; duration_days: number | null
-  order_total: number | string | null; customer_name?: string; branch_name?: string
+  order_total: number | string | null; total?: number | string | null
+  customer_name?: string; branch_name?: string
   notes?: string | null
 }
 
@@ -96,15 +97,15 @@ export default function OrdersPage() {
       )}
 
       <DataTable loading={loading} rows={paged} emptyMessage="لا توجد أوردرات" columns={[
-        { key: "order_name", label: "اسم الأوردر", render: (r) => <Link href={"/orders/" + r.id} className="font-semibold text-brand-orange hover:underline">{r.order_name}</Link> },
-        { key: "type", label: "النوع", render: (r) => ORDER_TYPE_LABELS[r.order_type] || r.order_type },
+        { key: "order_name", label: "اسم الأوردر", render: (r: any) => <Link href={"/orders/" + r.id} className="font-semibold text-brand-orange hover:underline">{r.order_name}</Link> },
+        { key: "type", label: "النوع", render: (r: any) => ORDER_TYPE_LABELS[r.order_type] || r.order_type },
         { key: "customer_name", label: "العميل" },
         { key: "branch_name", label: "المعرض" },
-        { key: "status", label: "الحالة", render: (r) => <span className={"badge " + STATUS_COLORS[r.status]}>{STATUS_LABELS[r.status]}</span> },
-        { key: "start_date", label: "البدء", render: (r) => formatDate(r.start_date) },
-        { key: "duration", label: "المدة", render: (r) => { const computed = daysBetween(r.start_date ?? "", r.end_date ?? ""); const days = r.duration_days ?? computed; return days != null ? days + " يوم" : "-" } },
-        { key: "total", label: "الإجمالي", render: (r) => <span className="font-bold">{formatCurrency(Number(r.order_total ?? r.total ?? 0))}</span> },
-        { key: "_actions", label: "إجراءات", render: (r) => <div className="flex items-center justify-center gap-1"><Link href={"/orders/" + r.id} className="p-1.5 hover:bg-blue-100 rounded text-base" title="عرض">👁️</Link><Link href={"/orders/" + r.id + "/edit"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="تعديل">✏️</Link><Link href={"/orders/" + r.id + "/invoice"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="طباعة فاتورة">🧾</Link>{profile?.role === "admin" && <button onClick={() => deleteOrder(r)} className="p-1.5 hover:bg-red-100 rounded text-base" title="حذف">🗑️</button>}</div> },
+        { key: "status", label: "الحالة", render: (r: any) => <span className={"badge " + STATUS_COLORS[r.status]}>{STATUS_LABELS[r.status]}</span> },
+        { key: "start_date", label: "البدء", render: (r: any) => formatDate(r.start_date) },
+        { key: "duration", label: "المدة", render: (r: any) => { const computed = daysBetween(r.start_date ?? "", r.end_date ?? ""); const days = r.duration_days ?? computed; return days != null ? days + " يوم" : "-" } },
+        { key: "total", label: "الإجمالي", render: (r: any) => <span className="font-bold">{formatCurrency(Number(r.order_total ?? r.total ?? 0))}</span> },
+        { key: "_actions", label: "إجراءات", render: (r: any) => <div className="flex items-center justify-center gap-1"><Link href={"/orders/" + r.id} className="p-1.5 hover:bg-blue-100 rounded text-base" title="عرض">👁️</Link><Link href={"/orders/" + r.id + "/edit"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="تعديل">✏️</Link><Link href={"/orders/" + r.id + "/invoice"} className="p-1.5 hover:bg-blue-100 rounded text-base" title="طباعة فاتورة">🧾</Link>{profile?.role === "admin" && <button onClick={() => deleteOrder(r)} className="p-1.5 hover:bg-red-100 rounded text-base" title="حذف">🗑️</button>}</div> },
       ]} />
 
       {totalPages > 1 && <div className="flex items-center justify-center gap-2 mt-4"><Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>السابق</Button><span className="text-sm text-gray-600">صفحة {page} من {totalPages}</span><Button variant="secondary" size="sm" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>التالي</Button></div>}
