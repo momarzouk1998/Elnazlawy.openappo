@@ -1,50 +1,65 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useUserStore } from "@/store/user-store";
-import { useApiMutation } from "@/hooks/useApi";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import PageHeader from "@/components/PageHeader";
-import { Input, Textarea } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-import { formatCurrency } from "@/lib/format";
+﻿"use client"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useUserStore } from "@/store/user-store"
+import { useApiMutation } from "@/hooks/useApi"
+import DashboardLayout from "@/components/layout/DashboardLayout"
+import PageHeader from "@/components/PageHeader"
+import { Input, Textarea, Select } from "@/components/ui/Input"
+import { Button } from "@/components/ui/Button"
+import { formatCurrency } from "@/lib/format"
+import { PAYMENT_METHOD_LABELS } from "@/lib/format"
 
 export default function NewOverheadForm() {
-  const router = useRouter();
-  const { user: profile } = useUserStore();
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), description: "", amount: "", notes: "" });
-  const { mutate, loading: saving } = useApiMutation();
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter()
+  const { user: profile } = useUserStore()
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    description: "",
+    amount: "",
+    payment_method: "نقدي",
+    notes: "",
+  })
+  const { mutate, loading: saving } = useApiMutation()
+  const [error, setError] = useState<string | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.description || !form.amount) { setError("البيان والمبلغ مطلوبين"); return; }
-    setError(null);
-    const { error: err } = await mutate('POST', '/api/overhead', {
-      date: form.date, description: form.description,
-      amount: Number(form.amount), notes: form.notes || null,
-    });
-    if (err) { setError(err); return; }
-    router.push("/overhead");
-    router.refresh();
+    e.preventDefault()
+    if (!form.description || !form.amount) {
+      setError("البيان والمبلغ مطلوبين")
+      return
+    }
+    setError(null)
+    const { error: err } = await mutate("POST", "/api/overhead?create_journal=true", {
+      date: form.date,
+      description: form.description,
+      amount: Number(form.amount),
+      payment_method: form.payment_method,
+      notes: form.notes || null,
+    })
+    if (err) { setError(err); return }
+    router.push("/overhead")
+    router.refresh()
   }
 
-  if (!profile) return null;
+  if (!profile) return null
   return (
     <DashboardLayout profile={profile}>
       <PageHeader title="نثريات جديدة" subtitle="كهرباء، أجور عمال، شحن، إلخ" backHref="/overhead" />
       <form onSubmit={onSubmit} className="card max-w-xl space-y-4">
-        <Input label="التاريخ" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
-        <Input label="البيان *" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="مثال: كهرباء المصنع، أجور عمال أسبوع 3" required />
-        <Input label="المبلغ *" type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
-        <Textarea label="ملاحظات" rows={3} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+        <Input label="التاريخ" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+        <Input label="البيان *" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="مثال: كهرباء المصنع، أجور عمال أسبوع 3" required />
+        <Input label="المبلغ *" type="number" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+        <Select label="طريقة الدفع" value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} options={Object.entries(PAYMENT_METHOD_LABELS).filter(([k]) => k !== "both" && k !== "كلاهما").map(([k, v]) => ({ value: k, label: v }))} />
+        <Textarea label="ملاحظات" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">{error}</div>}
-        {form.amount && <div className="bg-blue-50 p-3 rounded-lg text-sm">سيتم تسجيل الحركة تلقائياً في اليومية بـ <strong>{formatCurrency(Number(form.amount))}</strong></div>}
+        {form.amount && <div className="bg-blue-50 p-3 rounded-lg text-sm">سيتم تسجيل الحركة تلقائياً في اليومية بمبلغ <strong>{formatCurrency(Number(form.amount))}</strong></div>}
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="secondary" onClick={() => router.back()}>إلغاء</Button>
           <Button type="submit" loading={saving}>حفظ</Button>
         </div>
       </form>
     </DashboardLayout>
-  );
+  )
 }
+

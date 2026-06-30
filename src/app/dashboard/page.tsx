@@ -1,134 +1,88 @@
-import { redirect } from "next/navigation";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import PageHeader from "@/components/PageHeader";
-import { getCurrentUser } from "@/lib/auth-server";
-import prisma from "@/lib/db/prisma";
-import { formatCurrency, formatNumber, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, STATUS_LABELS, STATUS_COLORS } from "@/lib/format";
-import Link from "next/link";
-import { WeeklyBarChart, StatusPieChart } from "@/components/DashboardCharts";
+﻿import { redirect } from "next/navigation"
+import DashboardLayout from "@/components/layout/DashboardLayout"
+import PageHeader from "@/components/PageHeader"
+import { getCurrentUser } from "@/lib/auth-server"
+import prisma from "@/lib/db/prisma"
+import { formatCurrency, formatNumber, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS } from "@/lib/format"
+import Link from "next/link"
+import { WeeklyBarChart } from "@/components/DashboardCharts"
 
-export const dynamic = "force-dynamic";
+export const dynamic = "force-dynamic"
 
 export default async function DashboardPage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const profile = await getCurrentUser()
+  if (!profile) redirect("/login")
 
   const safeFetch = async <T,>(p: Promise<T[]>): Promise<{ data: T[]; error: string | null }> => {
     try {
-      const data = await p;
-      return { data, error: null };
+      const data = await p
+      return { data, error: null }
     } catch (e: any) {
-      return { data: [], error: e?.message ?? String(e) };
+      return { data: [], error: e?.message ?? String(e) }
     }
-  };
+  }
 
   const [boardsR, accessoriesR, ordersR, journalR, suppliersR] = await Promise.all([
     safeFetch<any>(prisma.$queryRaw<any[]>`SELECT unit_price, quantity_remaining FROM mazaya.boards_inventory WHERE deleted_at IS NULL`),
     safeFetch<any>(prisma.$queryRaw<any[]>`SELECT unit_price, quantity_remaining FROM mazaya.accessories_inventory WHERE deleted_at IS NULL`),
     safeFetch<any>(prisma.orders.findMany({ where: { deleted_at: null }, select: { status: true, created_at: true } })),
-    safeFetch<any>(prisma.journal_entries.findMany({ orderBy: { date: 'desc' }, take: 200, select: { entry_type: true, amount: true, date: true } })),
+    safeFetch<any>(prisma.journal_entries.findMany({ orderBy: { date: "desc" }, take: 200, select: { entry_type: true, amount: true, date: true } })),
     safeFetch<any>(prisma.suppliers.findMany({ where: { deleted_at: null }, select: { id: true } })),
-  ]);
-  const boards = boardsR.data, accessories = accessoriesR.data, orders = ordersR.data, journal = journalR.data, suppliers = suppliersR.data;
-  const queryErrors = [boardsR, accessoriesR, ordersR, journalR, suppliersR].filter(r => r.error).map(r => r.error);
+  ])
+  const boards = boardsR.data, accessories = accessoriesR.data, orders = ordersR.data, journal = journalR.data, suppliers = suppliersR.data
+  const queryErrors = [boardsR, accessoriesR, ordersR, journalR, suppliersR].filter((r) => r.error).map((r) => r.error)
 
   const inventoryValue = (boards ?? []).reduce((s, b) => s + (b.unit_price * b.quantity_remaining), 0)
-                       + (accessories ?? []).reduce((s, a) => s + (a.unit_price * a.quantity_remaining), 0);
+                       + (accessories ?? []).reduce((s, a) => s + (a.unit_price * a.quantity_remaining), 0)
 
-  const openOrders = (orders ?? []).filter(o => o.status === "مفتوح" || o.status === "قيد التنفيذ").length;
-  const monthStart = new Date(); monthStart.setDate(1);
-  const completedThisMonth = (orders ?? []).filter(o =>
-    (o.status === "مكتمل" || o.status === "تم التسليم") &&
-    new Date(o.created_at) >= monthStart
-  ).length;
+  const openOrders = (orders ?? []).filter((o) => o.status === "مفتوح" || o.status === "قيد التنفيذ").length
+  const monthStart = new Date(); monthStart.setDate(1)
+  const completedThisMonth = (orders ?? []).filter((o) =>
+    (o.status === "مكتمل" || o.status === "تم التسليم") && new Date(o.created_at) >= monthStart
+  ).length
 
-  // Balance — new entry_type names: income→incoming_from_branch, expense→outgoing_to_supplier
-  const income = (journal ?? []).filter((j: any) => j.entry_type === "دفعة واردة من معرض").reduce((s: number, j: any) => s + Number(j.amount), 0);
-  const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + Number(j.amount), 0);
-  const balance = income - spent;
+  const income = (journal ?? []).filter((j: any) => j.entry_type === "دفعة واردة من معرض").reduce((s: number, j: any) => s + Number(j.amount), 0)
+  const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + Number(j.amount), 0)
+  const balance = income - spent
 
-  // Weekly chart (last 7 days)
-  const weekly: Record<string, { day: string; income: number; expense: number; net: number }> = {};
-  const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const weekly: Record<string, { day: string; income: number; expense: number; net: number }> = {}
+  const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    weekly[key] = { day: dayNames[d.getDay()], income: 0, expense: 0, net: 0 };
+    const d = new Date(); d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    weekly[key] = { day: dayNames[d.getDay()], income: 0, expense: 0, net: 0 }
   }
   for (const j of (journal ?? []) as any[]) {
-    const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '');
+    const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? "")
     if (weekly[k]) {
-      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += Number(j.amount);
-      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += Number(j.amount);
-      weekly[k].net = weekly[k].income - weekly[k].expense;
+      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += Number(j.amount)
+      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += Number(j.amount)
+      weekly[k].net = weekly[k].income - weekly[k].expense
     }
   }
 
-  // Status pie
-  const statusCounts: Record<string, number> = {};
-  for (const o of (orders ?? [])) statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
-  const statusData: { name: string; value: number }[] = Object.entries(statusCounts)
-    .filter(([_, v]) => v > 0)
-    .map(([k, v]) => ({ name: k, value: v }));
-
-  const recentJournal = (journal ?? []).slice(0, 5) as any[];
+  const recentJournal = (journal ?? []).slice(0, 5) as any[]
 
   return (
     <DashboardLayout profile={profile}>
       <PageHeader
-        title={`أهلاً ${profile.full_name ?? profile.username} 👋`}
+        title={"أهلاً " + (profile.full_name ?? profile.username) + " 👋"}
         subtitle="نظرة سريعة على المصنع اليوم"
         helpTitle="لوحة التحكم"
-        helpDescription="من هنا تقدر تشوف ملخص شامل لكل حاجة: قيمة المخزون، الأوردرات المفتوحة، الرصيد الحالي، وأحدث الحركات المالية. اضغط على أي بطاقة للتفاصيل."
+        helpDescription="ملخص سريع: المخزون، الأوردرات، الرصيد، والحركة المالية."
       />
 
       {queryErrors.length > 0 && (
-        <div className="mb-4 bg-yellow-50 border border-yellow-300 text-yellow-800 p-3 rounded-lg text-sm">
-          ⚠️ <strong>تنبيه:</strong> بعض الاستعلامات ما اشتغلتش:
-          <ul className="list-disc mr-5 mt-1">{queryErrors.map((e, i) => <li key={i}>{e}</li>)}</ul>
-        </div>
+        <div className="card bg-red-50 border border-red-200 text-red-700 text-sm mb-4">⚠️ بعض البيانات لم تُحمّل: {queryErrors.join(" | ")}</div>
       )}
 
-      {/* Action buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <Link href="/orders/new" className="btn-primary">+ أوردر جديد</Link>
-        <Link href="/journal/new" className="btn-secondary">+ حركة يومية</Link>
-        <Link href="/boards/new" className="btn-secondary">+ شراء جديد</Link>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <MetricCard title="قيمة المخزون الحالية" value={formatCurrency(inventoryValue)} subtitle={formatNumber((boards?.length ?? 0) + (accessories?.length ?? 0)) + " صنف"} icon="📦" gradient="from-amber-500 to-orange-600" />
+        <MetricCard title="الأوردرات المفتوحة" value={formatNumber(openOrders)} subtitle="قيد التنفيذ والمفتوحة" icon="📋" gradient="from-blue-500 to-blue-700" />
+        <MetricCard title="الأوردرات المكتملة (الشهر)" value={formatNumber(completedThisMonth)} subtitle="هذا الشهر" icon="✅" gradient="from-green-500 to-emerald-600" />
+        <MetricCard title="الرصيد الحالي" value={formatCurrency(balance)} subtitle={balance >= 0 ? "لصالح المصنع" : "عجز"} icon="💰" gradient={balance >= 0 ? "from-emerald-500 to-green-700" : "from-red-500 to-red-700"} />
       </div>
 
-      {/* Top metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          title="قيمة المخزون الحالية"
-          value={formatCurrency(inventoryValue)}
-          subtitle={`${formatNumber((boards?.length ?? 0) + (accessories?.length ?? 0))} صنف`}
-          icon="📦"
-          gradient="from-amber-500 to-orange-600"
-        />
-        <MetricCard
-          title="الأوردرات المفتوحة"
-          value={formatNumber(openOrders)}
-          subtitle="قيد التنفيذ والمفتوحة"
-          icon="📋"
-          gradient="from-blue-500 to-blue-700"
-        />
-        <MetricCard
-          title="الأوردرات المكتملة (الشهر)"
-          value={formatNumber(completedThisMonth)}
-          subtitle="هذا الشهر"
-          icon="✅"
-          gradient="from-green-500 to-emerald-600"
-        />
-        <MetricCard
-          title="الرصيد الحالي"
-          value={formatCurrency(balance)}
-          subtitle={balance >= 0 ? "لصالح المصنع" : "عجز"}
-          icon="💰"
-          gradient={balance >= 0 ? "from-emerald-500 to-green-700" : "from-red-500 to-red-700"}
-        />
-      </div>
-
-      {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <MiniStat label="الموردون النشطون" value={suppliers?.length ?? 0} icon="🏭" />
         <MiniStat label="إجمالي الوارد" value={formatCurrency(income)} icon="⬆️" />
@@ -136,26 +90,13 @@ export default async function DashboardPage() {
         <MiniStat label="الصافي" value={formatCurrency(income - spent)} icon="📊" />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="card lg:col-span-2">
-          <h3 className="font-bold text-brand-black mb-3">📊 ملخص اليومية الأسبوعي</h3>
-          <div className="h-72">
-            <WeeklyBarChart data={Object.values(weekly)} />
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 className="font-bold text-brand-black mb-3">🥧 حالة الأوردرات</h3>
-          {statusData.length > 0 ? (
-            <div className="h-72">
-              <StatusPieChart data={statusData} />
-            </div>
-          ) : <div className="h-72 flex items-center justify-center text-gray-400">لا توجد أوردرات</div>}
+      <div className="card mb-6">
+        <h3 className="font-bold text-brand-black mb-3">📊 ملخص اليومية الأسبوعي</h3>
+        <div className="h-72">
+          <WeeklyBarChart data={Object.values(weekly)} />
         </div>
       </div>
 
-      {/* Recent journal */}
       <div className="card">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-brand-black">🕒 آخر 5 حركات مالية</h3>
@@ -165,19 +106,19 @@ export default async function DashboardPage() {
           <p className="text-gray-400 text-center py-8">لا توجد حركات بعد</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {recentJournal.map(j => (
+            {recentJournal.map((j) => (
               <div key={j.id} className="flex items-center justify-between py-3 gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className={`badge ${ENTRY_TYPE_COLORS[j.entry_type] || ""}`}>
+                  <span className={"badge " + (ENTRY_TYPE_COLORS[j.entry_type] || "")}>
                     {ENTRY_TYPE_LABELS[j.entry_type] || j.entry_type}
                   </span>
                   <span className="text-sm text-gray-700 truncate">{j.description}</span>
                 </div>
                 <div className="text-left flex-shrink-0">
-	                  <div className={`font-bold ${j.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>
-                    {formatCurrency(j.amount)}
+                  <div className={"font-bold " + (j.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600")}>
+                    {formatCurrency(Number(j.amount ?? 0))}
                   </div>
-                  <div className="text-xs text-gray-400">{j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? '')}</div>
+                  <div className="text-xs text-gray-400">{j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? "")}</div>
                 </div>
               </div>
             ))}
@@ -185,12 +126,12 @@ export default async function DashboardPage() {
         )}
       </div>
     </DashboardLayout>
-  );
+  )
 }
 
 function MetricCard({ title, value, subtitle, icon, gradient }: { title: string; value: string; subtitle: string; icon: string; gradient: string }) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-elevated`}>
+    <div className={"relative overflow-hidden rounded-2xl bg-gradient-to-br " + gradient + " p-5 text-white shadow-elevated"}>
       <div className="absolute -left-4 -top-4 text-7xl opacity-20">{icon}</div>
       <div className="relative">
         <div className="text-sm font-medium opacity-90">{title}</div>
@@ -198,7 +139,7 @@ function MetricCard({ title, value, subtitle, icon, gradient }: { title: string;
         <div className="text-xs opacity-80 mt-1">{subtitle}</div>
       </div>
     </div>
-  );
+  )
 }
 function MiniStat({ label, value, icon }: { label: string; value: string | number; icon: string }) {
   return (
@@ -209,5 +150,6 @@ function MiniStat({ label, value, icon }: { label: string; value: string | numbe
         <div className="font-bold text-brand-black text-sm truncate">{value}</div>
       </div>
     </div>
-  );
+  )
 }
+
