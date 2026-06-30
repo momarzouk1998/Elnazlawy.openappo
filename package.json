@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "mazaya-furniture",
   "version": "0.1.0",
   "private": true,
@@ -7,17 +7,12 @@
     "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "npx prisma generate"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@next/font": "^14.2.15",
     "@prisma/client": "^6.19.3",
-    "bcryptjs": "^2.4.3",
-    "jose": "^5.9.6",
-    "next": "16.2.9",
-    "pg": "^8.13.1",
-    "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
@@ -32,9 +27,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/xlsx": "^0.0.35",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.9",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "eslint": "^9"
   }
 }
+

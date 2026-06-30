@@ -1,0 +1,16 @@
+﻿name: Deploy to Server
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy
+        run: |
+          echo "Image built and pushed by build-and-push workflow. Run deploy manually on the server."
+          echo "Server: ${{ secrets.SSH_HOST }}"
+
