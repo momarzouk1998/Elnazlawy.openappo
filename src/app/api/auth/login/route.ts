@@ -13,7 +13,12 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.users.findFirst({
-      where: { username },
+      where: {
+        OR: [
+          { username },
+          { full_name: username },
+        ],
+      },
       select: { id: true, username: true, full_name: true, role: true, branch_id: true, password_hash: true, is_active: true },
     });
 
