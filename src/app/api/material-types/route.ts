@@ -1,5 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server"
-import { requireAdmin } from "@/lib/auth-server"
+import { requireAuth } from "@/lib/auth-server"
 import prisma from "@/lib/db/prisma"
 import { auditLog } from "@/lib/audit"
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin()
+    await requireAuth()
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "500")
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin()
+    const user = await requireAuth()
     const body = await request.json()
     const name = (body.name || body.value || "").trim()
     const category = body.category || "board"
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const sort_order = body.sort_order ?? 99
     const materialType = await prisma.material_types.create({ data: { name, category, sort_order } })
-    auditLog({ user_id: admin.id, action: "create", table_name: "material_types", row_id: materialType.id, after: materialType })
+    auditLog({ user_id: user.id, action: "create", table_name: "material_types", row_id: materialType.id, after: materialType })
     return NextResponse.json({ ok: true, data: materialType }, { status: 201 })
   } catch (e: any) {
     if (e.status === 401) return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED", message: "غير مسجل الدخول" } }, { status: 401 })

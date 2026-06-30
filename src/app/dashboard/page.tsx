@@ -5,7 +5,6 @@ import { getCurrentUser } from "@/lib/auth-server"
 import prisma from "@/lib/db/prisma"
 import { formatCurrency, formatNumber, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS } from "@/lib/format"
 import Link from "next/link"
-import { WeeklyBarChart } from "@/components/DashboardCharts"
 
 export const dynamic = "force-dynamic"
 
@@ -45,21 +44,6 @@ export default async function DashboardPage() {
   const spent = (journal ?? []).filter((j: any) => j.entry_type === "مشتريات" || j.entry_type === "نثريات").reduce((s: number, j: any) => s + Number(j.amount), 0)
   const balance = income - spent
 
-  const weekly: Record<string, { day: string; income: number; expense: number; net: number }> = {}
-  const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    weekly[key] = { day: dayNames[d.getDay()], income: 0, expense: 0, net: 0 }
-  }
-  for (const j of (journal ?? []) as any[]) {
-    const k = j.date instanceof Date ? j.date.toISOString().slice(0, 10) : String(j.date ?? "")
-    if (weekly[k]) {
-      if (j.entry_type === "دفعة واردة من معرض") weekly[k].income += Number(j.amount)
-      if (["مشتريات", "نثريات"].includes(j.entry_type)) weekly[k].expense += Number(j.amount)
-      weekly[k].net = weekly[k].income - weekly[k].expense
-    }
-  }
 
   const recentJournal = (journal ?? []).slice(0, 5) as any[]
 
@@ -88,13 +72,6 @@ export default async function DashboardPage() {
         <MiniStat label="إجمالي الوارد" value={formatCurrency(income)} icon="⬆️" />
         <MiniStat label="إجمالي المصروف" value={formatCurrency(spent)} icon="⬇️" />
         <MiniStat label="الصافي" value={formatCurrency(income - spent)} icon="📊" />
-      </div>
-
-      <div className="card mb-6">
-        <h3 className="font-bold text-brand-black mb-3">📊 ملخص اليومية الأسبوعي</h3>
-        <div className="h-72">
-          <WeeklyBarChart data={Object.values(weekly)} />
-        </div>
       </div>
 
       <div className="card">

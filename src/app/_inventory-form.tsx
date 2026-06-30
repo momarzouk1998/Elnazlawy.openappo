@@ -35,10 +35,18 @@ export default function NewInventoryForm({ category }: Props) {
   }, [])
 
   function loadMaterials(cat: "boards" | "accessories") {
-    const listKey = cat === "boards" ? "board_material" : "accessory_type"
-    fetch("/api/material-types?category=" + (cat === "boards" ? "board" : "accessory") + "&limit=500").then((r) => r.json()).then((d) => {
-      if (d.ok) setKnownMaterials((d.data.items ?? []).map((m: any) => m.name))
-    })
+    fetch("/api/material-types?category=" + (cat === "boards" ? "board" : "accessory") + "&limit=500")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setKnownMaterials((d.data.items ?? []).map((m: any) => m.name))
+        } else {
+          console.error("Failed to load material types", d.error)
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load material types", err)
+      })
   }
 
   useEffect(() => { loadMaterials(category) }, [category])
