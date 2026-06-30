@@ -62,18 +62,9 @@ jobs:
             docker pull "$IMAGE"
             docker tag "$IMAGE" "$LOCAL_TAG"
 
-            # Get correct Postgres host from running container
-            PG_HOST=$(docker ps --filter name=mazaya-postgres --format '{{.Names}}' | head -1)
-            PG_HOST="${PG_HOST%.*}"  # strip .1.xxx suffix
-            PG_HOST="${PG_HOST%%.*}"
-            PG_HOST="${PG_HOST:-mazaya-postgres}"
-
-            DATABASE_URL="postgres://mazaya:mazaya_pass_123@${PG_HOST}:5432/mazaya_factory"
-
-            # Update Swarm service with env var and new image
+            # Update Swarm service with new image
             docker service update \
               --image "$LOCAL_TAG" \
-              --env-add "DATABASE_URL=$DATABASE_URL" \
               --force \
               "$SERVICE" 2>/dev/null || echo "SERVICE_UPDATE_FAILED"
 
