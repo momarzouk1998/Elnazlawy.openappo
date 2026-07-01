@@ -30,8 +30,7 @@ ENV NODE_OPTIONS="--max-old-space-size=1280"
 RUN npx prisma generate && npm run build
 
 # 4. Runner (production) — tiny final image
-# Use alpine 3.19 for OpenSSL 1.1 compatibility with Prisma 5.22
-FROM node:20-alpine3.19 AS runner
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -40,8 +39,9 @@ ENV PORT=3000
 # Lower cap in production (~110-150MB RAM)
 ENV NODE_OPTIONS="--max-old-space-size=512"
 
-# Install OpenSSL 1.1 + libc6-compat for Prisma engines (Prisma 5.22 requires libssl.so.1.1)
-RUN apk add --no-cache openssl1.1 libc6-compat
+# Install OpenSSL 3.x runtime libs (Prisma binary targets linux-musl-openssl-3.0.x)
+# Alpine 3.19+ ships with openssl 3.x natively, just need the runtime
+RUN apk add --no-cache openssl libc6-compat
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs ; adduser --system --uid 1001 nextjs
