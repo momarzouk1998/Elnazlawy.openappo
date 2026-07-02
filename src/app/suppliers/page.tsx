@@ -11,6 +11,22 @@ import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { PAYMENT_METHOD_LABELS } from "@/lib/format";
+import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+
+const supplierFields: FieldDef[] = [
+  { name: "name", label: "اسم الشركة", required: true },
+  {
+    name: "payment_type",
+    label: "نوع التعامل",
+    options: [
+      { value: "نقدي", label: "نقدي" },
+      { value: "تحويل", label: "تحويل" },
+      { value: "كلاهما", label: "كلاهما" },
+    ],
+  },
+  { name: "phone", label: "رقم التواصل" },
+  { name: "notes", label: "ملاحظات", rows: 2 },
+];
 
 export default function SuppliersPage() {
   const router = useRouter();
@@ -68,7 +84,15 @@ export default function SuppliersPage() {
           { key: "_actions", label: "إجراءات", render: (r: any) => (
             <div className="flex items-center justify-center gap-1">
               <button onClick={() => router.push(`/suppliers/${r.id}`)} className="p-1.5 hover:bg-blue-100 rounded transition text-base" title="عرض">👁️</button>
-              <button onClick={() => router.push(`/suppliers/${r.id}`)} className="p-1.5 hover:bg-blue-100 rounded transition text-base" title="تعديل">✏️</button>
+              <RowEditor
+                row={r}
+                apiBase="/api/suppliers"
+                fields={supplierFields}
+                entityLabel="المورد"
+                refreshPage={false}
+                onChanged={() => refetch()}
+                deleteHint="لا يمكن حذف هذا المورد لوجود فواتير أو سجلات مرتبطة به"
+              />
             </div>
           )},
         ]}
