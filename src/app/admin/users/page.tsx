@@ -98,6 +98,8 @@ export default function UsersPage() {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-3 py-3 text-right font-semibold text-xs uppercase sticky right-0 bg-gray-50 z-10">الموظف</th>
+              <th className="px-3 py-3 text-right font-semibold text-xs uppercase">الإيميل / الرقم</th>
+              <th className="px-3 py-3 text-center font-semibold text-xs uppercase">الدور</th>
               {ALL_MODULES.map(m => (
                 <th key={m.key} className="px-2 py-3 text-center font-semibold text-xs uppercase" title={m.label}>
                   <div className="text-lg">{m.icon}</div>
@@ -109,32 +111,33 @@ export default function UsersPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={ALL_MODULES.length + 2} className="text-center py-8">جاري التحميل...</td></tr>
+              <tr><td colSpan={ALL_MODULES.length + 4} className="text-center py-8">جاري التحميل...</td></tr>
             ) : users.map(u => (
               <tr key={u.id} className={!u.is_active ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"}>
-                <td className="px-3 py-3 sticky right-0 bg-white">
+                <td className="px-3 py-3 sticky right-0 bg-white align-middle">
                   <div className="font-semibold text-brand-black">{u.username}</div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                    {(() => {
-                      const c = detectContactType(u.email_or_phone);
-                      return (
-                        <>
-                          <span title={c.label} aria-label={c.label}>{c.icon}</span>
-                          <span className="truncate max-w-[180px]" dir={c.type === 'email' ? 'ltr' : 'ltr'}>{u.email_or_phone}</span>
-                          <span className={`badge text-[10px] py-0 px-1.5 ${c.type === 'email' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                            {c.label}
-                          </span>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className="mt-1">
-                    <span className={`badge ${u.role === "admin" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"}`}>
-                      {u.role === "admin" ? "مدير المصنع" : "موظف"}
-                    </span>
-                    {u.branch_name && <span className="badge bg-gray-100 text-gray-700 mr-1">🏪 {u.branch_name}</span>}
-                    {!u.is_active && <span className="badge bg-red-100 text-red-800 mr-1">معطل</span>}
-                  </div>
+                  {u.branch_name && <div className="mt-1"><span className="badge bg-gray-100 text-gray-700">🏪 {u.branch_name}</span></div>}
+                  {!u.is_active && <div className="mt-1"><span className="badge bg-red-100 text-red-800">معطل</span></div>}
+                </td>
+                <td className="px-3 py-3 align-middle" dir="ltr">
+                  {(() => {
+                    const c = detectContactType(u.email_or_phone);
+                    return (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium ${c.type === 'email' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`} title={c.label}>
+                          <span>{c.icon}</span>
+                          <span>{c.label}</span>
+                        </span>
+                        <span className="text-gray-800 truncate max-w-[220px]" dir="ltr">{u.email_or_phone}</span>
+                      </div>
+                    );
+                  })()}
+                </td>
+                <td className="px-3 py-3 text-center align-middle">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${u.role === "admin" ? "bg-orange-100 text-orange-800 border border-orange-200" : "bg-blue-100 text-blue-800 border border-blue-200"}`}>
+                    <span>{u.role === "admin" ? "👑" : "👤"}</span>
+                    <span>{u.role === "admin" ? "مدير المصنع" : "موظف"}</span>
+                  </span>
                 </td>
                 {ALL_MODULES.map(m => (
                   <td key={m.key} className="px-2 py-3 text-center">
