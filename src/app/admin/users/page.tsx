@@ -10,24 +10,32 @@ import { Input, Select } from "@/components/ui/Input";
 import { ALL_MODULES } from "@/lib/auth";
 
 interface UserRow {
-  id: number; auth_id: string | null; username: string; email_or_phone: string;
+  id: number; auth_id: string | null; username: string;
+  // The admin user-list API returns the contact (email/phone) under
+  // `full_name` (legacy schema) — accept both names for forward-compat.
+  email_or_phone?: string | null; full_name?: string | null;
   role: string; branch_id: number | null; branch_name?: string;
   visible_modules: string[]; is_active: boolean; notes: string | null;
 }
 
 // Detect whether the value is an email (contains @ and a dot) or a phone number.
 // Phones are stored as digits (e.g. 01001234567) and the auth layer appends @mazaya.local.
-function detectContactType(value: string): { type: 'email' | 'phone'; icon: string; label: string } {
-  const v = (value ?? '').trim();
-  if (v.includes('@') && v.includes('.')) {
+// IMPORTANT: the value comes from the `full_name` column in the DB (legacy schema),
+// so we must never trust it to be non-null without a guard.
+function detectContactType(value: string | null | undefined): { type: 'email' | 'phone' | 'unknown'; icon: string; label: string } {
+  const v = (value ?? '').toString().trim();
+  if (!v) return { type: 'unknown', icon: '❔', label: 'غير محدد' };
+  // Email: must contain @ AND a dot after the @, with no whitespace.
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
     return { type: 'email', icon: '📧', label: 'إيميل' };
   }
-  // Phone: digits, possibly with +, spaces, dashes, parens
+  // Phone: keep only digits. Egyptian mobile is 11 digits (010/011/012/015),
+  // international is up to 15 per E.164. We accept 7-15 digits to be safe.
   const digitsOnly = v.replace(/[^\d]/g, '');
-  if (digitsOnly.length >= 6 && digitsOnly.length <= 15) {
+  if (digitsOnly.length >= 7 && digitsOnly.length <= 15) {
     return { type: 'phone', icon: '📱', label: 'رقم هاتف' };
   }
-  return { type: 'phone', icon: '❔', label: 'غير محدد' };
+  return { type: 'unknown', icon: '❔', label: 'غير محدد' };
 }
 
 export default function UsersPage() {
@@ -121,14 +129,18 @@ export default function UsersPage() {
                 </td>
                 <td className="px-3 py-3 align-middle" dir="ltr">
                   {(() => {
-                    const c = detectContactType(u.email_or_phone);
+                    // The DB column is `full_name` (legacy schema stores the
+                    // email/phone in this field). The admin user-list API
+                    // returns it as `full_name`, not `email_or_phone`.
+                    const raw = (u as any).email_or_phone ?? (u as any).full_name ?? '';
+                    const c = detectContactType(raw);
                     return (
                       <div className="flex items-center gap-1.5 text-xs">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium ${c.type === 'email' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`} title={c.label}>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-medium ${c.type === 'email' ? 'bg-blue-50 text-blue-700' : c.type === 'phone' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}`} title={c.label}>
                           <span>{c.icon}</span>
                           <span>{c.label}</span>
                         </span>
-                        <span className="text-gray-800 truncate max-w-[220px]" dir="ltr">{u.email_or_phone}</span>
+                        <span className="text-gray-800 truncate max-w-[220px]" dir="ltr">{raw || '—'}</span>
                       </div>
                     );
                   })()}
