@@ -121,23 +121,37 @@ export async function DELETE(
       );
     }
 
-    // Cannot deactivate self
+    // Cannot delete self
     if (admin.id === parseInt(id)) {
       return NextResponse.json(
-        { ok: false, error: { code: 'FORBIDDEN', message: 'لا يمكنك تعطيل حسابك الخاص' } },
+        { ok: false, error: { code: 'FORBIDDEN', message: 'لا يمكنك حذف حسابك الخاص' } },
         { status: 403 }
       );
     }
 
+    // Block deletion if the user has any orders on their record (preserves history)
+    const orderCount = await prisma.orders.count({ where: { created_by: parseInt(id) } });
+    if (orderCount > 0) {
+      return NextResponse.json(
+        { ok: false, error: { code: 'CONFLICT', message: `لا يمكن الحذف: المستخدم لديه ${orderCount} أوردر مسجل باسمه. استخدم زر التعطيل بدلاً من ذلك.` } },
+        { status: 409 }
+      );
+    }
+
+    // Soft-delete + scrub username so it never shows up again and frees the unique slot.
+    // (The row is kept so audit_log FKs and historical references stay valid.)
     const updatedUser = await prisma.users.update({
       where: { id: parseInt(id) },
-      data: { is_active: false },
+      data: {
+        is_active: false,
+        username: `__deleted_${id}_${Date.now()}`,
+      },
       select: { id: true, username: true, full_name: true, is_active: true },
     });
 
     auditLog({
       user_id: admin.id,
-      action: 'update',
+      action: 'delete',
       table_name: 'users',
       row_id: parseInt(id),
       before: existingUser,

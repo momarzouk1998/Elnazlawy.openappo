@@ -13,10 +13,16 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
     const role = searchParams.get('role') || '';
+    // By default we hide users that were soft-deleted (is_active=false).
+    // Pass ?show_disabled=1 to include them in the list.
+    const showDisabled = searchParams.get('show_disabled') === '1' || searchParams.get('show_disabled') === 'true';
 
     const offset = (page - 1) * limit;
 
     const where: any = {};
+    if (!showDisabled) {
+      where.is_active = true;
+    }
     if (search) {
       where.OR = [
         { username: { contains: search, mode: 'insensitive' } },
