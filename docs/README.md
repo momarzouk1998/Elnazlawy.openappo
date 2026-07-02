@@ -4,7 +4,7 @@
 >
 > **الوثائق الحساسة** (تحتوي IP السيرفر، credentials، مفاتيح) محفوظة في مجلد `MD/` المحمي من git tracking عبر `.gitignore`.
 
-## 📑 الفهارس المتاحة
+## 📑 الوثائق المتاحة
 
 | الملف | الوصف |
 |------|------|
@@ -14,15 +14,18 @@
 
 الوثائق التالية موجودة في `MD/` ولا تُرفع إلى GitHub:
 
-- `DEPLOY.md` — تفاصيل النشر الكاملة
-- `DEPLOY_RUNNER_SETUP.md` — إعداد Self-Hosted Runner
-- `SERVER_ACCESS.md` — بيانات الاتصال بالسيرفر
-- `POWERSHELL_GUIDE.md` — إدارة السيرفر من PowerShell
-- `PROJECT_STATUS.md` — حالة المشروع
-- `PROGRESS.md` / `PROGRESS_FIXES.md` — سجل التقدم
-- `BUILD.md` / `DEBUGGING_LOG.md` — سجلات البناء والت debugging
-- `SETUP_AR.md` — دليل الإعداد بالعربية
-- `TEST_REPORT.md` — تقرير الاختبارات
-- `mazaya-furniture-system-spec.md` — مواصفات النظام الكاملة
+| الملف | الوصف |
+|------|------|
+| `DEPLOY.md` | الدليل الشامل للنشر (CI/CD، Dockerfile، حل المشاكل) |
+| `DEPLOY_RUNNER_SETUP.md` | إعداد النشر: SSH-First (موصى به) + Self-Hosted Runner |
+| `SERVER_ACCESS.md` | بيانات الاتصال بالسيرفر (IP، SSH، DB) |
+| `MANUAL_DEPLOY.md` | حل يدوي سريع لتحديث الموقع |
 
-> **⚠️ ملاحظة:** مجلد `MD/` محمي عبر `.gitignore` السطر 87. لا ترفعه إلى GitHub.
+> **⚠️ ملاحظة:** مجلد `MD/` محمي عبر `.gitignore`. لا ترفعه إلى GitHub.
+
+## 🔄 آخر تحديث
+
+**2026-07-02:** مراجعة شاملة لملفات MD:
+- حذف 10 ملفات قديمة/مكررة
+- تحديث 4 ملفات بالتفاصيل الجديدة
+- النظام: SSH-First (مفتاح `id_ed25519`)
