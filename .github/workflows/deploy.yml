@@ -1,8 +1,10 @@
 # ========================================
-# Deploy to Server — Hybrid Approach
+# Deploy to Server — SSH-First Approach
 # ========================================
-# 1) يحاول Self-Hosted Runner أولاً (لو شغال)
-# 2) لو فشل، يعمل deploy عبر SSH (fallback)
+# Strategy: SSH direct from GitHub (works every time)
+# - No self-hosted runner needed
+# - No external dependencies
+# - Reliable deployment
 # ========================================
 
 name: Deploy to Server
@@ -13,49 +15,10 @@ on:
     branches: [main]
 
 jobs:
-  # ========================================
-  # Job 1: Self-Hosted Runner Approach
-  # ========================================
-  deploy-self-hosted:
-    name: Deploy via Self-Hosted Runner
-    runs-on: self-hosted
-    continue-on-error: true   # حتى لو فشل، الـ SSH job يكمل
-    steps:
-      - name: Pull latest image from GHCR
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker pull ghcr.io/momarzouk1998/mazaya.openappo:latest
-
-      - name: Update local image tag
-        run: |
-          docker tag ghcr.io/momarzouk1998/mazaya.openappo:latest furniture-xhl2yk:latest
-
-      - name: Update swarm service
-        run: |
-          docker service update --image furniture-xhl2yk:latest --force furniture-xhl2yk
-          echo "Service update triggered."
-
-      - name: Wait for service to settle
-        run: sleep 10
-
-      - name: Verify service status
-        run: |
-          echo "=== Service status ==="
-          docker service ps furniture-xhl2yk --no-trunc
-          echo ""
-          echo "=== Internal health check ==="
-          curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3001/ || echo "Internal check failed"
-
-  # ========================================
-  # Job 2: SSH Fallback
-  # ========================================
-  deploy-ssh:
-    name: Deploy via SSH (Fallback)
-    needs: deploy-self-hosted
-    if: failure()   # لو الـ self-hosted فشل، الـ SSH يكمل
+  deploy:
+    name: Deploy via SSH
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -67,26 +30,30 @@ jobs:
           script: |
             set -e
 
-            echo "=== Pulling latest image ==="
+            echo "=== [1/6] Pulling latest image from GHCR ==="
             docker pull ghcr.io/momarzouk1998/mazaya.openappo:latest
 
-            echo "=== Tagging local image ==="
+            echo "=== [2/6] Tagging local image ==="
             docker tag ghcr.io/momarzouk1998/mazaya.openappo:latest furniture-xhl2yk:latest
 
-            echo "=== Updating swarm service ==="
+            echo "=== [3/6] Updating swarm service ==="
             docker service update --image furniture-xhl2yk:latest --force furniture-xhl2yk
 
-            echo "=== Waiting 10s for service to settle ==="
-            sleep 10
+            echo "=== [4/6] Waiting 15s for service to settle ==="
+            sleep 15
 
-            echo "=== Service status ==="
+            echo "=== [5/6] Service status ==="
             docker service ps furniture-xhl2yk --no-trunc
 
+            echo ""
             echo "=== Internal health check ==="
             curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3001/ || echo "Internal check failed"
 
             echo "=== External health check ==="
             curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" https://mazaya.openappo.com/ || echo "External check failed"
 
-            echo "=== Cleaning up old images ==="
+            echo "=== [6/6] Cleaning up old images ==="
             docker image prune -f
+
+            echo ""
+            echo "=== Deployment complete ==="
