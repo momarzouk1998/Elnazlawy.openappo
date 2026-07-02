@@ -48,23 +48,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            IMAGE="ghcr.io/${{ github.repository }}:latest"
-            LOCAL_TAG="furniture-xhl2yk:latest"
-            SERVICE="furniture-xhl2yk"
-
-            docker pull "$IMAGE"
-            docker tag "$IMAGE" "$LOCAL_TAG"
-
-            # Update Swarm service with new image
-            docker service update \
-              --image "$LOCAL_TAG" \
-              --force \
-              "$SERVICE" 2>/dev/null || echo "SERVICE_UPDATE_FAILED"
-
+      # The actual deploy is handled by .github/workflows/deploy.yml
+      # (self-hosted runner on the production server).
+      # This job only builds + pushes the image.

@@ -1,3 +1,11 @@
+# ========================================
+# Self-Hosted Runner Approach
+# ========================================
+# This workflow uses a runner that lives on the production server itself.
+# The server pulls new code, builds, and updates its own service.
+# No SSH, no secrets, no network issues.
+# ========================================
+
 name: Deploy to Server
 
 on:
@@ -7,38 +15,49 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # The runner "mazaya-runner" must be registered on the server.
+    # See DEPLOY_RUNNER_SETUP.md for setup instructions.
+    runs-on: self-hosted
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            echo "=== Pulling latest image from GHCR ==="
-            docker pull ghcr.io/momarzouk1998/mazaya.openappo:latest
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            echo "=== Tagging local image ==="
-            docker tag ghcr.io/momarzouk1998/mazaya.openappo:latest furniture-xhl2yk:latest
+      - name: Pull latest image from GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/momarzouk1998/mazaya.openappo:latest
 
-            echo "=== Updating swarm service ==="
-            docker service update --image furniture-xhl2yk:latest --force furniture-xhl2yk
+      - name: Update local image tag
+        run: |
+          docker tag ghcr.io/momarzouk1998/mazaya.openappo:latest furniture-xhl2yk:latest
 
-            echo "=== Waiting 8s for service to settle ==="
-            sleep 8
+      - name: Update swarm service
+        run: |
+          docker service update --image furniture-xhl2yk:latest --force furniture-xhl2yk
+          echo "Service update triggered."
 
-            echo "=== Service status ==="
-            docker service ps furniture-xhl2yk --no-trunc
+      - name: Wait for service to settle
+        run: sleep 10
 
-            echo "=== Container logs (last 30 lines) ==="
-            CONTAINER_ID=$(docker ps --filter name=furniture-xhl2yk -q | head -1)
-            if [ -n "$CONTAINER_ID" ]; then
-              docker logs "$CONTAINER_ID" --tail 30
-            else
-              docker service logs furniture-xhl2yk --tail 30
-            fi
+      - name: Verify service status
+        run: |
+          echo "=== Service status ==="
+          docker service ps furniture-xhl2yk --no-trunc
+          echo ""
+          echo "=== Container logs (last 40 lines) ==="
+          CONTAINER_ID=$(docker ps --filter name=furniture-xhl2yk -q | head -1)
+          if [ -n "$CONTAINER_ID" ]; then
+            docker logs "$CONTAINER_ID" --tail 40
+          else
+            docker service logs furniture-xhl2yk --tail 40
+          fi
+          echo ""
+          echo "=== Internal health check ==="
+          curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3001/ || echo "Internal check failed"
 
-            echo "=== Health check ==="
-            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3001/ || echo "Internal health check failed"
+      - name: External health check
+        run: |
+          echo "=== External health check ==="
+          curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" https://mazaya.openappo.com/ || echo "External check failed"
