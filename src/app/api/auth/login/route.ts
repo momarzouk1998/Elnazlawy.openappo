@@ -12,8 +12,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Look up the user by username OR full_name, but ONLY consider active
+    // accounts. Without `is_active: true`, a soft-deleted user that kept
+    // its `full_name` (see DELETE handler) would match and block the real
+    // active user from signing in.
     const user = await prisma.users.findFirst({
       where: {
+        is_active: true,
         OR: [
           { username },
           { full_name: username },
@@ -26,13 +31,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { ok: false, error: { code: 'UNAUTHORIZED', message: 'بيانات الدخول غير صحيحة' } },
         { status: 401 }
-      );
-    }
-
-    if (!user.is_active) {
-      return NextResponse.json(
-        { ok: false, error: { code: 'FORBIDDEN', message: 'هذا الحساب معطّل. تواصل مع المدير.' } },
-        { status: 403 }
       );
     }
 

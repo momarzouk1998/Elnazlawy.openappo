@@ -138,13 +138,19 @@ export async function DELETE(
       );
     }
 
-    // Soft-delete + scrub username so it never shows up again and frees the unique slot.
-    // (The row is kept so audit_log FKs and historical references stay valid.)
+    // Soft-delete + scrub identifying fields so this row never matches any
+    // future login attempt. The row is kept so audit_log FKs and historical
+    // references stay valid. We must scrub BOTH `username` and `full_name`
+    // because the login route accepts both as identifiers.
+    const scrubbedFullName = existingUser.full_name
+      ? `__deleted_${id}_${existingUser.full_name}`
+      : null;
     const updatedUser = await prisma.users.update({
       where: { id: parseInt(id) },
       data: {
         is_active: false,
         username: `__deleted_${id}_${Date.now()}`,
+        full_name: scrubbedFullName,
       },
       select: { id: true, username: true, full_name: true, is_active: true },
     });
