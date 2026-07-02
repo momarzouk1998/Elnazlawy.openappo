@@ -15,6 +15,21 @@ interface UserRow {
   visible_modules: string[]; is_active: boolean; notes: string | null;
 }
 
+// Detect whether the value is an email (contains @ and a dot) or a phone number.
+// Phones are stored as digits (e.g. 01001234567) and the auth layer appends @mazaya.local.
+function detectContactType(value: string): { type: 'email' | 'phone'; icon: string; label: string } {
+  const v = (value ?? '').trim();
+  if (v.includes('@') && v.includes('.')) {
+    return { type: 'email', icon: '📧', label: 'إيميل' };
+  }
+  // Phone: digits, possibly with +, spaces, dashes, parens
+  const digitsOnly = v.replace(/[^\d]/g, '');
+  if (digitsOnly.length >= 6 && digitsOnly.length <= 15) {
+    return { type: 'phone', icon: '📱', label: 'رقم هاتف' };
+  }
+  return { type: 'phone', icon: '❔', label: 'غير محدد' };
+}
+
 export default function UsersPage() {
   const router = useRouter();
   const { user: profile } = useUserStore();
@@ -99,7 +114,20 @@ export default function UsersPage() {
               <tr key={u.id} className={!u.is_active ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"}>
                 <td className="px-3 py-3 sticky right-0 bg-white">
                   <div className="font-semibold text-brand-black">{u.username}</div>
-                  <div className="text-xs text-gray-500">{u.email_or_phone}</div>
+                  <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    {(() => {
+                      const c = detectContactType(u.email_or_phone);
+                      return (
+                        <>
+                          <span title={c.label} aria-label={c.label}>{c.icon}</span>
+                          <span className="truncate max-w-[180px]" dir={c.type === 'email' ? 'ltr' : 'ltr'}>{u.email_or_phone}</span>
+                          <span className={`badge text-[10px] py-0 px-1.5 ${c.type === 'email' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                            {c.label}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
                   <div className="mt-1">
                     <span className={`badge ${u.role === "admin" ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"}`}>
                       {u.role === "admin" ? "مدير المصنع" : "موظف"}
