@@ -35,7 +35,8 @@ export default function InventoryDetailPage() {
   const [usageData, setUsageData] = useState<any[]>([]);
   useEffect(() => {
     if (!item || !params.id) return;
-    const col = table === "boards" ? "board_id" : "accessory_id";
+    const itemId = String(params.id);
+    const itemCategory = table === "boards" ? "boards_inventory" : "accessories_inventory";
     fetch(`/api/orders?limit=500`)
       .then(r => r.json())
       .then(async (json) => {
@@ -47,8 +48,8 @@ export default function InventoryDetailPage() {
           const mRes = await fetch(`/api/orders/${order.id}/materials`);
           const mJson = await mRes.json();
           if (mJson.ok) {
-            for (const m of mJson.data) {
-              if (m.item_id === parseInt(params.id)) {
+            for (const m of (mJson.data || [])) {
+              if (String(m.item_id) === itemId && (m.item_category === itemCategory || m.inventory_table === itemCategory)) {
                 mats.push({ ...m, order_name: order.order_name, status: order.status });
               }
             }
