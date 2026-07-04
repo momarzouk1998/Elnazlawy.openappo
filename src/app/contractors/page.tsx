@@ -15,7 +15,6 @@ import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
 
 const contractorFields: FieldDef[] = [
   { name: "name", label: "اسم المقاول", required: true },
-  { name: "specialty", label: "النوع" },
   { name: "phone", label: "رقم التواصل" },
   { name: "notes", label: "ملاحظات", rows: 2 },
 ];
@@ -26,13 +25,10 @@ export default function ContractorsPage() {
   const { data, loading } = useApi<{ items: any[] }>('/api/contractors?limit=500');
   const rows = data?.items ?? [];
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
 
   const filtered = useMemo(() => rows.filter(c =>
-    (!search || c.name.toLowerCase().includes(search.toLowerCase())) &&
-    (!typeFilter || c.specialty === typeFilter)
-  ), [rows, search, typeFilter]);
-  const allTypes = [...new Set(rows.map(r => r.specialty).filter(Boolean))];
+    !search || c.name.toLowerCase().includes(search.toLowerCase())
+  ), [rows, search]);
 
   if (!profile) return null;
 
@@ -53,10 +49,6 @@ export default function ContractorsPage() {
       <div className="card mb-4">
         <FilterBar>
           <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث بالاسم..." /></div>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white">
-            <option value="">كل الأنواع</option>
-            {allTypes.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
           <div className="text-sm text-gray-500 mr-auto">النتائج: <strong>{filtered.length}</strong></div>
         </FilterBar>
       </div>
@@ -67,7 +59,6 @@ export default function ContractorsPage() {
         emptyMessage="لا يوجد مقاولون"
         columns={[
           { key: "name", label: "الاسم", render: r => <Link href={`/contractors/${r.id}`} className="font-semibold text-brand-orange hover:underline">{r.name}</Link> },
-          { key: "specialty", label: "النوع" },
           { key: "phone", label: "رقم التواصل" },
           { key: "total_work", label: "إجمالي الأعمال", render: r => formatCurrency(r.total_work || 0) },
           { key: "notes", label: "ملاحظات" },

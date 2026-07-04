@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUserStore } from "@/store/user-store";
 import { useApi } from "@/hooks/useApi";
@@ -13,6 +12,14 @@ import { exportToExcel } from "@/lib/excel";
 import { formatCurrency, formatDate, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, PAYMENT_METHOD_LABELS } from "@/lib/format";
 import { canSeeModule } from "@/lib/auth";
 import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
+import {
+  BoardPurchasePanel,
+  AccessoryPurchasePanel,
+  OverheadPanel,
+  IncomePanel,
+  InventorySearchPanel,
+  WorkersReportPanel,
+} from "@/app/journal/_panels";
 
 const journalFields: FieldDef[] = [
   { name: "date", label: "التاريخ", type: "date", required: true },
@@ -23,16 +30,42 @@ const journalFields: FieldDef[] = [
   { name: "notes", label: "ملاحظات", rows: 2 },
 ];
 
+type PanelKey =
+  | "board" | "accessory" | "overhead" | "income"
+  | "search" | "workers" | "today" | null;
+
+interface ActionBtn { key: PanelKey; icon: string; label: string; color: string; }
+
+const ACTIONS: ActionBtn[] = [
+  { key: "board", icon: "🪵", label: "شراء ألواح", color: "from-amber-500 to-orange-600" },
+  { key: "accessory", icon: "🔩", label: "شراء إكسسوارات", color: "from-purple-500 to-purple-700" },
+  { key: "overhead", icon: "💵", label: "نثريات / أجور عمال", color: "from-pink-500 to-rose-600" },
+  { key: "income", icon: "📥", label: "دفعة من معرض", color: "from-green-500 to-emerald-600" },
+  { key: "search", icon: "🔍", label: "بحث في المخزن", color: "from-blue-500 to-blue-700" },
+  { key: "today", icon: "📅", label: "تقرير اليوم", color: "from-cyan-500 to-teal-600" },
+  { key: "workers", icon: "🧑‍🔧", label: "تقرير العمال", color: "from-indigo-500 to-indigo-700" },
+];
+
+const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
+  board: "🪵 شراء ألواح",
+  accessory: "🔩 شراء إكسسوارات",
+  overhead: "💵 نثريات / أجور عمال",
+  income: "📥 دفعة واردة من معرض",
+  search: "🔍 بحث في المخزن",
+  workers: "🧑‍🔧 تقرير العمال",
+  today: "📅 تقرير اليوم",
+};
+
 export default function JournalPageWrapper({ showSummary = false }: { showSummary?: boolean }) {
-  const router = useRouter();
   const { user: profile } = useUserStore();
-  const { data, loading } = useApi<{ entries: any[] }>('/api/journal?limit=500');
+  const { data, loading, refetch } = useApi<{ entries: any[] }>("/api/journal?limit=500");
   const rows = data?.entries ?? [];
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [payFilter, setPayFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [activePanel, setActivePanel] = useState<PanelKey>(null);
 
   const filtered = useMemo(() => rows.filter(r => {
     const matchSearch = !search || r.description.toLowerCase().includes(search.toLowerCase());
@@ -42,34 +75,46 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
     return matchSearch && matchType && matchPay && matchDate;
   }), [rows, search, typeFilter, payFilter, fromDate, toDate]);
 
-  // Weekly summary
-  const today = new Date();
-  const weekStart = new Date(today); weekStart.setDate(today.getDate() - 6);
-  const weekRows = filtered.filter(r => new Date(r.date) >= weekStart);
-  const weekIncome = weekRows.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
-  const weekExpense = weekRows.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + Number(r.amount), 0);
-  const totalIncome = filtered.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
-  const totalExpense = filtered.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + Number(r.amount), 0);
+  // ====== 3 مستويات للملخص ======
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - 6);
+  const weekStartKey = weekStart.toISOString().slice(0, 10);
+
+  const todayRows = rows.filter(r => r.date === todayKey);
+  const weekRows = rows.filter(r => r.date >= weekStartKey);
+
+  const calcIncome = (arr: any[]) => arr.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
+  const calcExpense = (arr: any[]) => arr.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + Number(r.amount), 0);
+
+  const todayIncome = calcIncome(todayRows);
+  const todayExpense = calcExpense(todayRows);
+  const weekIncome = calcIncome(weekRows);
+  const weekExpense = calcExpense(weekRows);
+  const totalIncome = calcIncome(filtered);
+  const totalExpense = calcExpense(filtered);
+
+  // ====== تفاصيل اليوم لجدول "تقرير اليوم" ======
+  const todayDetail = todayRows.slice().reverse(); // الأحدث أولاً
+  const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
   if (!profile) return null;
   const canSee = canSeeModule(profile, "journal");
 
+  function closePanel() { setActivePanel(null); }
+
   return (
     <DashboardLayout profile={profile}>
       <PageHeader
-        title={showSummary ? "ملخص اليومية" : "اليومية المالية"}
-        subtitle={showSummary ? "صندوق الرصيد + ملخص الأسبوع" : `آخر ${filtered.length} حركة`}
-        helpTitle={showSummary ? "ملخص اليومية" : "اليومية المالية"}
-        helpDescription={showSummary
-          ? "ده ملخص أسبوعي وشامل لكل الحركات المالية: الوارد، المصروف، الرصيد. اضغط 'اليومية' للتفاصيل الكاملة."
-          : "كل الحركات المالية بتسجل هنا تلقائياً. الإضافات اليدوية (مثل دفعة من معرض) من '+ حركة يومية'."
-        }
+        title={showSummary ? "ملخص اليومية" : "اليومية"}
+        subtitle={showSummary ? "صندوق الرصيد + ملخص الأسبوع" : "أدخل أي حركة من هنا — شراء، نثريات، وارد، بحث"}
+        helpTitle="اليومية"
+        helpDescription="هنا تدخل كل حاجة من صفحة واحدة: اضغط أي زر في الأزرار السريعة (شراء ألواح، نثريات، دفعة من معرض...)، يفتح فورم جنبها. كل حاجة بتسجل في اليومية تلقائياً."
         backHref="/dashboard"
         actions={canSee ? (
           <>
-            <Link href="/journal"><Button variant="secondary">📋 كل الحركات</Button></Link>
-            <Link href="/journal/summary"><Button variant="secondary">📊 الملخص</Button></Link>
-            <Button onClick={() => router.push("/journal/new")}>+ حركة يومية</Button>
+            {!showSummary && <Link href="/journal/summary"><Button variant="secondary">📊 ملخص الأسبوع</Button></Link>}
+            {showSummary && <Link href="/journal"><Button variant="secondary">📋 كل الحركات</Button></Link>}
+            <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
           </>
         ) : null}
       />
@@ -78,13 +123,103 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         <div className="card text-center text-gray-500 py-12">🔒 هذه الصفحة للمصنع فقط.</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
-            <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white"><div className="text-xs opacity-90">الرصيد (الوارد التراكمي)</div><div className="text-xl font-extrabold">{formatCurrency(totalIncome)}</div></div>
-            <div className="card bg-gradient-to-br from-red-500 to-orange-600 text-white"><div className="text-xs opacity-90">المصروف التراكمي</div><div className="text-xl font-extrabold">{formatCurrency(totalExpense)}</div></div>
-            <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white"><div className="text-xs opacity-90">الباقي</div><div className="text-xl font-extrabold">{formatCurrency(totalIncome - totalExpense)}</div></div>
-            <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white"><div className="text-xs opacity-90">صافي الأسبوع</div><div className="text-xl font-extrabold">{formatCurrency(weekIncome - weekExpense)}</div></div>
+          {/* ===== 3 مستويات للملخص ===== */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            {/* تقرير اليوم */}
+            <div className="card border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-white">
+              <div className="text-xs font-bold text-cyan-700 mb-2">📅 تقرير اليوم ({formatDate(todayKey)})</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(todayIncome)}</div></div>
+                <div><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(todayExpense)}</div></div>
+                <div><div className="text-[10px] text-gray-500">الصافي</div><div className={`font-bold text-sm ${todayIncome - todayExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(todayIncome - todayExpense)}</div></div>
+              </div>
+            </div>
+            {/* تقرير آخر 7 أيام */}
+            <div className="card border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-white">
+              <div className="text-xs font-bold text-blue-700 mb-2">📆 آخر 7 أيام</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(weekIncome)}</div></div>
+                <div><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(weekExpense)}</div></div>
+                <div><div className="text-[10px] text-gray-500">الصافي</div><div className={`font-bold text-sm ${weekIncome - weekExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(weekIncome - weekExpense)}</div></div>
+              </div>
+            </div>
+            {/* التقرير العام (التراكمي) */}
+            <div className="card border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-white">
+              <div className="text-xs font-bold text-purple-700 mb-2">📊 التقرير العام (تراكمي)</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(totalIncome)}</div></div>
+                <div><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(totalExpense)}</div></div>
+                <div><div className="text-[10px] text-gray-500">الصافي</div><div className={`font-bold text-sm ${totalIncome - totalExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(totalIncome - totalExpense)}</div></div>
+              </div>
+            </div>
           </div>
 
+          {/* ===== أزرار الإجراءات السريعة ===== */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+            {ACTIONS.map(a => (
+              <button
+                key={a.key}
+                onClick={() => setActivePanel(activePanel === a.key ? null : a.key)}
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${a.color} p-4 text-white shadow-md transition hover:scale-105 ${activePanel === a.key ? "ring-4 ring-offset-2 ring-brand-orange" : ""}`}
+              >
+                <div className="text-3xl mb-1">{a.icon}</div>
+                <div className="text-xs font-bold leading-tight">{a.label}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* ===== لوحة ديناميكية ===== */}
+          {activePanel && (
+            <div className="card mb-6 border-2 border-brand-orange/30">
+              <div className="flex items-center justify-between mb-3 pb-3 border-b">
+                <h3 className="font-bold text-lg text-brand-orange">{PANEL_TITLES[activePanel]}</h3>
+                <button onClick={closePanel} className="text-gray-400 hover:text-red-500 text-xl">✕</button>
+              </div>
+              <div className={activePanel === "today" ? "" : "max-w-2xl"}>
+                {activePanel === "board" && <BoardPurchasePanel onSaved={() => refetch()} />}
+                {activePanel === "accessory" && <AccessoryPurchasePanel onSaved={() => refetch()} />}
+                {activePanel === "overhead" && <OverheadPanel onSaved={() => refetch()} />}
+                {activePanel === "income" && <IncomePanel onSaved={() => refetch()} />}
+                {activePanel === "search" && <InventorySearchPanel />}
+                {activePanel === "workers" && <WorkersReportPanel />}
+                {activePanel === "today" && (
+                  <div>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="bg-green-50 p-3 rounded-lg text-center"><div className="text-xs text-gray-600">إجمالي الوارد اليوم</div><div className="font-bold text-green-700 text-lg">{formatCurrency(todayIncome)}</div></div>
+                      <div className="bg-red-50 p-3 rounded-lg text-center"><div className="text-xs text-gray-600">إجمالي المصروف اليوم</div><div className="font-bold text-red-700 text-lg">{formatCurrency(todayExpense)}</div></div>
+                      <div className="bg-blue-50 p-3 rounded-lg text-center"><div className="text-xs text-gray-600">الصافي اليوم</div><div className={`font-bold text-lg ${todayIncome - todayExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(todayIncome - todayExpense)}</div></div>
+                    </div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50"><tr>
+                          <th className="p-2 text-right">النوع</th>
+                          <th className="p-2 text-right">البيان</th>
+                          <th className="p-2 text-right">الطريقة</th>
+                          <th className="p-2 text-right">المبلغ</th>
+                        </tr></thead>
+                        <tbody className="divide-y">
+                          {todayDetail.length === 0 && <tr><td colSpan={4} className="p-4 text-center text-gray-400">لا توجد حركات اليوم بعد</td></tr>}
+                          {todayDetail.map(r => (
+                            <tr key={r.id} className="hover:bg-gray-50">
+                              <td className="p-2"><span className={`badge ${ENTRY_TYPE_COLORS[r.entry_type] || ""}`}>{ENTRY_TYPE_LABELS[r.entry_type] || r.entry_type}</span></td>
+                              <td className="p-2">{r.description}{r.party_name ? <span className="text-gray-400 text-xs"> ({r.party_name})</span> : null}</td>
+                              <td className="p-2 text-xs">{PAYMENT_METHOD_LABELS[r.payment_method] || "-"}</td>
+                              <td className={`p-2 font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 text-right">
+                      <Button variant="secondary" onClick={() => exportToExcel(todayDetail as any, `journal_today_${todayKey}`)}>📥 تصدير تقرير اليوم</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ===== جدول كل الحركات ===== */}
           <div className="card mb-4">
             <FilterBar>
               <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
@@ -98,64 +233,23 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
               </select>
               <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="من" />
               <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="إلى" />
-              <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
             </FilterBar>
           </div>
 
-          {!showSummary && (
-            <DataTable
-              loading={loading}
-              rows={filtered}
-              emptyMessage="لا توجد حركات مالية"
-              columns={[
-                { key: "date", label: "التاريخ", render: r => formatDate(r.date) },
-                { key: "entry_type", label: "النوع", render: r => <span className={`badge ${ENTRY_TYPE_COLORS[r.entry_type]}`}>{ENTRY_TYPE_LABELS[r.entry_type]}</span> },
-                { key: "description", label: "البيان" },
-                { key: "party", label: "الجهة", render: r => r.party_name || "-" },
-                { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
-                { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
-                { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/journal" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
-              ]}
-            />
-          )}
-
-          {showSummary && (
-            <div className="card overflow-hidden">
-              <h3 className="font-bold text-lg mb-3">📅 ملخص آخر 7 أيام</h3>
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-100">
-                  <th className="p-3 text-right">اليوم</th>
-                  <th className="p-3 text-right">الوارد</th>
-                  <th className="p-3 text-right">المصروف</th>
-                  <th className="p-3 text-right">الصافي</th>
-                </tr></thead>
-                <tbody>
-                  {Array.from({ length: 7 }).map((_, i) => {
-                    const d = new Date(); d.setDate(d.getDate() - (6 - i));
-                    const key = d.toISOString().slice(0, 10);
-                    const dayRows = weekRows.filter(r => r.date === key);
-	                    const inc = dayRows.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
-	                    const exp = dayRows.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + Number(r.amount), 0);
-                    const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-                    return (
-                      <tr key={key} className="border-b">
-                        <td className="p-3">{dayNames[d.getDay()]} <span className="text-gray-400 text-xs">({formatDate(key)})</span></td>
-                        <td className="p-3 text-green-700 font-bold">{formatCurrency(inc)}</td>
-                        <td className="p-3 text-red-700 font-bold">{formatCurrency(exp)}</td>
-                        <td className={`p-3 font-bold ${inc - exp >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(inc - exp)}</td>
-                      </tr>
-                    );
-                  })}
-                  <tr className="bg-gradient-to-l from-brand-orange-light to-white font-bold border-t-2 border-brand-orange">
-                    <td className="p-3">الإجمالي</td>
-                    <td className="p-3 text-green-700">{formatCurrency(weekIncome)}</td>
-                    <td className="p-3 text-red-700">{formatCurrency(weekExpense)}</td>
-                    <td className={`p-3 ${weekIncome - weekExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(weekIncome - weekExpense)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            loading={loading}
+            rows={filtered}
+            emptyMessage="لا توجد حركات مالية"
+            columns={[
+              { key: "date", label: "التاريخ", render: r => formatDate(r.date) },
+              { key: "entry_type", label: "النوع", render: r => <span className={`badge ${ENTRY_TYPE_COLORS[r.entry_type]}`}>{ENTRY_TYPE_LABELS[r.entry_type]}</span> },
+              { key: "description", label: "البيان" },
+              { key: "party", label: "الجهة", render: r => r.party_name || "-" },
+              { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
+              { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
+              { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/journal" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
+            ]}
+          />
         </>
       )}
     </DashboardLayout>

@@ -84,7 +84,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const body = await request.json();
-    const allowed = ['order_name', 'customer_id', 'branch_id', 'order_type', 'start_date', 'end_date', 'status', 'installation_cost', 'internal_transport_cost', 'external_transport_cost', 'factory_commission', 'notes'];
+    const allowed = ['order_name', 'customer_id', 'branch_id', 'order_type', 'start_date', 'end_date', 'status', 'installation_cost', 'internal_transport_cost', 'external_transport_cost', 'factory_commission', 'workers_count', 'notes'];
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {

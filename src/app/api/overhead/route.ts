@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       orderBy: [{ date: 'desc' }, { created_at: 'desc' }],
       skip: offset,
       take: limit,
+      include: { worker: { select: { id: true, name: true } } },
     });
 
     const serialized = expenses.map((e) => ({ ...e, amount: Number(e.amount) }));
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     const createJournal = searchParams.get('create_journal') === 'true';
 
     const body = await request.json();
-    const { description, amount, category, payment_method, date, notes } = body;
+    const { description, amount, category, payment_method, date, notes, worker_id } = body;
 
     if (!description || description.trim() === '') {
       return NextResponse.json(
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
             journal_entry_id: journalEntry.id,
             created_by: user.id,
             notes: notes || null,
+            worker_id: worker_id || null,
           },
         });
 
@@ -135,6 +137,7 @@ export async function POST(request: NextRequest) {
         payment_method: payment_method || null,
         created_by: user.id,
         notes: notes || null,
+        worker_id: worker_id || null,
       },
     });
 

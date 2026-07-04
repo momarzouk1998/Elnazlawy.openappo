@@ -88,7 +88,7 @@ export default function OrderDetailPage() {
           </div>
           <div className="card"><div className="text-xs text-gray-500">تاريخ البدء</div><div className="font-bold mt-1">{formatDate(order.start_date)}</div></div>
           <div className="card"><div className="text-xs text-gray-500">تاريخ الانتهاء</div><div className="font-bold mt-1">{formatDate(order.end_date)}</div></div>
-          <div className="card"><div className="text-xs text-gray-500">المدة</div><div className="font-bold mt-1 text-brand-orange">{order.duration_days != null ? `${order.duration_days} يوم` : "-"}</div></div>
+          <div className="card"><div className="text-xs text-gray-500">عدد العمال</div><div className="font-bold mt-1 text-brand-orange">{order.workers_count ?? 0}</div></div>
         </div>
       )}
 

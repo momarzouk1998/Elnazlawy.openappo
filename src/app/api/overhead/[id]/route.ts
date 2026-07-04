@@ -46,7 +46,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { description, amount, category, payment_method, date, notes } = body;
+    const { description, amount, category, payment_method, date, notes, worker_id } = body;
 
     if (amount !== undefined && (amount <= 0 || amount === null)) {
       return NextResponse.json(
@@ -62,6 +62,7 @@ export async function PATCH(
     if (amount !== undefined) data.amount = amount;
     if (payment_method !== undefined) data.payment_method = payment_method || null;
     if (notes !== undefined) data.notes = notes;
+    if (worker_id !== undefined) data.worker_id = worker_id || null;
     data.updated_at = new Date();
 
     const expense = await prisma.overhead_expenses.update({

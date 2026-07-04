@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency } from "@/lib/format";
 
-type ReportType = "inventory" | "orders" | "cashflow" | "suppliers" | "overhead";
+type ReportType = "inventory" | "orders" | "cashflow" | "suppliers" | "overhead" | "workers";
 
 export default function ReportsPage() {
   const { user: profile } = useUserStore();
@@ -61,8 +61,29 @@ export default function ReportsPage() {
       result = (suppliers).map((x: any) => ({ الاسم: x.name, "نوع التعامل": x.payment_type, الهاتف: x.phone ?? "", "إجمالي المشتريات": totals[x.id] || 0 }));
     } else if (type === "overhead") {
       const { data: o } = await mutate('GET', `/api/overhead?limit=500${fromDate ? '&from_date=' + fromDate : ''}${toDate ? '&to_date=' + toDate : ''}`);
-      const items = o?.items ?? o ?? [];
-      result = (items).map((x: any) => ({ التاريخ: x.date, البيان: x.description, المبلغ: x.amount, ملاحظات: x.notes ?? "" }));
+      const items = o?.expenses ?? o?.items ?? o ?? [];
+      result = (items).map((x: any) => ({ التاريخ: x.date, التصنيف: x.category ?? "", البيان: x.description, العامل: x.worker?.name ?? "", المبلغ: x.amount, ملاحظات: x.notes ?? "" }));
+    } else if (type === "workers") {
+      const [{ data: w }, { data: o }] = await Promise.all([
+        mutate('GET', '/api/workers?limit=500'),
+        mutate('GET', `/api/overhead?limit=2000${fromDate ? '&date_from=' + fromDate : ''}${toDate ? '&date_to=' + toDate : ''}`),
+      ]);
+      const workers = w?.items ?? w ?? [];
+      const expenses = o?.expenses ?? o?.items ?? o ?? [];
+      const byWorker: Record<string, { count: number; total: number; last: string }> = {};
+      for (const e of expenses) {
+        if (!e.worker_id) continue;
+        const wid = String(e.worker_id);
+        if (!byWorker[wid]) byWorker[wid] = { count: 0, total: 0, last: "" };
+        byWorker[wid].count += 1;
+        byWorker[wid].total += Number(e.amount || 0);
+        const d = String(e.date).slice(0, 10);
+        if (d > byWorker[wid].last) byWorker[wid].last = d;
+      }
+      result = (workers).map((x: any) => {
+        const s = byWorker[String(x.id)] || { count: 0, total: 0, last: "" };
+        return { الاسم: x.name, الهاتف: x.phone ?? "", "عدد المصروفات": s.count, "إجمالي الأجور": s.total, "آخر صرف": s.last || "-" };
+      });
     }
     setData(result);
     setLoading(false);
@@ -70,8 +91,8 @@ export default function ReportsPage() {
 
   if (!profile) return null;
 
-  const total = type === "cashflow" || type === "suppliers" || type === "orders" || type === "overhead"
-    ? data.reduce((s, r) => s + (Number(r["المبلغ"] ?? r["الإجمالي"] ?? r["إجمالي المشتريات"] ?? 0)), 0)
+  const total = type === "cashflow" || type === "suppliers" || type === "orders" || type === "overhead" || type === "workers"
+    ? data.reduce((s, r) => s + (Number(r["المبلغ"] ?? r["الإجمالي"] ?? r["إجمالي المشتريات"] ?? r["إجمالي الأجور"] ?? 0)), 0)
     : data.reduce((s, r) => s + (Number(r["قيمة المتبقي"] ?? 0)), 0);
 
   return (
@@ -92,8 +113,9 @@ export default function ReportsPage() {
             <option value="cashflow">💸 التدفق النقدي</option>
             <option value="suppliers">🏭 تقرير الموردين</option>
             <option value="overhead">📄 تقرير النثريات</option>
+            <option value="workers">🧑‍🔧 تقرير العمال (الأجور)</option>
           </select>
-          {type !== "inventory" && (
+          {type !== "inventory" && type !== "workers" && (
             <>
               <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" placeholder="من" />
               <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" placeholder="إلى" />

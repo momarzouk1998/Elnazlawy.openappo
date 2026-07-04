@@ -57,6 +57,7 @@ export default function NewOrderForm() {
     start_date: new Date().toISOString().slice(0, 10),
     end_date: "",
     status: "مفتوح",
+    workers_count: "",
     notes: "",
   })
 
@@ -108,6 +109,7 @@ export default function NewOrderForm() {
           start_date: ord.start_date ? String(ord.start_date).slice(0, 10) : "",
           end_date: ord.end_date ? String(ord.end_date).slice(0, 10) : "",
           status: ord.status ?? "مفتوح",
+          workers_count: ord.workers_count != null ? String(ord.workers_count) : "",
           notes: ord.notes ?? "",
         })
         setCosts({
@@ -177,6 +179,7 @@ export default function NewOrderForm() {
       start_date: order.start_date || null,
       end_date: order.end_date || null,
       status: order.status,
+      workers_count: order.workers_count ? Number(order.workers_count) : 0,
       notes: order.notes || null,
     }
     let orderId: string
@@ -253,9 +256,10 @@ export default function NewOrderForm() {
               <Select label="الأوردر الأصلي" value={order.parent_order_id} onChange={(e) => setOrder({ ...order, parent_order_id: e.target.value })} options={[{ value: "", label: "— اختر —" }, ...allOrders.map((o) => ({ value: String(o.id), label: o.order_name }))]} />
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Input label="تاريخ البدء" type="date" value={order.start_date} onChange={(e) => setOrder({ ...order, start_date: e.target.value })} />
             <Input label="تاريخ الانتهاء" type="date" value={order.end_date} onChange={(e) => setOrder({ ...order, end_date: e.target.value })} />
+            <Input label="عدد العمال" type="number" min="0" value={order.workers_count} onChange={(e) => setOrder({ ...order, workers_count: e.target.value })} placeholder="0" />
             <Select label="الحالة" value={order.status} onChange={(e) => setOrder({ ...order, status: e.target.value })} options={[{ value: "مفتوح", label: "مفتوح" }, { value: "قيد التنفيذ", label: "قيد التنفيذ" }, { value: "مكتمل", label: "مكتمل" }, { value: "تم التسليم", label: "تم التسليم" }]} />
           </div>
           <Textarea label="ملاحظات عامة" rows={4} value={order.notes} onChange={(e) => setOrder({ ...order, notes: e.target.value })} />

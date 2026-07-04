@@ -22,6 +22,7 @@ export const ALL_MODULES = [
   { key: 'orders', label: 'الأوردرات', icon: '📦', path: '/orders' },
   { key: 'journal', label: 'اليومية', icon: '💰', path: '/journal' },
   { key: 'overhead', label: 'النثريات', icon: '📄', path: '/overhead' },
+  { key: 'workers', label: 'العمال', icon: '🧑‍🔧', path: '/workers' },
   { key: 'contractors', label: 'المقاولين', icon: '🔨', path: '/contractors' },
   { key: 'reports', label: 'التقارير', icon: '📈', path: '/reports' },
   { key: 'users', label: 'المستخدمين', icon: '⚙️', path: '/admin/users' },

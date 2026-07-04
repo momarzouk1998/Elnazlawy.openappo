@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   try {
     const user = await requireAuth();
     const body = await request.json();
-    const { order_name, customer_id, branch_id, order_type, start_date, end_date, status, installation_cost, internal_transport_cost, external_transport_cost, factory_commission, notes } = body;
+    const { order_name, customer_id, branch_id, order_type, start_date, end_date, status, installation_cost, internal_transport_cost, external_transport_cost, factory_commission, workers_count, notes } = body;
 
     if (!order_name || !order_name.trim()) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الأوردر مطلوب' } }, { status: 400 });
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
         internal_transport_cost: internal_transport_cost || 0,
         external_transport_cost: external_transport_cost || 0,
         factory_commission: factory_commission || 0,
+        workers_count: workers_count ?? 0,
         notes: notes || null,
         created_by: user.id,
       },

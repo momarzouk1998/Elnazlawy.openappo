@@ -63,7 +63,9 @@ export default function OverheadPage() {
         emptyMessage="لا توجد نثريات"
         columns={[
           { key: "date", label: "التاريخ", render: (r) => formatDate(r.date) },
+          { key: "category", label: "التصنيف", render: (r) => r.category ? <span className="badge bg-purple-100 text-purple-700 border-purple-300">{r.category}</span> : "-" },
           { key: "description", label: "البيان" },
+          { key: "worker", label: "العامل", render: (r) => r.worker?.name || "-" },
           { key: "amount", label: "المبلغ", render: (r) => <span className="font-bold text-red-600">{formatCurrency(Number(r.amount ?? 0))}</span> },
           { key: "notes", label: "ملاحظات" },
           { key: "_actions", label: "إجراءات", render: (r) => <RowEditor row={r} apiBase="/api/overhead" fields={overheadFields} entityLabel="النثريات" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بحركة يومية" /> },

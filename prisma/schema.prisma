@@ -90,6 +90,7 @@ model orders {
   start_date              DateTime               @default(now()) @db.Date
   end_date                DateTime?              @db.Date
   duration_days           Int?
+  workers_count           Int?                   @default(0)
   status                  String                 @default("مفتوح") @db.Text
   boards_cost             Decimal                @default(0)
   accessories_cost        Decimal                @default(0)
@@ -213,6 +214,20 @@ model contractors {
   @@schema("mazaya")
 }
 
+model workers {
+  id         String              @id @default(uuid()) @db.Uuid
+  name       String              @db.Text
+  phone      String?             @db.Text
+  notes      String?             @db.Text
+  deleted_at DateTime?           @db.Timestamptz()
+  created_at DateTime?           @default(now()) @db.Timestamptz()
+  updated_at DateTime?           @default(now()) @db.Timestamptz()
+  expenses   overhead_expenses[]
+
+  @@map("workers")
+  @@schema("mazaya")
+}
+
 model journal_entries {
   id             String              @id @default(uuid()) @db.Uuid
   date           DateTime            @default(now()) @db.Date
@@ -244,10 +259,12 @@ model overhead_expenses {
   payment_method  String?            @db.Text
   notes           String?            @db.Text
   journal_entry_id String?           @unique @db.Uuid
+  worker_id       String?            @db.Uuid
   created_by      Int?
   created_at      DateTime?          @default(now()) @db.Timestamptz()
   updated_at      DateTime?          @default(now()) @db.Timestamptz()
   journal_entry   journal_entries?   @relation(fields: [journal_entry_id], references: [id])
+  worker          workers?           @relation(fields: [worker_id], references: [id])
 
   @@map("overhead_expenses")
   @@schema("mazaya")
