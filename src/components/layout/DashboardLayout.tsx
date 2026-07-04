@@ -12,11 +12,13 @@ export default function DashboardLayout({ profile, children }: Props) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // الأدمن بيشوف كل الموديولات. الموظف بيشوف اللي في visible_modules بس،
-  // ما عدا الموديولات adminOnly (زي المستخدمين) — دي أدمن-أونلي حتى لو متعلم عليها.
-  const visible = profile.role === 'admin'
-    ? ALL_MODULES
-    : ALL_MODULES.filter(m => profile.visible_modules.includes(m.key) && !(m as any).adminOnly);
+  // الكل (أدمن وموظف) بيشوف اللي في visible_modules بس.
+  // الاستثناء: الموديولات adminOnly (المستخدمين) — دي تظهر للأدمن دايماً عشان يديرها،
+  // وتختفي عن الموظفين تماماً حتى لو متعلم عليها.
+  const visible = ALL_MODULES.filter(m => {
+    if ((m as any).adminOnly) return profile.role === 'admin';
+    return profile.visible_modules.includes(m.key);
+  });
   const isActive = (item: typeof ALL_MODULES[number]) => {
     const p = (item as any).path || `/${item.key}`;
     return pathname === p || pathname.startsWith(p + "/");
