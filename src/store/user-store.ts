@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import type { CurrentProfile } from '@/lib/auth'
 
@@ -12,9 +13,9 @@ interface UserState {
 
 /**
  * Central user store.
- * - Set on app load from /api/auth/user
+ * - Hydrated from SSR via `setInitialUser()` (see UserInitializer)
+ * - Falls back to a client-side /api/auth/user fetch when no SSR data
  * - Cleared on logout
- * - Used by sidebar, header, permissions checks
  */
 export const useUserStore = create<UserState>((set) => ({
   user: null,
@@ -23,8 +24,24 @@ export const useUserStore = create<UserState>((set) => ({
   setUser: (user) => set({ user, initialized: true }),
 
   logout: () => {
-    // Fire-and-forget: clear cookie server-side
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     set({ user: null, initialized: true })
   },
 }))
+
+/**
+ * One-shot helper: hydrate the store with SSR-supplied user data.
+ * Safe to call from a client component's render path because it only
+ * sets the state once (subsequent calls are no-ops).
+ *
+ * Returns `true` if the store was just hydrated, `false` if it was
+ * already initialized. Components can use this to decide whether to
+ * block render until the first client-side fetch completes.
+ */
+let ssrHydrated = false
+export function hydrateUserFromSSR(user: CurrentProfile | null): boolean {
+  if (ssrHydrated) return false
+  ssrHydrated = true
+  useUserStore.setState({ user, initialized: true })
+  return true
+}
