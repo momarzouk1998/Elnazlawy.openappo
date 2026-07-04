@@ -95,7 +95,7 @@ export default function AccessoriesPage() {
           <div className="text-sm text-gray-500 mr-auto">النتائج: <strong>{filtered.length}</strong></div>
         </FilterBar>
       </div>
-      <DataTable loading={loading} rows={filtered} emptyMessage="لا توجد اكسسوارات." onRowClick={(r) => router.push("/accessories/" + r.id)} columns={[
+      <DataTable loading={loading} rows={filtered} emptyMessage="لا توجد اكسسوارات." columns={[
         { key: "item_name", label: "البيان", render: (r: any) => <Link href={"/accessories/" + r.id} className="text-brand-orange hover:underline font-medium">{r.item_name}</Link> },
         { key: "code", label: "الكود", render: (r: any) => <code className="text-xs bg-gray-100 px-2 py-1 rounded">{r.code}</code> },
         { key: "type", label: "النوع" },

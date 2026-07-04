@@ -14,10 +14,9 @@ interface Props<T> {
   rows: T[];
   emptyMessage?: string;
   loading?: boolean;
-  onRowClick?: (row: T) => void;
 }
 
-export function DataTable<T extends { id?: number | string }>({ columns, rows, emptyMessage = "لا توجد بيانات", loading, onRowClick }: Props<T>) {
+export function DataTable<T extends { id?: number | string }>({ columns, rows, emptyMessage = "لا توجد بيانات", loading }: Props<T>) {
   return (
     <div className="bg-white rounded-xl shadow-card overflow-hidden border border-gray-100">
       <div className="overflow-x-auto">
@@ -39,11 +38,7 @@ export function DataTable<T extends { id?: number | string }>({ columns, rows, e
             ) : rows.length === 0 ? (
               <tr><td colSpan={columns.length} className="text-center py-12 text-gray-400">{emptyMessage}</td></tr>
             ) : rows.map((row, i) => (
-              <tr
-                key={row.id ?? i}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-                className={`${onRowClick ? "cursor-pointer" : ""} hover:bg-gray-50 transition`}
-              >
+              <tr key={row.id ?? i} className="hover:bg-gray-50 transition">
                 {columns.map(c => (
                   <td key={c.key} className={`px-4 py-3 text-gray-800 whitespace-nowrap ${c.className || ""}`}>
                     {c.render ? c.render(row) : (row as any)[c.key] ?? "-"}

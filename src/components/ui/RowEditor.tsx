@@ -105,7 +105,7 @@ export default function RowEditor({
 
   return (
     <>
-      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-center gap-1">
         <button
           onClick={openEdit}
           className="p-1.5 hover:bg-blue-100 rounded transition text-base"
