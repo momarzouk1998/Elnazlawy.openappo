@@ -43,7 +43,7 @@ const ACTIONS: ActionBtn[] = [
   { key: "search", icon: "🔍", label: "بحث في المخزن", color: "from-blue-500 to-blue-700" },
   { key: "today", icon: "📅", label: "تقرير اليوم", color: "from-cyan-500 to-teal-600" },
   { key: "workers", icon: "🧑‍🔧", label: "تقرير العمال", color: "from-indigo-500 to-indigo-700" },
-  { key: "filter", icon: "🔎", label: "فلتر الحركات", color: "from-gray-500 to-gray-700" },
+  { key: "filter", icon: "📋", label: "الحركات المالية", color: "from-gray-500 to-gray-700" },
 ];
 
 const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
@@ -54,7 +54,7 @@ const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
   search: "🔍 بحث في المخزن",
   workers: "🧑‍🔧 تقرير العمال",
   today: "📅 تقرير اليوم",
-  filter: "🔎 فلتر الحركات",
+  filter: "📋 الحركات المالية",
 };
 
 export default function JournalPageWrapper({ showSummary = false }: { showSummary?: boolean }) {
@@ -169,7 +169,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 <h3 className="font-bold text-lg text-brand-orange">{PANEL_TITLES[activePanel]}</h3>
                 <button onClick={closePanel} className="text-gray-400 hover:text-red-500 text-xl">✕</button>
               </div>
-              <div className={activePanel === "today" ? "" : "max-w-2xl"}>
+              <div className={activePanel === "today" || activePanel === "filter" ? "" : "max-w-2xl"}>
                 {activePanel === "board" && <BoardPurchasePanel onSaved={() => refetch()} />}
                 {activePanel === "accessory" && <AccessoryPurchasePanel onSaved={() => refetch()} />}
                 {activePanel === "overhead" && <OverheadPanel onSaved={() => refetch()} />}
@@ -200,6 +200,20 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                         )}
                       </div>
                     </div>
+                    <DataTable
+                      loading={loading}
+                      rows={filtered}
+                      emptyMessage="لا توجد حركات مالية"
+                      columns={[
+                        { key: "date", label: "التاريخ", render: r => formatDate(r.date) },
+                        { key: "entry_type", label: "النوع", render: r => <span className={`badge ${ENTRY_TYPE_COLORS[r.entry_type]}`}>{ENTRY_TYPE_LABELS[r.entry_type]}</span> },
+                        { key: "description", label: "البيان" },
+                        { key: "party", label: "الجهة", render: r => r.party_name || "-" },
+                        { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
+                        { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
+                        { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/journal" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
+                      ]}
+                    />
                   </div>
                 )}
                 {activePanel === "today" && (
@@ -280,21 +294,6 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
             </div>
           )}
 
-          {/* ===== جدول كل الحركات ===== */}
-          <DataTable
-            loading={loading}
-            rows={filtered}
-            emptyMessage="لا توجد حركات مالية"
-            columns={[
-              { key: "date", label: "التاريخ", render: r => formatDate(r.date) },
-              { key: "entry_type", label: "النوع", render: r => <span className={`badge ${ENTRY_TYPE_COLORS[r.entry_type]}`}>{ENTRY_TYPE_LABELS[r.entry_type]}</span> },
-              { key: "description", label: "البيان" },
-              { key: "party", label: "الجهة", render: r => r.party_name || "-" },
-              { key: "payment_method", label: "الطريقة", render: r => PAYMENT_METHOD_LABELS[r.payment_method] || "-" },
-              { key: "amount", label: "المبلغ", render: r => <span className={`font-bold ${r.entry_type === "دفعة واردة من معرض" ? "text-green-600" : "text-red-600"}`}>{formatCurrency(r.amount)}</span> },
-              { key: "_actions", label: "إجراءات", render: r => <RowEditor row={r} apiBase="/api/journal" fields={journalFields} entityLabel="الحركة المالية" deleteHint="لا يمكن حذف هذه الحركة لأنها مرتبطة بأوردر أو حركات أخرى" /> },
-            ]}
-          />
         </>
       )}
     </DashboardLayout>
