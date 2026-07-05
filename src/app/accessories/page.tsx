@@ -9,7 +9,7 @@ import PageHeader from "@/components/PageHeader"
 import { DataTable } from "@/components/DataTable"
 import { SearchBox, FilterBar } from "@/components/SearchFilter"
 import { Button } from "@/components/ui/Button"
-import { exportToExcel, importFromExcel } from "@/lib/excel"
+import { exportToExcel } from "@/lib/excel"
 import { formatCurrency } from "@/lib/format"
 import RowEditor, { type FieldDef } from "@/components/ui/RowEditor"
 
@@ -33,7 +33,6 @@ export default function AccessoriesPage() {
   const [supplierFilter, setSupplierFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
   const [availableOnly, setAvailableOnly] = useState(false)
-  const [importing, setImporting] = useState(false)
 
   const types = useMemo(() => {
     const set = new Set<string>()
@@ -49,43 +48,13 @@ export default function AccessoriesPage() {
     return matchSearch && matchSup && matchType && matchAvail
   }), [rows, search, supplierFilter, typeFilter, availableOnly])
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
-    setImporting(true)
-    try {
-      const excelData = await importFromExcel<any>(file)
-      let ok = 0, fail = 0
-      for (const r of excelData) {
-        const supplierName = String(r["الشركة"] || r["المورد"] || "").trim()
-        const supplier = suppliers.find((s: any) => s.name === supplierName)
-        const payload = {
-          item_name: String(r["البيان"] || r["item_name"] || "").trim(),
-          code: String(r["الكود"] || r["code"] || "").trim(),
-          type: String(r["النوع"] || r["type"] || "").trim(),
-          supplier_id: supplier?.id ?? null,
-          unit_price: Number(r["السعر"] || r["unit_price"] || 0),
-          quantity_in: Number(r["العدد"] || r["quantity_in"] || 0),
-          notes: String(r["ملاحظات"] || r["notes"] || "").trim() || null,
-        }
-        if (!payload.item_name || !payload.code) { fail++; continue }
-        const res = await fetch("/api/accessories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-        if (res.ok) ok++; else fail++
-      }
-      alert("تم استيراد " + ok + " بنجاح" + (fail ? "، فشل " + fail : ""))
-      location.reload()
-    } finally { setImporting(false); e.target.value = "" }
-  }
-
   if (!profile) return null
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="مخزون الاكسسوارات" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الاكسسوارات" helpDescription="إدارة مفصلات، سكك درج، مجاري، كاوتش، إلخ. نفس فكرة الألواح: ابحث أولاً، لو الصنف موجود زود الكمية، لو مش موجود أنشئ صنف جديد. الكود فريد لكل مورد." backHref="/dashboard" actions={<>
-        <label className="btn-secondary cursor-pointer">{importing ? "جاري..." : "📤 استيراد Excel"}<input type="file" accept=".xlsx,.xls" hidden onChange={handleImport} /></label>
-        <Button variant="secondary" onClick={() => exportToExcel(filtered.map(({ id, supplier_name, total_price, ...rest }: any) => rest as any), "accessories_inventory")}>تصدير</Button>
-        <Button onClick={() => router.push("/accessories/buy")}>🛒 شراء</Button>
-        <Button variant="secondary" onClick={() => router.push("/accessories/new")}>+ اكسسوار جديد</Button>
-      </>} />
+      <PageHeader title="مخزون الاكسسوارات" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الاكسسوارات" helpDescription="إدارة مفصلات، سكك درج، مجاري، كاوتش، إلخ. الشراء والإضافة الجديدة من صفحة اليومية." backHref="/dashboard" actions={
+        <Button variant="secondary" onClick={() => exportToExcel(filtered.map(({ id, supplier_name, total_price, ...rest }: any) => rest as any), "accessories_inventory")}>📥 تصدير</Button>
+      } />
       {/* إجمالي المخزون */}
       {rows.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
@@ -122,7 +91,7 @@ export default function AccessoriesPage() {
         { key: "quantity_used", label: "المستخدم" },
         { key: "quantity_remaining", label: "المتبقي", render: (r: any) => <span className={r.quantity_remaining > 0 ? "font-bold text-green-600" : "text-gray-400"}>{r.quantity_remaining}</span> },
         { key: "total_price", label: "الإجمالي", render: (r: any) => <span className="font-bold">{formatCurrency(Number(r.total_price ?? 0))}</span> },
-        { key: "_actions", label: "إجراءات", render: (r: any) => <RowEditor row={r} apiBase="/api/accessories" fields={accessoryFields} entityLabel="الاكسسوار" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" extraButtons={<Link href={"/accessories/buy"} onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-green-100 rounded text-base" title="شراء كمية">🛒</Link>} /> },
+        { key: "_actions", label: "إجراءات", render: (r: any) => <RowEditor row={r} apiBase="/api/accessories" fields={accessoryFields} entityLabel="الاكسسوار" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" /> },
       ]} />
     </DashboardLayout>
   )

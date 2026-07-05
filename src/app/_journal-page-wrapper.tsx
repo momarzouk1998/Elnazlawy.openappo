@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useUserStore } from "@/store/user-store";
 import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -32,7 +31,7 @@ const journalFields: FieldDef[] = [
 
 type PanelKey =
   | "board" | "accessory" | "overhead" | "income"
-  | "search" | "workers" | "today" | null;
+  | "search" | "workers" | "today" | "filter" | null;
 
 interface ActionBtn { key: PanelKey; icon: string; label: string; color: string; }
 
@@ -44,6 +43,7 @@ const ACTIONS: ActionBtn[] = [
   { key: "search", icon: "🔍", label: "بحث في المخزن", color: "from-blue-500 to-blue-700" },
   { key: "today", icon: "📅", label: "تقرير اليوم", color: "from-cyan-500 to-teal-600" },
   { key: "workers", icon: "🧑‍🔧", label: "تقرير العمال", color: "from-indigo-500 to-indigo-700" },
+  { key: "filter", icon: "🔎", label: "فلتر الحركات", color: "from-gray-500 to-gray-700" },
 ];
 
 const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
@@ -54,6 +54,7 @@ const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
   search: "🔍 بحث في المخزن",
   workers: "🧑‍🔧 تقرير العمال",
   today: "📅 تقرير اليوم",
+  filter: "🔎 فلتر الحركات",
 };
 
 export default function JournalPageWrapper({ showSummary = false }: { showSummary?: boolean }) {
@@ -118,9 +119,6 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         helpTitle="اليومية"
         helpDescription="هنا تدخل كل حاجة من صفحة واحدة: اضغط أي زر في الأزرار السريعة (شراء ألواح، نثريات، دفعة من معرض...)، يفتح فورم جنبها. كل حاجة بتسجل في اليومية تلقائياً."
         backHref="/dashboard"
-        actions={canSee ? (
-          <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
-        ) : null}
       />
 
       {!canSee ? (
@@ -151,7 +149,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
           </div>
 
           {/* ===== أزرار الإجراءات السريعة ===== */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
             {ACTIONS.map(a => (
               <button
                 key={a.key}
@@ -178,6 +176,32 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 {activePanel === "income" && <IncomePanel onSaved={() => refetch()} />}
                 {activePanel === "search" && <InventorySearchPanel />}
                 {activePanel === "workers" && <WorkersReportPanel />}
+                {activePanel === "filter" && (
+                  <div className="space-y-3">
+                    <FilterBar>
+                      <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
+                      <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
+                        <option value="">كل الأنواع</option>
+                        {Object.entries(ENTRY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <select value={payFilter} onChange={e => setPayFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
+                        <option value="">كل طرق الدفع</option>
+                        {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="من" />
+                      <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="إلى" />
+                    </FilterBar>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">النتائج: <strong>{filtered.length}</strong> حركة</span>
+                      <div className="flex gap-2">
+                        <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
+                        {(search || typeFilter || payFilter || fromDate || toDate) && (
+                          <Button variant="secondary" onClick={() => { setSearch(""); setTypeFilter(""); setPayFilter(""); setFromDate(""); setToDate(""); }}>🗑️ مسح الفلتر</Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {activePanel === "today" && (
                   <div>
                     {/* ملخص الرصيد الجاري */}
@@ -257,22 +281,6 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
           )}
 
           {/* ===== جدول كل الحركات ===== */}
-          <div className="card mb-4">
-            <FilterBar>
-              <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
-                <option value="">كل الأنواع</option>
-                {Object.entries(ENTRY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <select value={payFilter} onChange={e => setPayFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
-                <option value="">كل طرق الدفع</option>
-                {Object.entries(PAYMENT_METHOD_LABELS).filter(([k]) => k !== "both").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="من" />
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="إلى" />
-            </FilterBar>
-          </div>
-
           <DataTable
             loading={loading}
             rows={filtered}
