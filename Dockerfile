@@ -49,6 +49,10 @@ RUN addgroup --system --gid 1001 nodejs ; adduser --system --uid 1001 nextjs
 # Copy generated Prisma client so it's available at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
+# Copy Prisma CLI and migrations for running migrate deploy on startup
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/engines ./node_modules/@prisma/engines
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 # Copy built standalone app (smaller than full build)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -59,5 +63,5 @@ USER nextjs
 
 EXPOSE 3000
 
-# Use -H 0.0.0.0 explicitly — Swarm sets HOSTNAME=<task-name> which would otherwise bind to 127.0.1.1
-CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node server.js"]
+# Run migrations then start the server
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy 2>/dev/null || echo 'Migrations skipped or already applied' && HOSTNAME=0.0.0.0 node server.js"]

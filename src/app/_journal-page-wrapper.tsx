@@ -119,11 +119,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         helpDescription="هنا تدخل كل حاجة من صفحة واحدة: اضغط أي زر في الأزرار السريعة (شراء ألواح، نثريات، دفعة من معرض...)، يفتح فورم جنبها. كل حاجة بتسجل في اليومية تلقائياً."
         backHref="/dashboard"
         actions={canSee ? (
-          <>
-            {!showSummary && <Link href="/journal/summary"><Button variant="secondary">📊 ملخص الأسبوع</Button></Link>}
-            {showSummary && <Link href="/journal"><Button variant="secondary">📋 كل الحركات</Button></Link>}
-            <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
-          </>
+          <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
         ) : null}
       />
 
