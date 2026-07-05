@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         journal = await tx.journal_entries.create({
           data: {
             date: date ? new Date(date) : new Date(),
-            entry_type: "purchase",
+            entry_type: "مشتريات",
             description: "شراء " + qty + " " + item.item_name,
             amount: total,
             payment_method: payment_method || "نقدي",

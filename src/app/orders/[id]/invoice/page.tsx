@@ -12,6 +12,7 @@ export default function InvoicePage() {
   const [materials, setMaterials] = useState<any[]>([]);
   const [costs, setCosts] = useState<any>(null);
   const [external, setExternal] = useState<any[]>([]);
+  const [extraCosts, setExtraCosts] = useState<any[]>([]);
 
   // Fetch related data when order loads
   useEffect(() => {
@@ -20,10 +21,12 @@ export default function InvoicePage() {
       fetch(`/api/orders/${id}/materials`).then(r => r.json()),
       fetch(`/api/orders/${id}`).then(r => r.json()),
       fetch(`/api/orders/${id}/external-work`).then(r => r.json()),
-    ]).then(([mRes, cRes, eRes]) => {
+      fetch(`/api/orders/${id}/extra-costs`).then(r => r.json()),
+    ]).then(([mRes, cRes, eRes, exRes]) => {
       setMaterials(mRes?.data ?? []);
       setCosts(cRes?.data?.costs ?? null);
       setExternal(eRes?.data ?? []);
+      setExtraCosts(exRes?.data ?? []);
     });
   }, [order?.id, id]);
 
@@ -103,6 +106,17 @@ export default function InvoicePage() {
           <div className="flex justify-between"><span>نقل داخلي:</span><strong>{formatCurrency(costs?.internal_transport_cost)}</strong></div>
           <div className="flex justify-between"><span>نقل خارجي:</span><strong>{formatCurrency(costs?.external_transport_cost)}</strong></div>
           <div className="flex justify-between"><span>عمولة المصنع:</span><strong>{formatCurrency(costs?.factory_commission)}</strong></div>
+          {extraCosts && extraCosts.length > 0 && (
+            <>
+              <div className="border-t pt-2 mt-2 font-semibold">تكاليف إضافية:</div>
+              {extraCosts.map((e: any) => (
+                <div key={e.id} className="flex justify-between text-gray-600">
+                  <span>{e.cost_type}{e.notes ? ` (${e.notes})` : ""}:</span>
+                  <strong>{formatCurrency(Number(e.amount))}</strong>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         <div className="bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white p-4 rounded-xl flex items-center justify-between">

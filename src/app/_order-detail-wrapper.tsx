@@ -19,6 +19,7 @@ export default function OrderDetailPage() {
   const { data: order, loading, refetch: refetchOrder } = useApi<any>(`/api/orders/${id}`);
   const { data: materialsData } = useApi<any[]>(`/api/orders/${id}/materials`);
   const { data: externalData } = useApi<any[]>(`/api/orders/${id}/external-work`);
+  const { data: extraCostsData } = useApi<any[]>(`/api/orders/${id}/extra-costs`);
   const { data: journalResp } = useApi<{ entries: any[] } | any[]>(`/api/journal?order_id=${id}&limit=500`);
 
   const materials = materialsData ?? (order?.materials ?? []);
@@ -33,6 +34,8 @@ export default function OrderDetailPage() {
     order_total: order.order_total ?? 0,
   } : null;
   const external = externalData ?? (order?.external_work ?? []);
+  const extraCosts = extraCostsData ?? (order?.extra_costs ?? []);
+  const extraCostsTotal = extraCosts.reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0);
   const transfers = Array.isArray(journalResp)
     ? journalResp
     : (journalResp?.entries ?? []);
@@ -121,8 +124,22 @@ export default function OrderDetailPage() {
             <div className="card"><div className="text-xs text-gray-500">نقل داخلي</div><div className="font-bold">{formatCurrency(costs.internal_transport_cost)}</div></div>
             <div className="card"><div className="text-xs text-gray-500">نقل خارجي</div><div className="font-bold">{formatCurrency(costs.external_transport_cost)}</div></div>
             <div className="card"><div className="text-xs text-gray-500">عمولة المصنع</div><div className="font-bold">{formatCurrency(costs.factory_commission)}</div></div>
-            <div className="card bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white"><div className="text-xs opacity-90">الإجمالي</div><div className="font-extrabold text-lg">{formatCurrency(costs.order_total)}</div></div>
+            <div className={`card ${extraCostsTotal > 0 ? "bg-yellow-50 border-yellow-200" : ""}`}><div className="text-xs text-gray-500">تكاليف إضافية</div><div className="font-bold">{formatCurrency(extraCostsTotal)}</div></div>
+            <div className="card bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white md:col-span-4"><div className="text-xs opacity-90">الإجمالي</div><div className="font-extrabold text-lg">{formatCurrency(costs.order_total)}</div></div>
           </div>
+          {extraCosts.length > 0 && (
+            <div className="card mb-4">
+              <h4 className="font-bold text-sm mb-2">➕ تفاصيل التكاليف الإضافية</h4>
+              <div className="space-y-1 text-sm">
+                {extraCosts.map((e: any) => (
+                  <div key={e.id} className="flex justify-between py-1 border-b last:border-0">
+                    <span>{e.cost_type}{e.notes ? ` — ${e.notes}` : ""}</span>
+                    <strong>{formatCurrency(Number(e.amount))}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 

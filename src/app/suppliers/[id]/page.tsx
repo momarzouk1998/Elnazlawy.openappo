@@ -23,8 +23,11 @@ export default function SupplierDetailPage() {
   if (!user) return null;
   if (!supplier && !loading) return <DashboardLayout profile={user}><div className="card">المورد غير موجود</div></DashboardLayout>;
 
-  const totalPurchases = purchases.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0);
+  // المدفوعات الفعلية لهذا المورد (غير التمريرية)
+  const actualPayments = purchases.filter((p: any) => !p.is_pass_through);
+  const totalPayments = actualPayments.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0);
   const totalItemsValue = [...boards, ...accessories].reduce((s: number, it: any) => s + (it.unit_price * it.quantity_remaining), 0);
+  const balance = totalPayments - totalItemsValue;
 
   return (
     <DashboardLayout profile={user}>
@@ -34,7 +37,7 @@ export default function SupplierDetailPage() {
         backHref="/suppliers"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="card">
           <div className="text-sm text-gray-500">إجمالي الأصناف</div>
           <div className="text-2xl font-extrabold text-brand-black">{boards.length + accessories.length}</div>
@@ -45,7 +48,14 @@ export default function SupplierDetailPage() {
         </div>
         <div className="card">
           <div className="text-sm text-gray-500">إجمالي المدفوعات</div>
-          <div className="text-2xl font-extrabold text-red-600">{formatCurrency(totalPurchases)}</div>
+          <div className="text-2xl font-extrabold text-red-600">{formatCurrency(totalPayments)}</div>
+        </div>
+        <div className={`card ${balance >= 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+          <div className="text-sm text-gray-500">الرصيد</div>
+          <div className={`text-2xl font-extrabold ${balance >= 0 ? "text-red-600" : "text-green-600"}`}>
+            {balance >= 0 ? `عليك ${formatCurrency(balance)}` : `لك ${formatCurrency(Math.abs(balance))}`}
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">{balance >= 0 ? "دفعتله أكتر من قيمة المخزون" : "المخزون أكتر من اللي دفعت"}</div>
         </div>
       </div>
 

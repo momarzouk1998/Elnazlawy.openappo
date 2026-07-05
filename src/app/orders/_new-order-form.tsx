@@ -83,6 +83,10 @@ export default function NewOrderForm() {
   const [customWorkType, setCustomWorkType] = useState("")
   const [knownWorkTypes, setKnownWorkTypes] = useState<string[]>(["ألوميتال", "تنجيد", "دهان", "تركيب إضاءة", "نجارة خارجية"])
 
+  // Extra costs — dynamic rows (type + amount + notes)
+  const [extraCosts, setExtraCosts] = useState<{ cost_type: string; amount: number; notes: string }[]>([])
+  const [knownCostTypes, setKnownCostTypes] = useState<string[]>(["أجور عمال", "كهرباء", "شحن", "صيانة", "أخرى"])
+
   function addCustomWorkType() {
     const t = customWorkType.trim()
     if (!t) return
@@ -93,10 +97,11 @@ export default function NewOrderForm() {
   useEffect(() => {
     if (!editingId) return
     ;(async () => {
-      const [ordRes, matsRes, extRes] = await Promise.all([
+      const [ordRes, matsRes, extRes, extraRes] = await Promise.all([
         fetch("/api/orders/" + editingId).then((r) => r.json()),
         fetch("/api/orders/" + editingId + "/materials").then((r) => r.json()),
         fetch("/api/orders/" + editingId + "/external-work").then((r) => r.json()),
+        fetch("/api/orders/" + editingId + "/extra-costs").then((r) => r.json()),
       ])
       const ord = ordRes?.data
       if (ord) {
@@ -137,6 +142,16 @@ export default function NewOrderForm() {
       })))
       const types = Array.from(new Set([...knownWorkTypes, ...ext.map((e: any) => e.work_type).filter(Boolean)]))
       setKnownWorkTypes(types)
+      // Load extra costs
+      const extra = extraRes?.data ?? []
+      const loadedExtra = extra.map((e: any) => ({
+        cost_type: e.cost_type ?? "",
+        amount: Number(e.amount ?? 0),
+        notes: e.notes ?? "",
+      }))
+      setExtraCosts(loadedExtra)
+      const costTypes = Array.from(new Set([...knownCostTypes, ...loadedExtra.map((e) => e.cost_type).filter(Boolean)]))
+      setKnownCostTypes(costTypes)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingId])
@@ -163,9 +178,11 @@ export default function NewOrderForm() {
 
   const boardsCost = usedItems.filter((u) => u.category === "board").reduce((s, u) => s + (u.quantity * u.unit_price), 0)
   const accessoriesCost = usedItems.filter((u) => u.category === "accessory").reduce((s, u) => s + (u.quantity * u.unit_price), 0)
+  const extraCostsTotal = extraCosts.reduce((s, e) => s + (e.amount || 0), 0)
   const orderTotal = boardsCost + accessoriesCost
     + (costs.installation_cost || 0) + (costs.internal_transport_cost || 0)
     + (costs.external_transport_cost || 0) + (costs.factory_commission || 0)
+    + extraCostsTotal
 
   async function onSubmit() {
     setError(null)
@@ -218,6 +235,18 @@ export default function NewOrderForm() {
       }))
       if (ext.length > 0) await mutate("POST", "/api/orders/" + orderId + "/external-work", ext)
     }
+
+    // Save extra costs
+    if (editingId) await fetch("/api/orders/" + orderId + "/extra-costs?extra_id=all", { method: "DELETE" })
+    if (extraCosts.length > 0) {
+      const extCosts = extraCosts.filter((e) => e.cost_type && e.amount > 0).map((e) => ({
+        cost_type: e.cost_type,
+        amount: e.amount,
+        notes: e.notes || null,
+      }))
+      if (extCosts.length > 0) await mutate("POST", "/api/orders/" + orderId + "/extra-costs", extCosts)
+    }
+
     router.push("/orders/" + orderId)
     router.refresh()
   }
@@ -348,6 +377,69 @@ export default function NewOrderForm() {
                 <br />ده بس مرجع — التوزيع نفسه يدوي.
               </div>
             </div>
+          </div>
+
+          {/* تكاليف إضافية ديناميكية */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold">➕ تكاليف إضافية</h3>
+              <Button variant="secondary" onClick={() => setExtraCosts((s) => [...s, { cost_type: "", amount: 0, notes: "" }])}>+ إضافة</Button>
+            </div>
+            <p className="text-xs text-gray-500">أضف أي تكلفة إضافية مش موجودة في الحقول الثابتة (مثال: أجور عمال، كهرباء، شحن...).</p>
+            {extraCosts.length === 0 ? (
+              <div className="text-gray-400 text-center py-4 text-sm">لا توجد تكاليف إضافية</div>
+            ) : (
+              <div className="space-y-2">
+                {extraCosts.map((e, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2 items-end p-2 border rounded-lg bg-gray-50">
+                    <div className="col-span-4">
+                      <label className="text-xs text-gray-500">نوع التكلفة</label>
+                      <input
+                        list="extra-cost-type-list"
+                        type="text"
+                        value={e.cost_type}
+                        onChange={(ev) => {
+                          const v = ev.target.value;
+                          setExtraCosts((s) => s.map((x, j) => j === i ? { ...x, cost_type: v } : x));
+                          if (v && !knownCostTypes.includes(v)) setKnownCostTypes((arr) => [...arr, v]);
+                        }}
+                        placeholder="مثال: أجور عمال"
+                        className="w-full px-2 py-1.5 border rounded text-sm"
+                      />
+                      <datalist id="extra-cost-type-list">{knownCostTypes.map((t) => <option key={t} value={t} />)}</datalist>
+                    </div>
+                    <div className="col-span-3">
+                      <label className="text-xs text-gray-500">المبلغ</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={e.amount}
+                        onChange={(ev) => setExtraCosts((s) => s.map((x, j) => j === i ? { ...x, amount: Number(ev.target.value) } : x))}
+                        className="w-full px-2 py-1.5 border rounded text-sm"
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <label className="text-xs text-gray-500">ملاحظات</label>
+                      <input
+                        value={e.notes}
+                        onChange={(ev) => setExtraCosts((s) => s.map((x, j) => j === i ? { ...x, notes: ev.target.value } : x))}
+                        placeholder="اختياري"
+                        className="w-full px-2 py-1.5 border rounded text-sm"
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-end justify-center">
+                      <button onClick={() => setExtraCosts((s) => s.filter((_, j) => j !== i))} className="text-red-500 hover:bg-red-100 rounded px-2 py-1.5 text-sm">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {extraCostsTotal > 0 && (
+              <div className="flex justify-between p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                <span>إجمالي التكاليف الإضافية:</span>
+                <strong className="text-yellow-700">{formatCurrency(extraCostsTotal)}</strong>
+              </div>
+            )}
           </div>
           <div className="md:col-span-2 card bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white">
             <div className="flex items-center justify-between">

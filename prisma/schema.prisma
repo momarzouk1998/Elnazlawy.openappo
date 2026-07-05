@@ -111,6 +111,7 @@ model orders {
   creator                 users?                 @relation("orders_created_by", fields: [created_by], references: [id])
   materials               order_materials[]
   external_work           order_external_work[]
+  extra_costs             order_extra_costs[]
   journal_entries         journal_entries[]
 
   @@map("orders")
@@ -143,6 +144,19 @@ model order_external_work {
   order         orders    @relation(fields: [order_id], references: [id], onDelete: Cascade)
 
   @@map("order_external_work")
+  @@schema("mazaya")
+}
+
+model order_extra_costs {
+  id            String    @id @default(uuid()) @db.Uuid
+  order_id      String    @db.Uuid
+  cost_type     String    @db.Text
+  amount        Decimal   @default(0)
+  notes         String?   @db.Text
+  created_at    DateTime? @default(now()) @db.Timestamptz()
+  order         orders    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@map("order_extra_costs")
   @@schema("mazaya")
 }
 

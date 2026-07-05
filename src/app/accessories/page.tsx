@@ -86,6 +86,23 @@ export default function AccessoriesPage() {
         <Button onClick={() => router.push("/accessories/buy")}>🛒 شراء</Button>
         <Button variant="secondary" onClick={() => router.push("/accessories/new")}>+ اكسسوار جديد</Button>
       </>} />
+      {/* إجمالي المخزون */}
+      {rows.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+            <div className="text-xs opacity-90">عدد الأصناف المتبقية</div>
+            <div className="text-2xl font-extrabold">{rows.filter((a: any) => a.quantity_remaining > 0).length}</div>
+          </div>
+          <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+            <div className="text-xs opacity-90">إجمالي الكمية المتبقية</div>
+            <div className="text-2xl font-extrabold">{rows.reduce((s: number, a: any) => s + Number(a.quantity_remaining || 0), 0)}</div>
+          </div>
+          <div className="col-span-2 md:col-span-1 card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+            <div className="text-xs opacity-90">قيمة المخزون الحالي</div>
+            <div className="text-2xl font-extrabold">{formatCurrency(rows.reduce((s: number, a: any) => s + (Number(a.unit_price || 0) * Number(a.quantity_remaining || 0)), 0))}</div>
+          </div>
+        </div>
+      )}
       <div className="card mb-4">
         <FilterBar>
           <div className="flex-1 min-w-[200px]"><SearchBox value={search} onChange={setSearch} placeholder="ابحث بالاسم أو الكود..." /></div>

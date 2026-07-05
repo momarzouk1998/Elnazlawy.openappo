@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND', message: 'الأوردر غير موجود' } }, { status: 404 });
     }
 
-    const [materialsR, extWorkR, totalsR] = await Promise.all([
+    const [materialsR, extWorkR, totalsR, extraCostsR] = await Promise.all([
       prisma.$queryRawUnsafe<any[]>(`
         SELECT om.*,
           CASE
@@ -46,9 +46,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         FROM mazaya.order_materials om
         WHERE om.order_id = $1::uuid
       `, orderId),
+      prisma.$queryRawUnsafe<any[]>(
+        `SELECT * FROM mazaya.order_extra_costs WHERE order_id = $1::uuid ORDER BY created_at ASC`,
+        orderId,
+      ),
     ]);
 
     const totals = totalsR[0];
+    const extraCostsTotal = extraCostsR.reduce((s: number, r: any) => s + Number(r.amount ?? 0), 0);
     const { customer, branch, ...orderData } = order;
 
     return NextResponse.json({
@@ -59,9 +64,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         branch_name: branch?.name ?? null,
         materials: materialsR,
         external_work: extWorkR,
+        extra_costs: extraCostsR.map((r: any) => ({ ...r, amount: Number(r.amount) })),
         boards_cost: Number(totals.boards_cost),
         accessories_cost: Number(totals.accessories_cost),
-        order_total: Number(totals.boards_cost) + Number(totals.accessories_cost) + Number(order.installation_cost ?? 0) + Number(order.internal_transport_cost ?? 0) + Number(order.external_transport_cost ?? 0) + Number(order.factory_commission ?? 0),
+        extra_costs_total: extraCostsTotal,
+        order_total: Number(totals.boards_cost) + Number(totals.accessories_cost) + Number(order.installation_cost ?? 0) + Number(order.internal_transport_cost ?? 0) + Number(order.external_transport_cost ?? 0) + Number(order.factory_commission ?? 0) + extraCostsTotal,
       },
     });
   } catch (e: any) {

@@ -13,183 +13,214 @@ const PAY_OPTS = Object.entries(PAYMENT_METHOD_LABELS)
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /* ============================================================
- * 1) شراء ألواح (panel)
+ * فورم شراء/إضافة موحد (يُستخدم للألواح والإكسسوارات)
  * ============================================================ */
-export function BoardPurchasePanel({ onSaved }: { onSaved?: () => void }) {
+function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory"; onSaved?: () => void }) {
+  const catLabel = cat === "board" ? "لوح" : "إكسسوار";
+  const apiList = cat === "board" ? "/api/boards?limit=500" : "/api/accessories?limit=500";
+  const apiCreate = cat === "board" ? "/api/boards" : "/api/accessories";
+  const apiPurchase = cat === "board" ? "/api/boards/purchase" : "/api/accessories/purchase";
+
   const [items, setItems] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [q, setQ] = useState("");
+  const [isNew, setIsNew] = useState(false);
   const [form, setForm] = useState({
-    item_id: "", item_name: "", quantity: "", unit_price: "", supplier_id: "",
+    item_id: "", item_name: "", code: "", material_type: "",
+    quantity: "", unit_price: "", supplier_id: "",
     payment_method: "نقدي", date: todayStr(), notes: "",
+    order_id: "",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/boards?limit=500").then(r => r.json()).then(d => setItems(d?.data?.items ?? d?.items ?? []));
-    fetch("/api/suppliers?limit=500").then(r => r.json()).then(d => setSuppliers(d?.data?.items ?? d?.items ?? []));
+    fetch(apiList).then(r => r.json()).then(d => setItems(d?.data?.items ?? d?.items ?? []));
+    fetch("/api/orders?limit=500&status=مفتوح").then(r => r.json()).then(d => setOrders(d?.data?.items ?? d?.items ?? []));
   }, []);
 
   const filtered = useMemo(() => {
-    if (!q.trim()) return items.filter(i => i.quantity_remaining > 0).slice(0, 12);
+    if (!q.trim()) return items.filter(i => i.quantity_remaining > 0).slice(0, 15);
     const s = q.toLowerCase();
-    return items.filter(i => (i.item_name?.toLowerCase().includes(s) || i.code?.toLowerCase().includes(s))).slice(0, 12);
+    return items.filter(i => (i.item_name?.toLowerCase().includes(s) || i.code?.toLowerCase().includes(s))).slice(0, 20);
   }, [items, q]);
 
   function pick(it: any) {
+    setIsNew(false);
     setForm(f => ({
       ...f,
-      item_id: it.id, item_name: it.item_name, unit_price: String(it.unit_price ?? ""),
+      item_id: it.id, item_name: it.item_name, code: it.code,
+      material_type: it.material_type || "",
+      unit_price: String(it.unit_price ?? ""),
       supplier_id: String(it.supplier_id ?? ""),
     }));
   }
 
+  function handleQChange(val: string) {
+    setQ(val);
+    const s = val.toLowerCase();
+    const found = items.some(i => i.item_name?.toLowerCase().includes(s) || i.code?.toLowerCase().includes(s));
+    if (!found && val.trim().length > 1) {
+      setIsNew(true);
+      setForm(f => ({ ...f, item_id: "", item_name: val, code: "", material_type: "" }));
+    } else {
+      setIsNew(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null); setMsg(null);
-    if (!form.item_id || !form.quantity) { setErr("اختر الصنف واكتب الكمية"); return; }
-    setSaving(true);
-    try {
-      const res = await fetch("/api/boards/purchase", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_id: form.item_id,
-          quantity: Number(form.quantity),
-          unit_price: Number(form.unit_price || 0),
+
+    if (isNew) {
+      // صنف جديد → أنشئه أولاً ثم اشتريه
+      if (!form.item_name || !form.code || !form.quantity) {
+        setErr("الاسم، الكود، والكمية مطلوبين"); return;
+      }
+      setSaving(true);
+      try {
+        const createPayload: any = {
+          item_name: form.item_name, code: form.code,
           supplier_id: form.supplier_id || null,
-          payment_method: form.payment_method,
-          date: form.date,
+          unit_price: Number(form.unit_price || 0),
+          quantity_in: Number(form.quantity),
           notes: form.notes || null,
-          create_journal: true,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
-      setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
-      setForm(f => ({ ...f, item_id: "", item_name: "", quantity: "", notes: "" }));
-      onSaved?.();
-    } finally { setSaving(false); }
+        };
+        if (cat === "board") createPayload.material_type = form.material_type || null;
+        else createPayload.type = form.material_type || null;
+
+        const createRes = await fetch(apiCreate, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(createPayload),
+        });
+        const createData = await createRes.json();
+        if (!createRes.ok) { setErr(createData?.error?.message || "خطأ في إنشاء الصنف"); return; }
+
+        // تسجيل في اليومية
+        if (Number(form.unit_price || 0) > 0 && Number(form.quantity) > 0) {
+          await fetch("/api/journal", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date: form.date,
+              entry_type: "مشتريات",
+              description: `شراء ${form.quantity} ${form.item_name} (جديد)`,
+              amount: Number(form.quantity) * Number(form.unit_price || 0),
+              payment_method: form.payment_method,
+              party_type: form.supplier_id ? "supplier" : null,
+              party_id: form.supplier_id || null,
+              notes: form.notes || null,
+            }),
+          });
+        }
+
+        setMsg(`✅ تم إضافة وشراء ${form.quantity} × ${form.item_name}`);
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "" }));
+        setQ(""); setIsNew(false);
+        onSaved?.();
+      } finally { setSaving(false); }
+    } else {
+      // صنف موجود → اشترِ منه
+      if (!form.item_id || !form.quantity) { setErr("اختر الصنف واكتب الكمية"); return; }
+      setSaving(true);
+      try {
+        const res = await fetch(apiPurchase, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_id: form.item_id,
+            quantity: Number(form.quantity),
+            unit_price: Number(form.unit_price || 0),
+            supplier_id: form.supplier_id || null,
+            payment_method: form.payment_method,
+            date: form.date,
+            notes: form.notes || null,
+            create_journal: true,
+          }),
+        });
+        const j = await res.json();
+        if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
+        setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "" }));
+        setQ(""); setIsNew(false);
+        onSaved?.();
+      } finally { setSaving(false); }
+    }
   }
+
+  const total = Number(form.quantity || 0) * Number(form.unit_price || 0);
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {/* بحث + اختيار */}
       <div>
-        <Input label="ابحث عن صنف" value={q} onChange={e => setQ(e.target.value)} placeholder="اسم أو كود اللوح..." />
-        <div className="mt-1 max-h-40 overflow-y-auto divide-y border rounded-lg">
-          {filtered.map(it => (
-            <button type="button" key={it.id} onClick={() => pick(it)}
-              className={`w-full text-right px-3 py-2 hover:bg-brand-orange/10 text-sm ${form.item_id === it.id ? "bg-brand-orange/10 font-semibold" : ""}`}>
-              {it.item_name} <span className="text-xs text-gray-500">({it.code}) • متبقي: {it.quantity_remaining}</span>
-            </button>
-          ))}
-          {filtered.length === 0 && <div className="px-3 py-2 text-gray-400 text-sm">لا توجد نتائج</div>}
-        </div>
+        <Input label={`ابحث عن ${catLabel}...`} value={q} onChange={e => handleQChange(e.target.value)}
+          placeholder="اكتب اسم أو كود... لو موجود تختاره، لو مش موجود تضيفه" />
+        {!isNew && q.trim() && (
+          <div className="mt-1 max-h-40 overflow-y-auto divide-y border rounded-lg">
+            {filtered.map(it => (
+              <button type="button" key={it.id} onClick={() => pick(it)}
+                className={`w-full text-right px-3 py-2 hover:bg-brand-orange/10 text-sm ${form.item_id === it.id ? "bg-brand-orange/10 font-semibold" : ""}`}>
+                {it.item_name} <span className="text-xs text-gray-500">({it.code}) • متبقي: {it.quantity_remaining}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && <div className="px-3 py-2 text-gray-400 text-sm">لا توجد نتائج — اكتب التفاصيل وسيُنشأ صنف جديد</div>}
+          </div>
+        )}
       </div>
-      {form.item_name && <div className="bg-green-50 p-2 rounded text-sm">المختار: <strong>{form.item_name}</strong></div>}
+
+      {isNew && (
+        <div className="bg-amber-50 border border-amber-200 p-2 rounded text-sm text-amber-700">
+          🆕 <strong>{catLabel} جديد</strong> — اكتب التفاصيل وسيُنشأ تلقائياً
+        </div>
+      )}
+      {!isNew && form.item_name && (
+        <div className="bg-green-50 p-2 rounded text-sm">
+          المختار: <strong>{form.item_name}</strong>
+        </div>
+      )}
+
+      {/* حقول الصنف الجديد */}
+      {isNew && (
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
+          <Input label="الكود *" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required />
+        </div>
+      )}
+      {isNew && (
+        <Input label={cat === "board" ? "الخامة" : "النوع"} value={form.material_type} onChange={e => setForm({ ...form, material_type: e.target.value })}
+          placeholder={cat === "board" ? "مثال: مرفات، كونتر..." : "مثال: مفصلات، مقابض..."} />
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <Input label="الكمية *" type="number" step="0.01" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
         <Input label="سعر الوحدة" type="number" step="0.01" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value })} />
       </div>
+
+      {/* الأوردر (اختياري) */}
+      <Select label="الأوردر (اختياري)" value={form.order_id} onChange={e => setForm({ ...form, order_id: e.target.value })}
+        options={[{ value: "", label: "— بدون أوردر —" }, ...orders.map((o: any) => ({ value: String(o.id), label: o.order_name }))]} />
+
       <div className="grid grid-cols-2 gap-3">
         <Input label="التاريخ" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
         <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
       </div>
       {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
       {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
-      {form.quantity && form.unit_price && (
-        <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(Number(form.quantity) * Number(form.unit_price))}</strong> — هيُسجل في اليومية تلقائياً</div>
+      {total > 0 && (
+        <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(total)}</strong> — هيُسجل في اليومية تلقائياً</div>
       )}
-      <Button type="submit" loading={saving} className="w-full">🛒 تسجيل الشراء</Button>
+      <Button type="submit" loading={saving} disabled={isNew && !form.code} className="w-full">
+        🛒 تسجيل {isNew ? "إضافة وشراء" : "الشراء"}
+      </Button>
     </form>
   );
 }
 
-/* ============================================================
- * 2) شراء إكسسوارات
- * ============================================================ */
-export function AccessoryPurchasePanel({ onSaved }: { onSaved?: () => void }) {
-  const [items, setItems] = useState<any[]>([]);
-  const [q, setQ] = useState("");
-  const [form, setForm] = useState({
-    item_id: "", item_name: "", quantity: "", unit_price: "", supplier_id: "",
-    payment_method: "نقدي", date: todayStr(), notes: "",
-  });
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+/* فورم شراء الألواح (بحث + إضافة جديد في مكان واحد) */
+export function BoardPurchasePanel(props: any) { return <UnifiedItemPurchaseForm cat="board" {...props} />; }
 
-  useEffect(() => {
-    fetch("/api/accessories?limit=500").then(r => r.json()).then(d => setItems(d?.data?.items ?? d?.items ?? []));
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!q.trim()) return items.filter(i => i.quantity_remaining > 0).slice(0, 12);
-    const s = q.toLowerCase();
-    return items.filter(i => (i.item_name?.toLowerCase().includes(s) || i.code?.toLowerCase().includes(s))).slice(0, 12);
-  }, [items, q]);
-
-  function pick(it: any) {
-    setForm(f => ({ ...f, item_id: it.id, item_name: it.item_name, unit_price: String(it.unit_price ?? ""), supplier_id: String(it.supplier_id ?? "") }));
-  }
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setErr(null); setMsg(null);
-    if (!form.item_id || !form.quantity) { setErr("اختر الصنف واكتب الكمية"); return; }
-    setSaving(true);
-    try {
-      const res = await fetch("/api/accessories/purchase", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          item_id: form.item_id, quantity: Number(form.quantity),
-          unit_price: Number(form.unit_price || 0),
-          supplier_id: form.supplier_id || null,
-          payment_method: form.payment_method, date: form.date,
-          notes: form.notes || null, create_journal: true,
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
-      setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
-      setForm(f => ({ ...f, item_id: "", item_name: "", quantity: "", notes: "" }));
-      onSaved?.();
-    } finally { setSaving(false); }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      <div>
-        <Input label="ابحث عن صنف" value={q} onChange={e => setQ(e.target.value)} placeholder="اسم أو كود الإكسسوار..." />
-        <div className="mt-1 max-h-40 overflow-y-auto divide-y border rounded-lg">
-          {filtered.map(it => (
-            <button type="button" key={it.id} onClick={() => pick(it)}
-              className={`w-full text-right px-3 py-2 hover:bg-brand-orange/10 text-sm ${form.item_id === it.id ? "bg-brand-orange/10 font-semibold" : ""}`}>
-              {it.item_name} <span className="text-xs text-gray-500">({it.code}) • متبقي: {it.quantity_remaining}</span>
-            </button>
-          ))}
-          {filtered.length === 0 && <div className="px-3 py-2 text-gray-400 text-sm">لا توجد نتائج</div>}
-        </div>
-      </div>
-      {form.item_name && <div className="bg-green-50 p-2 rounded text-sm">المختار: <strong>{form.item_name}</strong></div>}
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="الكمية *" type="number" step="0.01" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
-        <Input label="سعر الوحدة" type="number" step="0.01" value={form.unit_price} onChange={e => setForm({ ...form, unit_price: e.target.value })} />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="التاريخ" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-        <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
-      </div>
-      {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
-      {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
-      {form.quantity && form.unit_price && (
-        <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(Number(form.quantity) * Number(form.unit_price))}</strong> — هيسجل في اليومية</div>
-      )}
-      <Button type="submit" loading={saving} className="w-full">🛒 تسجيل الشراء</Button>
-    </form>
-  );
-}
+/* فورم شراء الإكسسوارات (بحث + إضافة جديد في مكان واحد) */
+export function AccessoryPurchasePanel(props: any) { return <UnifiedItemPurchaseForm cat="accessory" {...props} />; }
 
 /* ============================================================
  * 3) نثريات / أجور عمال
@@ -279,9 +310,12 @@ export function OverheadPanel({ onSaved }: { onSaved?: () => void }) {
  * ============================================================ */
 export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
   const [branches, setBranches] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [form, setForm] = useState({
     date: todayStr(), amount: "", payment_method: "تحويل",
     description: "دفعة واردة من معرض", notes: "", branch_id: "",
+    direction: "in", // "in" = داخل المصنع | "out" = خارج للمورد
+    supplier_id: "",
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -289,6 +323,7 @@ export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
 
   useEffect(() => {
     fetch("/api/branches?limit=500").then(r => r.json()).then(d => setBranches(d?.data?.items ?? d?.items ?? []));
+    fetch("/api/suppliers?limit=500").then(r => r.json()).then(d => setSuppliers(d?.data?.items ?? d?.items ?? []));
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -297,27 +332,55 @@ export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
     if (!form.amount) { setErr("المبلغ مطلوب"); return; }
     setSaving(true);
     try {
-      const body: any = {
-        date: form.date,
-        entry_type: "دفعة واردة من معرض",
-        description: form.branch_id
-          ? `دفعة واردة من ${branches.find(b => String(b.id) === form.branch_id)?.name || "معرض"}`
-          : form.description,
-        amount: Number(form.amount),
-        payment_method: form.payment_method,
-        notes: form.notes || null,
-      };
-      if (form.branch_id) {
-        body.party_type = "branch";
-        body.party_id = form.branch_id;
+      const branchName = branches.find(b => String(b.id) === form.branch_id)?.name || "معرض";
+      const supplierName = suppliers.find(s => s.id === form.supplier_id)?.name || "";
+
+      if (form.direction === "out") {
+        // تحويل تمريري: المعرض → المورد
+        if (!form.branch_id) { setErr("اختار المعرض"); return; }
+        if (!form.supplier_id) { setErr("اختار المورد"); return; }
+        const body: any = {
+          date: form.date,
+          entry_type: "تحويل تمريري",
+          description: `تحويل ${branchName} → ${supplierName}`,
+          amount: Number(form.amount),
+          payment_method: form.payment_method,
+          notes: form.notes || null,
+          is_passthrough: true,
+          branch_id: form.branch_id,
+          supplier_id: form.supplier_id,
+        };
+        const res = await fetch("/api/journal", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await res.json();
+        if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
+        setMsg(`✅ تم تسجيل تحويل ${formatCurrency(Number(form.amount))} من ${branchName} إلى ${supplierName}`);
+      } else {
+        // وارد عادي للمصنع
+        const body: any = {
+          date: form.date,
+          entry_type: "دفعة واردة من معرض",
+          description: form.branch_id
+            ? `دفعة واردة من ${branchName}`
+            : form.description,
+          amount: Number(form.amount),
+          payment_method: form.payment_method,
+          notes: form.notes || null,
+        };
+        if (form.branch_id) {
+          body.party_type = "branch";
+          body.party_id = form.branch_id;
+        }
+        const res = await fetch("/api/journal", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const j = await res.json();
+        if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
+        setMsg(`✅ تم تسجيل وارد ${formatCurrency(Number(form.amount))}`);
       }
-      const res = await fetch("/api/journal", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const j = await res.json();
-      if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
-      setMsg(`✅ تم تسجيل وارد ${formatCurrency(Number(form.amount))}`);
       setForm(f => ({ ...f, amount: "", notes: "" }));
       onSaved?.();
     } finally { setSaving(false); }
@@ -325,15 +388,40 @@ export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
 
   return (
     <form onSubmit={submit} className="space-y-3">
+      {/* اختيار الاتجاه */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">اتجاه التحويل</label>
+        <div className="flex gap-3">
+          <label className={`flex-1 cursor-pointer rounded-xl p-3 border-2 text-center transition ${form.direction === "in" ? "border-green-400 bg-green-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <input type="radio" name="direction" value="in" checked={form.direction === "in"} onChange={() => setForm(f => ({ ...f, direction: "in" }))} className="hidden" />
+            <div className="text-lg">🟢</div>
+            <div className="text-sm font-bold">داخل المصنع</div>
+            <div className="text-[10px] text-gray-500">وارد للمصنع</div>
+          </label>
+          <label className={`flex-1 cursor-pointer rounded-xl p-3 border-2 text-center transition ${form.direction === "out" ? "border-red-400 bg-red-50" : "border-gray-200 hover:border-gray-300"}`}>
+            <input type="radio" name="direction" value="out" checked={form.direction === "out"} onChange={() => setForm(f => ({ ...f, direction: "out" }))} className="hidden" />
+            <div className="text-lg">🔴</div>
+            <div className="text-sm font-bold">خارج للمورد</div>
+            <div className="text-[10px] text-gray-500">تحويل من المعرض للمورد</div>
+          </label>
+        </div>
+      </div>
+
       <Input label="التاريخ" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-      <Select label="المعرض (اختياري)" value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })}
-        options={[{ value: "", label: "— عام —" }, ...branches.map(b => ({ value: String(b.id), label: b.name }))]} />
+      <Select label="المعرض" value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })}
+        options={[{ value: "", label: "— اختر المعرض —" }, ...branches.map(b => ({ value: String(b.id), label: b.name }))]} />
+
+      {form.direction === "out" && (
+        <Select label="المورد *" value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}
+          options={[{ value: "", label: "— اختر المورد —" }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} />
+      )}
+
       <Input label="المبلغ *" type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} required />
       <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
       <Input label="ملاحظات" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
       {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
-      <Button type="submit" loading={saving} className="w-full">📥 تسجيل الوارد</Button>
+      <Button type="submit" loading={saving} className="w-full">{form.direction === "out" ? "🔄 تسجيل التحويل" : "📥 تسجيل الوارد"}</Button>
     </form>
   );
 }
@@ -409,12 +497,24 @@ export function InventorySearchPanel() {
 }
 
 /* ============================================================
- * 6) تقرير العمال السريع (داخل اليومية)
+ * 6) تقرير العمال السريع (داخل اليومية) — مع فلتر زمني بالأسبوع
  * ============================================================ */
+function getLastThursday(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun ... 6=Sat
+  const diff = (day + 3) % 7; // أيام بعد الخميس (الخميس=4 → diff=0)
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
 export function WorkersReportPanel() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // فلتر زمني — الافتراضي: من آخر خميس إلى اليوم
+  const [dateFrom, setDateFrom] = useState(getLastThursday);
+  const [dateTo, setDateTo] = useState(todayStr);
 
   useEffect(() => {
     Promise.all([
@@ -430,15 +530,19 @@ export function WorkersReportPanel() {
     const m: Record<string, { total: number; count: number; last: string }> = {};
     for (const e of expenses) {
       if (!e.worker_id) continue;
+      const d = String(e.date).slice(0, 10);
+      // فلتر حسب التاريخ المختار
+      if (dateFrom && d < dateFrom) continue;
+      if (dateTo && d > dateTo) continue;
       const id = String(e.worker_id);
       if (!m[id]) m[id] = { total: 0, count: 0, last: "" };
       m[id].total += Number(e.amount || 0);
       m[id].count += 1;
-      const d = String(e.date).slice(0, 10);
-      if (d > m[id].last) m[id].last = d;
+      const ed = String(e.date).slice(0, 10);
+      if (ed > m[id].last) m[id].last = ed;
     }
     return m;
-  }, [expenses]);
+  }, [expenses, dateFrom, dateTo]);
 
   const rows = workers.map(w => ({ ...w, ...(stats[w.id] || { total: 0, count: 0, last: "" }) }));
   const grandTotal = rows.reduce((s, r) => s + r.total, 0);
@@ -447,10 +551,28 @@ export function WorkersReportPanel() {
 
   return (
     <div className="space-y-3">
+      {/* فلتر التاريخ */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">من</label>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">إلى</label>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="px-3 py-2 border rounded-lg text-sm" />
+        </div>
+        <button onClick={() => { setDateFrom(getLastThursday()); setDateTo(todayStr()); }}
+          className="mt-4 text-xs px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+          🔄 هذا الأسبوع
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-purple-50 p-3 rounded-lg text-center">
-          <div className="text-xs text-gray-600">عدد العمال</div>
-          <div className="text-xl font-bold">{workers.length}</div>
+          <div className="text-xs text-gray-600">عدد العمال ({dateFrom} → {dateTo})</div>
+          <div className="text-xl font-bold">{rows.filter(r => r.count > 0).length}</div>
         </div>
         <div className="bg-green-50 p-3 rounded-lg text-center">
           <div className="text-xs text-gray-600">إجمالي الأجور</div>

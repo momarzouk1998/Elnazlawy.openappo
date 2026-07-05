@@ -38,7 +38,7 @@ interface ActionBtn { key: PanelKey; icon: string; label: string; color: string;
 
 const ACTIONS: ActionBtn[] = [
   { key: "board", icon: "🪵", label: "شراء ألواح", color: "from-amber-500 to-orange-600" },
-  { key: "accessory", icon: "🔩", label: "شراء إكسسوارات", color: "from-purple-500 to-purple-700" },
+  { key: "accessory", icon: "🔩", label: "شراء إكسسوارات", color: "from-violet-500 to-purple-600" },
   { key: "overhead", icon: "💵", label: "نثريات / أجور عمال", color: "from-pink-500 to-rose-600" },
   { key: "income", icon: "📥", label: "دفعة من معرض", color: "from-green-500 to-emerald-600" },
   { key: "search", icon: "🔍", label: "بحث في المخزن", color: "from-blue-500 to-blue-700" },
@@ -50,7 +50,7 @@ const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
   board: "🪵 شراء ألواح",
   accessory: "🔩 شراء إكسسوارات",
   overhead: "💵 نثريات / أجور عمال",
-  income: "📥 دفعة واردة من معرض",
+  income: "📥 دفعة من معرض",
   search: "🔍 بحث في المخزن",
   workers: "🧑‍🔧 تقرير العمال",
   today: "📅 تقرير اليوم",
@@ -131,8 +131,8 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         <div className="card text-center text-gray-500 py-12">🔒 هذه الصفحة للمصنع فقط.</div>
       ) : (
         <>
-          {/* ===== 3 مستويات للملخص ===== */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+          {/* ===== ملخص اليوم + آخر 7 أيام ===== */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
             {/* تقرير اليوم */}
             <div className="card border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-white">
               <div className="text-xs font-bold text-cyan-700 mb-2">📅 تقرير اليوم ({formatDate(todayKey)})</div>
@@ -150,15 +150,6 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 <div className="bg-green-50 rounded p-1.5"><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(weekIncome)}</div></div>
                 <div className="bg-red-50 rounded p-1.5"><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(weekExpense)}</div></div>
                 <div className="col-span-2 bg-blue-50 rounded p-1.5"><div className="text-[10px] text-gray-500">صافي الأسبوع</div><div className={`font-bold text-sm ${weekIncome - weekExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(weekIncome - weekExpense)}</div></div>
-              </div>
-            </div>
-            {/* التقرير العام (التراكمي) */}
-            <div className="card border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-white">
-              <div className="text-xs font-bold text-purple-700 mb-2">📊 التقرير العام (تراكمي)</div>
-              <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-green-50 rounded p-1.5"><div className="text-[10px] text-gray-500">إجمالي الوارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(totalIncome)}</div></div>
-                <div className="bg-red-50 rounded p-1.5"><div className="text-[10px] text-gray-500">إجمالي المصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(totalExpense)}</div></div>
-                <div className="col-span-2 bg-purple-50 rounded p-1.5"><div className="text-[10px] text-gray-500">الرصيد الكلي الحالي</div><div className={`font-bold text-sm ${closingBalance >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(closingBalance)}</div></div>
               </div>
             </div>
           </div>
