@@ -25,8 +25,17 @@ export default function NewJournalForm() {
   const journalEntries: any[] = Array.isArray(journalData) ? journalData : (journalData?.entries ?? [])
 
   // unique values from existing journal entries
+  // نوّحد القيم الإنجليزي للعربي عشان متظهرش كخيارات مكررة
+  const normalizePayment = (p: string) =>
+    p === "cash" ? "نقدي" :
+    p === "transfer" ? "تحويل" :
+    p === "both" ? "كلاهما" : p;
   const knownDescriptions = Array.from(new Set(journalEntries.map((j) => j.description).filter(Boolean)))
-  const knownPaymentMethods = Array.from(new Set(journalEntries.map((j) => j.payment_method).filter((v) => v && v !== "both" && v !== "كلاهما")))
+  const knownPaymentMethods = Array.from(new Set(
+    journalEntries
+      .map((j) => normalizePayment(j.payment_method))
+      .filter((v) => v && v !== "both" && v !== "كلاهما" && v !== "نقدي" && v !== "تحويل")
+  ))
 
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -48,11 +57,12 @@ export default function NewJournalForm() {
     const payload: any = {
       date: form.date, entry_type: form.entry_type, description: form.description,
       amount: Number(form.amount), payment_method: form.payment_method,
-      supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
-      branch_id: form.branch_id ? Number(form.branch_id) : null,
-      contractor_id: form.contractor_id ? Number(form.contractor_id) : null,
-      order_id: form.order_id ? Number(form.order_id) : null,
-      is_passthrough: form.is_passthrough,
+      supplier_id: form.supplier_id || null,
+      branch_id: form.branch_id || null,
+      contractor_id: form.contractor_id || null,
+      order_id: form.order_id || null,
+      // التمريري يتفعل تلقائياً لو النوع "تحويل تمريري" + المستخدم يقدر يفعله يدوياً
+      is_passthrough: form.is_passthrough || form.entry_type === "تحويل تمريري",
       notes: form.notes || null,
     }
     const { error: err } = await mutate("POST", "/api/journal", payload)
@@ -91,7 +101,7 @@ export default function NewJournalForm() {
             <datalist id="payment-method-list">
               <option value="نقدي" />
               <option value="تحويل" />
-              {knownPaymentMethods.filter((p) => p !== "نقدي" && p !== "تحويل").map((p) => <option key={p} value={p} />)}
+              {knownPaymentMethods.map((p) => <option key={p} value={p} />)}
             </datalist>
             <p className="text-xs text-gray-500 mt-1">💡 اكتب طريقة جديدة أو اختار من الموجودة</p>
           </div>

@@ -104,7 +104,13 @@ export async function POST(request: NextRequest) {
     const user = await requireAuth();
 
     const body = await request.json();
-    const { description, amount, entry_type, payment_method, party_type, party_id, order_id, date } = body;
+    const {
+      description, amount, entry_type, payment_method,
+      party_type, party_id, order_id, date, notes,
+      // يدعم الفورم اللي بيبعت الأطراف بأسماء مستقلة
+      branch_id, supplier_id, contractor_id,
+      is_passthrough,
+    } = body;
 
     if (!description || description.trim() === '') {
       return NextResponse.json(
@@ -142,16 +148,95 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const entryDate = date ? new Date(date) : new Date();
+    const cleanDesc = description.trim();
+
+    // ============================================================
+    // الحالة الخاصة: التحويل التمريري (Pass-through)
+    // المعرض حوّل مباشرة للمورد → نسجل حركتين:
+    //   1) دفعة واردة من المعرض (تزيد الرصيد)
+    //   2) دفعة صادرة للمورد (تنقص الرصيد)
+    // الاتنين بنفس المبلغ، فالصافي = صفر، لكن السجل يبقى صحيح.
+    // ============================================================
+    const isPass = Boolean(is_passthrough)
+      || entry_type === 'تحويل تمريري'
+      || entry_type === 'transfer';
+
+    if (isPass) {
+      if (!branch_id || !supplier_id) {
+        return NextResponse.json(
+          { ok: false, error: { code: 'VALIDATION_ERROR', message: 'التحويل التمريري يتطلب اختيار المعرض والمورد' } },
+          { status: 400 }
+        );
+      }
+
+      const [incoming, outgoing] = await prisma.$transaction([
+        prisma.journal_entries.create({
+          data: {
+            date: entryDate,
+            entry_type: 'دفعة واردة من معرض',
+            description: `[تمريري] ${cleanDesc}`,
+            amount,
+            payment_method: payment_method || null,
+            party_type: 'branch',
+            party_id: branch_id,
+            order_id: order_id || null,
+            is_pass_through: true,
+            notes: notes || null,
+            created_by: user.id,
+          },
+        }),
+        prisma.journal_entries.create({
+          data: {
+            date: entryDate,
+            entry_type: 'دفعة صادرة لمورد',
+            description: `[تمريري] ${cleanDesc}`,
+            amount,
+            payment_method: payment_method || null,
+            party_type: 'supplier',
+            party_id: supplier_id,
+            order_id: order_id || null,
+            is_pass_through: true,
+            notes: notes || null,
+            created_by: user.id,
+          },
+        }),
+      ]);
+
+      auditLog({ user_id: user.id, action: 'create', table_name: 'journal_entries', row_id: incoming.id, after: incoming });
+      auditLog({ user_id: user.id, action: 'create', table_name: 'journal_entries', row_id: outgoing.id, after: outgoing });
+
+      return NextResponse.json({
+        ok: true,
+        data: { pass_through: true, incoming: { ...incoming, amount: Number(incoming.amount) }, outgoing: { ...outgoing, amount: Number(outgoing.amount) } },
+      }, { status: 201 });
+    }
+
+    // ============================================================
+    // الحالة العادية: قيد واحد
+    // لو الفورم بعت branch_id/supplier_id/contractor_id بدون party_type،
+    // اشتقّ party_type/party_id تلقائياً عشان الفورم يشتغل صح.
+    // ============================================================
+    let resolvedPartyType = party_type || null;
+    let resolvedPartyId = party_id || null;
+
+    if (!resolvedPartyType) {
+      if (branch_id)        { resolvedPartyType = 'branch';     resolvedPartyId = branch_id; }
+      else if (supplier_id) { resolvedPartyType = 'supplier';   resolvedPartyId = supplier_id; }
+      else if (contractor_id) { resolvedPartyType = 'contractor'; resolvedPartyId = contractor_id; }
+    }
+
     const entry = await prisma.journal_entries.create({
       data: {
-        date: date ? new Date(date) : new Date(),
+        date: entryDate,
         entry_type,
-        description: description.trim(),
+        description: cleanDesc,
         amount,
         payment_method: payment_method || null,
-        party_type: party_type || null,
-        party_id: party_id || null,
+        party_type: resolvedPartyType,
+        party_id: resolvedPartyId,
         order_id: order_id || null,
+        notes: notes || null,
         created_by: user.id,
       },
     });
