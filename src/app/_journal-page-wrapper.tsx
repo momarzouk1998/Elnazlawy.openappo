@@ -5,7 +5,7 @@ import { useApi } from "@/hooks/useApi";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import PageHeader from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
-import { SearchBox, FilterBar } from "@/components/SearchFilter";
+import { SearchBox } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
 import { formatCurrency, formatDate, ENTRY_TYPE_LABELS, ENTRY_TYPE_COLORS, PAYMENT_METHOD_LABELS } from "@/lib/format";
@@ -67,6 +67,9 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [activePanel, setActivePanel] = useState<PanelKey>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const activeFiltersCount = [typeFilter, payFilter, fromDate, toDate].filter(Boolean).length;
 
   const filtered = useMemo(() => rows.filter(r => {
     const matchSearch = !search || r.description.toLowerCase().includes(search.toLowerCase());
@@ -178,27 +181,46 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 {activePanel === "workers" && <WorkersReportPanel />}
                 {activePanel === "filter" && (
                   <div className="space-y-3">
-                    <FilterBar>
-                      <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
-                      <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
-                        <option value="">كل الأنواع</option>
-                        {Object.entries(ENTRY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                      <select value={payFilter} onChange={e => setPayFilter(e.target.value)} className="px-3 py-2.5 border rounded-lg bg-white">
-                        <option value="">كل طرق الدفع</option>
-                        {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                      <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="من" />
-                      <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="px-3 py-2.5 border rounded-lg" title="إلى" />
-                    </FilterBar>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">النتائج: <strong>{filtered.length}</strong> حركة</span>
-                      <div className="flex gap-2">
-                        <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
-                        {(search || typeFilter || payFilter || fromDate || toDate) && (
-                          <Button variant="secondary" onClick={() => { setSearch(""); setTypeFilter(""); setPayFilter(""); setFromDate(""); setToDate(""); }}>🗑️ مسح الفلتر</Button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-[200px]"><SearchBox value={search} onChange={setSearch} placeholder="ابحث في البيان..." /></div>
+                      <Button variant="secondary" onClick={() => setFilterOpen(v => !v)} className="relative">تصفية{activeFiltersCount > 0 && <span className="absolute -top-2 -right-2 bg-brand-orange text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{activeFiltersCount}</span>}</Button>
+                    </div>
+                    {filterOpen && (
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-3 border">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">نوع الحركة</label>
+                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white">
+                              <option value="">كل الأنواع</option>
+                              {Object.entries(ENTRY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">طريقة الدفع</label>
+                            <select value={payFilter} onChange={e => setPayFilter(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white">
+                              <option value="">كل طرق الدفع</option>
+                              {Object.entries(PAYMENT_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">من تاريخ</label>
+                            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">إلى تاريخ</label>
+                            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" />
+                          </div>
+                        </div>
+                        {activeFiltersCount > 0 && (
+                          <div className="flex justify-end">
+                            <Button variant="secondary" size="sm" onClick={() => { setTypeFilter(""); setPayFilter(""); setFromDate(""); setToDate(""); }}>🗑️ مسح الفلاتر</Button>
+                          </div>
                         )}
                       </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-500">النتائج: <strong>{filtered.length}</strong> حركة</span>
+                      <Button variant="secondary" onClick={() => exportToExcel(filtered as any, "journal")}>📥 تصدير</Button>
                     </div>
                     <DataTable
                       loading={loading}
