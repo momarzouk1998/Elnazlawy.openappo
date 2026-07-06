@@ -177,7 +177,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 {activePanel === "accessory" && <AccessoryPurchasePanel onSaved={() => refetch()} />}
                 {activePanel === "overhead" && <OverheadPanel onSaved={() => refetch()} />}
                 {activePanel === "income" && <IncomePanel onSaved={() => refetch()} />}
-                {activePanel === "search" && <InventorySearchPanel />}
+                {activePanel === "search" && <InventorySearchPanel onOpenPurchase={(cat) => setActivePanel(cat)} />}
                 {activePanel === "workers" && <WorkersReportPanel />}
                 {activePanel === "filter" && (
                   <div className="space-y-3">

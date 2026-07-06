@@ -95,7 +95,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const data: any = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
-        data[key] = body[key];
+        if ((key === 'start_date' || key === 'end_date') && body[key]) {
+          data[key] = new Date(body[key]).toISOString();
+        } else {
+          data[key] = body[key];
+        }
       }
     }
     if (Object.keys(data).length === 0) {

@@ -23,6 +23,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
   const [items, setItems] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [isNew, setIsNew] = useState(false);
   const [form, setForm] = useState({
@@ -38,6 +39,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
   useEffect(() => {
     fetch(apiList).then(r => r.json()).then(d => setItems(d?.data?.items ?? d?.items ?? []));
     fetch("/api/orders?limit=500&status=مفتوح").then(r => r.json()).then(d => setOrders(d?.data?.items ?? d?.items ?? []));
+    fetch("/api/suppliers?limit=500").then(r => r.json()).then(d => setSuppliers(d?.data?.items ?? d?.items ?? []));
   }, []);
 
   const filtered = useMemo(() => {
@@ -75,20 +77,24 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
     if (isNew) {
       // صنف جديد → أنشئه أولاً ثم اشتريه
-      if (!form.item_name || !form.code || !form.quantity) {
-        setErr("الاسم، الكود، والكمية مطلوبين"); return;
+      const needsCode = cat === "board";
+      if (!form.item_name || (needsCode && !form.code) || !form.quantity) {
+        setErr(cat === "board" ? "الاسم، الكود، والكمية مطلوبين" : "الاسم والكمية مطلوبين");
+        return;
       }
       setSaving(true);
       try {
         const createPayload: any = {
-          item_name: form.item_name, code: form.code,
+          item_name: form.item_name,
           supplier_id: form.supplier_id || null,
           unit_price: Number(form.unit_price || 0),
           quantity_in: Number(form.quantity),
           notes: form.notes || null,
         };
-        if (cat === "board") createPayload.material_type = form.material_type || null;
-        else createPayload.type = form.material_type || null;
+        if (cat === "board") {
+          createPayload.code = form.code;
+          createPayload.material_type = form.material_type || null;
+        }
 
         const createRes = await fetch(apiCreate, {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -115,7 +121,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         }
 
         setMsg(`✅ تم إضافة وشراء ${form.quantity} × ${form.item_name}`);
-        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "" }));
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
         setQ(""); setIsNew(false);
         onSaved?.();
       } finally { setSaving(false); }
@@ -140,7 +146,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         const j = await res.json();
         if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
         setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
-        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "" }));
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
         setQ(""); setIsNew(false);
         onSaved?.();
       } finally { setSaving(false); }
@@ -180,16 +186,23 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       )}
 
       {/* حقول الصنف الجديد */}
-      {isNew && (
+      {isNew && cat === "board" && (
         <div className="grid grid-cols-2 gap-3">
           <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
           <Input label="الكود *" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required />
         </div>
       )}
-      {isNew && (
-        <Input label={cat === "board" ? "الخامة" : "النوع"} value={form.material_type} onChange={e => setForm({ ...form, material_type: e.target.value })}
-          placeholder={cat === "board" ? "مثال: مرفات، كونتر..." : "مثال: مفصلات، مقابض..."} />
+      {isNew && cat === "board" && (
+        <Input label="الخامة" value={form.material_type} onChange={e => setForm({ ...form, material_type: e.target.value })}
+          placeholder="مثال: مرفات، كونتر..." />
       )}
+      {isNew && cat === "accessory" && (
+        <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
+      )}
+
+      {/* المورد */}
+      <Select label="المورد" value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}
+        options={[{ value: "", label: "— بدون مورد —" }, ...suppliers.map((s: any) => ({ value: String(s.id), label: s.name }))]} />
 
       <div className="grid grid-cols-2 gap-3">
         <Input label="الكمية *" type="number" step="0.01" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />
@@ -209,7 +222,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       {total > 0 && (
         <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(total)}</strong> — هيُسجل في اليومية تلقائياً</div>
       )}
-      <Button type="submit" loading={saving} disabled={isNew && !form.code} className="w-full">
+      <Button type="submit" loading={saving} disabled={isNew && cat === "board" && !form.code} className="w-full">
         🛒 تسجيل {isNew ? "إضافة وشراء" : "الشراء"}
       </Button>
     </form>
@@ -429,7 +442,7 @@ export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
 /* ============================================================
  * 5) بحث موحّد في المخزن (ألواح + إكسسوارات)
  * ============================================================ */
-export function InventorySearchPanel() {
+export function InventorySearchPanel({ onOpenPurchase }: { onOpenPurchase?: (cat: "board" | "accessory") => void }) {
   const [boards, setBoards] = useState<any[]>([]);
   const [accessories, setAccessories] = useState<any[]>([]);
   const [q, setQ] = useState("");
@@ -459,7 +472,17 @@ export function InventorySearchPanel() {
 
   return (
     <div className="space-y-3">
-      <Input label="ابحث في المخزن" value={q} onChange={e => setQ(e.target.value)} placeholder="اسم الصنف أو الكود (مثال: مفصلة، K-100)..." />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <Input label="ابحث في المخزن" value={q} onChange={e => setQ(e.target.value)} placeholder="اسم الصنف أو الكود (مثال: مفصلة، K-100)..." />
+        </div>
+        {onOpenPurchase && (
+          <div className="flex items-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => onOpenPurchase("board")}>🪵 دخول مخزون الألواح</Button>
+            <Button variant="secondary" size="sm" onClick={() => onOpenPurchase("accessory")}>🔩 دخول مخزون الإكسسوارات</Button>
+          </div>
+        )}
+      </div>
       {loading ? (
         <div className="text-gray-400 text-sm py-4 text-center">جاري التحميل...</div>
       ) : (
