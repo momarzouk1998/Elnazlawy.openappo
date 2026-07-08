@@ -38,7 +38,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
   useEffect(() => {
     fetch(apiList).then(r => r.json()).then(d => setItems(d?.data?.items ?? d?.items ?? []));
-    fetch("/api/orders?limit=500&status=مفتوح").then(r => r.json()).then(d => setOrders(d?.data?.items ?? d?.items ?? []));
+    fetch("/api/orders?limit=500").then(r => r.json()).then(d => setOrders(d?.data?.items ?? d?.items ?? []));
     fetch("/api/suppliers?limit=500").then(r => r.json()).then(d => setSuppliers(d?.data?.items ?? d?.items ?? []));
   }, []);
 
@@ -210,8 +210,14 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       </div>
 
       {/* الأوردر (اختياري) */}
-      <Select label="الأوردر (اختياري)" value={form.order_id} onChange={e => setForm({ ...form, order_id: e.target.value })}
-        options={[{ value: "", label: "— بدون أوردر —" }, ...orders.map((o: any) => ({ value: String(o.id), label: o.order_name }))]} />
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">الأوردر (اختياري)</label>
+        <input list={"order-list-" + cat} type="text" value={orders.find((o: any) => o.id === form.order_id)?.order_name ?? ""} onChange={(e) => {
+          const selected = orders.find((o: any) => o.order_name === e.target.value)
+          setForm({ ...form, order_id: selected ? String(selected.id) : "" })
+        }} placeholder="🔍 ابحث باسم الأوردر..." className="w-full px-3 py-2 border rounded-lg" />
+        <datalist id={"order-list-" + cat}>{orders.map((o: any) => <option key={o.id} value={o.order_name} />)}</datalist>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Input label="التاريخ" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
