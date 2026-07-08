@@ -16,7 +16,7 @@ export default function NewJournalForm() {
   const { data: suppliersData } = useApi<{ items: any[] }>("/api/suppliers?limit=500")
   const { data: branchesData } = useApi<{ items: any[] }>("/api/branches?limit=500")
   const { data: contractorsData } = useApi<{ items: any[] }>("/api/contractors?limit=500")
-  const { data: ordersData } = useApi<{ items: any[] }>("/api/orders?limit=100")
+  const { data: ordersData } = useApi<{ items: any[] }>("/api/orders?limit=500")
   const { data: journalData } = useApi<any>("/api/journal?limit=500")
   const suppliers = suppliersData?.items ?? []
   const branches = branchesData?.items ?? []
@@ -154,10 +154,11 @@ export default function NewJournalForm() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">الأوردر المرتبط (اختياري)</label>
-          <select value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
-            <option value="">— بدون —</option>
-            {orders.map((o: any) => <option key={o.id} value={o.id}>{o.order_name}</option>)}
-          </select>
+          <input list="order-list" type="text" value={orders.find((o: any) => o.id === form.order_id)?.order_name ?? ""} onChange={(e) => {
+            const selected = orders.find((o: any) => o.order_name === e.target.value)
+            setForm({ ...form, order_id: selected ? selected.id : "" })
+          }} placeholder="🔍 ابحث باسم الأوردر..." className="w-full px-3 py-2 border rounded-lg" />
+          <datalist id="order-list">{orders.map((o: any) => <option key={o.id} value={o.order_name} />)}</datalist>
         </div>
 
         <Textarea label="ملاحظات" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
