@@ -5,8 +5,10 @@ import prisma from "@/lib/db/prisma";
 export const dynamic = "force-dynamic";
 
 /**
- * One-time fix: recalculate quantity_used, quantity_remaining, total_price
- * from actual order_materials + quantity_in.
+ * One-time fix:
+ * 1. Recalculate quantity_used, quantity_remaining, total_price from actual order_materials
+ * 2. Create missing journal entries for inventory purchases that were never recorded
+ *
  * Call: GET /api/fix-inventory (requires admin login)
  */
 export async function GET() {
@@ -16,7 +18,7 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: "أدمن فقط" }, { status: 403 });
     }
 
-    // Fix boards: recalculate quantity_used from order_materials
+    // ===== 1) إصلاح quantity_remaining من order_materials =====
     const boardsUsed = await prisma.$queryRawUnsafe<{ item_id: string; total_used: string }[]>(`
       SELECT item_id, SUM(quantity_used)::numeric AS total_used
       FROM mazaya.order_materials
@@ -39,7 +41,7 @@ export async function GET() {
       }
     }
 
-    // For boards with NO materials but quantity_remaining = 0 and quantity_in > 0
+    // Boards with NO materials but quantity_remaining = 0 and quantity_in > 0
     const boardsNoMaterials = await prisma.$executeRawUnsafe(`
       UPDATE mazaya.boards_inventory
       SET quantity_remaining = quantity_in,
@@ -51,7 +53,7 @@ export async function GET() {
     `);
     boardsFixed += boardsNoMaterials;
 
-    // Fix accessories: same
+    // Same for accessories
     const accUsed = await prisma.$queryRawUnsafe<{ item_id: string; total_used: string }[]>(`
       SELECT item_id, SUM(quantity_used)::numeric AS total_used
       FROM mazaya.order_materials
@@ -85,16 +87,70 @@ export async function GET() {
     `);
     accFixed += accNoMaterials;
 
-    // Verify
+    // ===== 2) إنشاء journal entries للمشتريات القديمة اللي مش مسجلة =====
+    // نلاقي كل inventory items اللي اتباعوا (quantity_in > 0) ومش لهم journal entry
+    const missingBoards = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT bi.id, bi.item_name, bi.quantity_in, bi.unit_price, bi.date_added, bi.supplier_id,
+             bi.quantity_in * bi.unit_price AS total_cost
+      FROM mazaya.boards_inventory bi
+      WHERE bi.deleted_at IS NULL AND bi.quantity_in > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM mazaya.journal_entries je
+          WHERE je.entry_type = 'مشتريات'
+            AND je.description LIKE '%' || bi.item_name || '%'
+            AND je.created_at >= bi.created_at
+        )
+    `);
+
+    const missingAcc = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT ai.id, ai.item_name, ai.quantity_in, ai.unit_price, ai.date_added, ai.supplier_id,
+             ai.quantity_in * ai.unit_price AS total_cost
+      FROM mazaya.accessories_inventory ai
+      WHERE ai.deleted_at IS NULL AND ai.quantity_in > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM mazaya.journal_entries je
+          WHERE je.entry_type = 'مشتريات'
+            AND je.description LIKE '%' || ai.item_name || '%'
+        )
+    `);
+
+    const missingAll = [...missingBoards, ...missingAcc];
+    let journalCreated = 0;
+
+    for (const item of missingAll) {
+      const cost = Number(item.total_cost);
+      if (cost <= 0) continue;
+
+      try {
+        await prisma.journal_entries.create({
+          data: {
+            date: item.date_added || new Date(),
+            entry_type: "مشتريات",
+            description: "شراء " + Number(item.quantity_in) + " " + item.item_name,
+            amount: cost,
+            payment_method: "نقدي",
+            party_type: item.supplier_id ? "supplier" : null,
+            party_id: item.supplier_id || null,
+            notes: "إصلاح تلقائي: بيانات شراء قديمة لم تكن مسجلة في اليومية",
+            created_by: user.id,
+          },
+        });
+        journalCreated++;
+      } catch (e: any) {
+        // Skip duplicates silently
+      }
+    }
+
+    // ===== 3) Verify =====
     const boardsSample = await prisma.$queryRawUnsafe<any[]>(
       `SELECT item_name, quantity_in, quantity_used, quantity_remaining, total_price, unit_price FROM mazaya.boards_inventory WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10`
     );
 
     return NextResponse.json({
       ok: true,
-      message: "تم إصلاح المخزون",
-      boardsFixed,
-      accessoriesFixed: accFixed,
+      message: "تم إصلاح المخزون + اليومية",
+      inventoryFixed: { boards: boardsFixed, accessories: accFixed },
+      journalEntriesCreated: journalCreated,
       sample: boardsSample.map((b: any) => ({
         name: b.item_name,
         qtyIn: Number(b.quantity_in),
