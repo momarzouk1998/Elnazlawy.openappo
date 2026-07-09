@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/auth-server"
 import prisma from "@/lib/db/prisma"
 import { auditLog } from "@/lib/audit"
@@ -19,6 +19,42 @@ export async function GET(request: NextRequest) {
       prisma.material_types.findMany({ where, orderBy: [{ sort_order: "asc" }, { name: "asc" }], skip: offset, take: limit }),
       prisma.material_types.count({ where }),
     ])
+
+    // --- Dynamic fallback for legacy materials ---
+    const legacyNames = new Set<string>()
+    if (!category || category === "board") {
+      const bMats = await prisma.boards_inventory.findMany({
+        where: { material_type: { not: "" }, deleted_at: null },
+        select: { material_type: true },
+        distinct: ["material_type"],
+      })
+      bMats.forEach(b => legacyNames.add((b.material_type || "").trim()))
+    }
+    if (!category || category === "accessory") {
+      const aMats = await prisma.accessories_inventory.findMany({
+        where: { material_type: { not: "" }, deleted_at: null },
+        select: { material_type: true },
+        distinct: ["material_type"],
+      })
+      aMats.forEach(a => legacyNames.add((a.material_type || "").trim()))
+    }
+    const existingNames = new Set(items.map(i => i.name.trim().toLowerCase()))
+    let virtualId = -1
+    legacyNames.forEach(name => {
+      if (name && !existingNames.has(name.toLowerCase())) {
+        items.push({
+          id: `legacy-${virtualId--}` as any,
+          name,
+          category: category || "board",
+          is_active: true,
+          sort_order: 99,
+          created_at: new Date(),
+        })
+        existingNames.add(name.toLowerCase())
+      }
+    })
+    // ---------------------------------------------
+
     return NextResponse.json({ ok: true, data: { items, total, page, limit } })
   } catch (e: any) {
     if (e.status === 401) return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED", message: "غير مسجل الدخول" } }, { status: 401 })
