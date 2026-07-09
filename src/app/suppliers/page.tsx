@@ -10,7 +10,7 @@ import { DataTable } from "@/components/DataTable";
 import { SearchBox, FilterBar } from "@/components/SearchFilter";
 import { Button } from "@/components/ui/Button";
 import { exportToExcel } from "@/lib/excel";
-import { PAYMENT_METHOD_LABELS } from "@/lib/format";
+import { PAYMENT_METHOD_LABELS, formatCurrency } from "@/lib/format";
 import RowEditor, { type FieldDef } from "@/components/ui/RowEditor";
 
 const supplierFields: FieldDef[] = [

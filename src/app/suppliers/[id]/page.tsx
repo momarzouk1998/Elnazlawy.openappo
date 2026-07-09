@@ -17,14 +17,14 @@ export default function SupplierDetailPage() {
 
   const boards = boardsData?.items?.filter((b: any) => b.supplier_id === parseInt(id)) || [];
   const accessories = accData?.items?.filter((a: any) => a.supplier_id === parseInt(id)) || [];
-  const journalEntries = journalData?.entries || [];
+  const purchases = journalData?.entries || [];
 
   if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
   if (!supplier && !loading) return <DashboardLayout profile={user}><div className="card">المورد غير موجود</div></DashboardLayout>;
 
-  const totalPurchases = journalEntries.filter((p: any) => ['مشتريات', 'purchase'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
-  const totalPayments = journalEntries.filter((p: any) => ['دفعة صادرة لمورد', 'outgoing_to_supplier'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalPurchases = purchases.filter((p: any) => ['مشتريات', 'purchase'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalPayments = purchases.filter((p: any) => ['دفعة صادرة لمورد', 'outgoing_to_supplier'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const balance = totalPurchases - totalPayments;
 
   return (
