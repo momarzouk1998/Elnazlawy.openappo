@@ -3,5 +3,5 @@ import { getCurrentUser } from "@/lib/auth-server";
 
 export default async function RootPage() {
   const profile = await getCurrentUser();
-  redirect(profile ? "/dashboard" : "/login");
+  redirect(profile ? "/journal" : "/login");
 }

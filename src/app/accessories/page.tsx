@@ -15,7 +15,6 @@ import RowEditor, { type FieldDef } from "@/components/ui/RowEditor"
 
 const accessoryFields: FieldDef[] = [
   { name: "item_name", label: "اسم الصنف", required: true },
-  { name: "code", label: "الكود", required: true },
   { name: "type", label: "النوع" },
   { name: "unit_price", label: "سعر الوحدة", type: "number" },
   { name: "quantity_in", label: "الكمية المبدئية", type: "number" },
@@ -52,7 +51,7 @@ export default function AccessoriesPage() {
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="مخزون الاكسسوارات" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الاكسسوارات" helpDescription="إدارة مفصلات، سكك درج، مجاري، كاوتش، إلخ. الشراء والإضافة الجديدة من صفحة اليومية." backHref="/dashboard" actions={
+      <PageHeader title="مخزون الاكسسوارات" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الاكسسوارات" helpDescription="إدارة مفصلات، سكك درج، مجاري، كاوتش، إلخ. الشراء والإضافة الجديدة من صفحة اليومية." backHref="/journal" actions={
         <Button variant="secondary" onClick={() => exportToExcel(filtered.map(({ id, supplier_name, total_price, ...rest }: any) => rest as any), "accessories_inventory")}>📥 تصدير</Button>
       } />
       {/* إجمالي المخزون */}
@@ -89,9 +88,8 @@ export default function AccessoriesPage() {
           <div className="text-sm text-gray-500 mr-auto">النتائج: <strong>{filtered.length}</strong></div>
         </FilterBar>
       </div>
-      <DataTable loading={loading} rows={filtered} emptyMessage="لا توجد اكسسوارات." columns={[
+        <DataTable loading={loading} rows={filtered} emptyMessage="لا توجد اكسسوارات." columns={[
         { key: "item_name", label: "البيان", render: (r: any) => <Link href={"/accessories/" + r.id} className="text-brand-orange hover:underline font-medium">{r.item_name}</Link> },
-        { key: "code", label: "الكود", render: (r: any) => <code className="text-xs bg-gray-100 px-2 py-1 rounded">{r.code}</code> },
         { key: "type", label: "النوع" },
         { key: "supplier_name", label: "المورد" },
         { key: "unit_price", label: "السعر", render: (r: any) => formatCurrency(Number(r.unit_price ?? 0)) },

@@ -68,7 +68,7 @@ export default function OrdersPage() {
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="الأوردرات" subtitle={filtered.length + " أوردر مطابق للفلاتر"} helpTitle="الأوردرات" helpDescription="هنا كل أوردرات المصنع. ابحث بالاسم أو العميل، فلتر بالمعرض أو الحالة أو التاريخ." backHref="/dashboard" actions={<Button onClick={() => router.push("/orders/new")}>+ أوردر جديد</Button>} />
+      <PageHeader title="الأوردرات" subtitle={filtered.length + " أوردر مطابق للفلاتر"} helpTitle="الأوردرات" helpDescription="هنا كل أوردرات المصنع. ابحث بالاسم أو العميل، فلتر بالمعرض أو الحالة أو التاريخ." backHref="/journal" actions={<Button onClick={() => router.push("/orders/new")}>+ أوردر جديد</Button>} />
       <div className="card mb-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[200px]"><SearchBox value={search} onChange={setSearch} placeholder="ابحث باسم الأوردر أو العميل..." /></div>

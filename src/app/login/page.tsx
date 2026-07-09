@@ -40,7 +40,7 @@ export default function LoginPage() {
     if (remember) localStorage.setItem("mazaya_identifier", identifier);
     else localStorage.removeItem("mazaya_identifier");
 
-    router.push("/dashboard");
+    router.push("/journal");
     router.refresh();
   }
 

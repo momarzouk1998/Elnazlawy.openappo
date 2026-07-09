@@ -43,7 +43,7 @@ export default function OverheadPage() {
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="النثريات" subtitle="مصاريف تشغيل المصنع العامة" helpTitle="النثريات" helpDescription="كهرباء، أجور عمال، شحن، إلخ." backHref="/dashboard" actions={<Button onClick={() => router.push("/overhead/new")}>+ نثريات جديدة</Button>} />
+      <PageHeader title="النثريات" subtitle="مصاريف تشغيل المصنع العامة" helpTitle="النثريات" helpDescription="كهرباء، أجور عمال، شحن، إلخ." backHref="/journal" actions={<Button onClick={() => router.push("/overhead/new")}>+ نثريات جديدة</Button>} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white"><div className="text-xs opacity-90">إجمالي النثريات</div><div className="text-2xl font-extrabold">{formatCurrency(total)}</div></div>
         <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white"><div className="text-xs opacity-90">آخر 7 أيام</div><div className="text-2xl font-extrabold">{formatCurrency(weekTotal)}</div></div>

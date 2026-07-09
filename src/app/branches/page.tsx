@@ -48,7 +48,7 @@ export default function BranchesPage() {
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="المعارض / الفروع" subtitle="النقاط اللي بتبتاع للعميل النهائي" helpTitle="المعارض" helpDescription="هنا الـ 4 معارض بتاعة المصنع. كل معرض له عملاء وأوردرات. المعرض يحوّل للمصنع قيمة الأوردرات اللي بيوصلها." backHref="/dashboard" actions={<><Button variant="secondary" onClick={() => exportToExcel(filtered, "branches")}>تصدير</Button><Button onClick={() => router.push("/branches/new")}>+ معرض جديد</Button></>} />
+      <PageHeader title="المعارض / الفروع" subtitle="النقاط اللي بتبتاع للعميل النهائي" helpTitle="المعارض" helpDescription="هنا الـ 4 معارض بتاعة المصنع. كل معرض له عملاء وأوردرات. المعرض يحوّل للمصنع قيمة الأوردرات اللي بيوصلها." backHref="/journal" actions={<><Button variant="secondary" onClick={() => exportToExcel(filtered, "branches")}>تصدير</Button><Button onClick={() => router.push("/branches/new")}>+ معرض جديد</Button></>} />
       <div className="card mb-4">
         <FilterBar>
           <div className="flex-1"><SearchBox value={search} onChange={setSearch} placeholder="ابحث باسم المعرض أو الموقع..." /></div>

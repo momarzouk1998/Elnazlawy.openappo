@@ -73,7 +73,7 @@ export default function ProfilePage() {
         subtitle="إدارة بيانات حسابك وكلمة المرور"
         helpTitle="الملف الشخصي"
         helpDescription="من هنا تقدر تشوف بيانات حسابك، وتغير كلمة السر الخاصة بيك. لو عايز تغير اسمك أو الإيميل، تواصل مع مدير المصنع."
-        backHref="/dashboard"
+        backHref="/journal"
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl">
@@ -279,7 +279,6 @@ function PasswordStrength({ password }: { password: string }) {
 
 function moduleLabel(key: string): string {
   const labels: Record<string, string> = {
-    dashboard: "لوحة التحكم",
     suppliers: "الموردين",
     boards_inventory: "مخزون الألواح",
     accessories_inventory: "مخزون الاكسسوارات",

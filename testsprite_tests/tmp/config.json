@@ -1,0 +1,19 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3001",
+  "loginUser": "admin",
+  "loginPassword": "admin123",
+  "executionArgs": {
+    "projectName": "mazaya-furniture",
+    "projectPath": "D:\\OPEN APPS\\DigitalOcian Projects\\mazaya-system",
+    "testIds": [],
+    "additionalInstruction": "Test ALL pages, forms, buttons, and authentication flow. Test login with invalid credentials, test login with valid credentials. Test every list page (orders, customers, suppliers, branches, workers, contractors, accessories, boards, journal, overhead, reports, profile, admin/users, admin/material-types). Test create forms. Test search and filter functionality. Test pagination. Test delete operations. Check for console errors and 500 errors.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-KgqZxFUWrDoAIqk85z-fB-sTzMEqen6quUv34C8PVaVuuxSKT1xftN79BCJNH2IcDu-Qsb35vfE02fcZvTGlerNsjzB-ys5AeZoBs9WT5vuPDGN0PSNCbFZ9iS33CD6PWGI"
+    }
+  },
+  "serverPort": 51648
+}

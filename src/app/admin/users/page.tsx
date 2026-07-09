@@ -90,7 +90,7 @@ export default function UsersPage() {
         subtitle={`${users.length} موظف`}
         helpTitle="إدارة المستخدمين"
         helpDescription="من هنا تقدر تضيف موظفين جداد أو تعدل بيانات الموجودين، وتتحكم في الصفحات اللي يشوفها كل موظف من الـ Checkboxes، وتعطل حساب أو تريست الباسورد. كل موظف بيشوف بس الصفحات اللي مفعّلها."
-        backHref="/dashboard"
+        backHref="/journal"
         actions={<Button onClick={() => setShowAdd(true)}>+ إضافة موظف جديد</Button>}
       />
 
@@ -197,7 +197,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   const [form, setForm] = useState({
     username: "", email_or_phone: "", password: "",
     role: "branch_user", branch_id: "",
-    visible_modules: ["dashboard", "orders"] as string[],
+    visible_modules: ["journal", "orders"] as string[],
     is_active: true, notes: "",
   });
   const [saving, setSaving] = useState(false);
@@ -236,7 +236,7 @@ function AddUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
             <label className="text-sm font-medium">الصفحات المرئية</label>
             <div className="flex gap-1">
               <button onClick={() => setForm(f => ({ ...f, visible_modules: ALL_MODULES.map(m => m.key) }))} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">تحديد الكل</button>
-              <button onClick={() => setForm(f => ({ ...f, visible_modules: ["dashboard"] }))} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">إلغاء الكل</button>
+              <button onClick={() => setForm(f => ({ ...f, visible_modules: [] }))} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">إلغاء الكل</button>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

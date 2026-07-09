@@ -206,3 +206,5 @@ config.local.json
 config.local.yaml
 config.local.yml
 settings.local.json
+
+testsprite_tests\tmp\config.json

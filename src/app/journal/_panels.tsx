@@ -77,9 +77,8 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
     if (isNew) {
       // صنف جديد → أنشئه أولاً ثم اشتريه
-      const needsCode = cat === "board";
-      if (!form.item_name || (needsCode && !form.code) || !form.quantity) {
-        setErr(cat === "board" ? "الاسم، الكود، والكمية مطلوبين" : "الاسم والكمية مطلوبين");
+      if (!form.item_name || !form.quantity) {
+        setErr("الاسم والكمية مطلوبين");
         return;
       }
       setSaving(true);
@@ -92,7 +91,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
           notes: form.notes || null,
         };
         if (cat === "board") {
-          createPayload.code = form.code;
+          if (form.code) createPayload.code = form.code;
           createPayload.material_type = form.material_type || null;
         }
 
@@ -187,10 +186,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
       {/* حقول الصنف الجديد */}
       {isNew && cat === "board" && (
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
-          <Input label="الكود *" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required />
-        </div>
+        <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
       )}
       {isNew && cat === "board" && (
         <Input label="الخامة" value={form.material_type} onChange={e => setForm({ ...form, material_type: e.target.value })}
@@ -228,7 +224,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       {total > 0 && (
         <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(total)}</strong> — هيُسجل في اليومية تلقائياً</div>
       )}
-      <Button type="submit" loading={saving} disabled={isNew && cat === "board" && !form.code} className="w-full">
+      <Button type="submit" loading={saving} className="w-full">
         🛒 تسجيل {isNew ? "إضافة وشراء" : "الشراء"}
       </Button>
     </form>

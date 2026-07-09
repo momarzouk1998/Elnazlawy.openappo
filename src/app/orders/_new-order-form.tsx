@@ -62,8 +62,8 @@ export default function NewOrderForm() {
   })
 
   const items: Item[] = useMemo(() => [
-    ...boardsRaw.map((b: any) => ({ id: b.id, name: b.item_name, code: b.code, remaining: b.quantity_remaining ?? 0, price: b.unit_price, category: "board" as const })),
-    ...accessoriesRaw.map((a: any) => ({ id: a.id, name: a.item_name, code: a.code, remaining: a.quantity_remaining ?? 0, price: a.unit_price, category: "accessory" as const })),
+    ...boardsRaw.map((b: any) => ({ id: b.id, name: b.item_name, code: b.code, remaining: Number(b.quantity_remaining ?? 0), price: Number(b.unit_price ?? 0), category: "board" as const })),
+    ...accessoriesRaw.map((a: any) => ({ id: a.id, name: a.item_name, code: a.code, remaining: Number(a.quantity_remaining ?? 0), price: Number(a.unit_price ?? 0), category: "accessory" as const })),
   ], [boardsRaw, accessoriesRaw])
 
   const [searchItem, setSearchItem] = useState("")

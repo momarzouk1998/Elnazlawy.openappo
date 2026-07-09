@@ -56,26 +56,17 @@ export async function POST(request: Request) {
     if (!item_name || !item_name.trim()) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الصنف مطلوب' } }, { status: 400 });
     }
-    if (!code || !code.trim()) {
-      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'كود الصنف مطلوب' } }, { status: 400 });
-    }
     if (!unit_price || unit_price <= 0) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر الوحدة مطلوب' } }, { status: 400 });
     }
 
-    const existing = await prisma.accessories_inventory.findFirst({
-      where: { supplier_id: supplier_id || null, code: code.trim(), deleted_at: null },
-      select: { id: true },
-    });
-    if (existing) {
-      return NextResponse.json({ ok: false, error: { code: 'CONFLICT', message: 'هذا الكود موجود بالفعل لنفس المورد' } }, { status: 409 });
-    }
+    const autoCode = code?.trim() || `ACC-${Date.now().toString(36).toUpperCase()}`;
 
     const item = await prisma.accessories_inventory.create({
       data: {
         item_name: item_name.trim(),
         material_type: material_type || '',
-        code: code.trim(),
+        code: autoCode,
         supplier_id: supplier_id || null,
         unit_price,
         quantity_in: quantity_in || 0,

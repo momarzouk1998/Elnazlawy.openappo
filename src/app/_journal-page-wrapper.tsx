@@ -60,7 +60,15 @@ const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
 export default function JournalPageWrapper({ showSummary = false }: { showSummary?: boolean }) {
   const { user: profile } = useUserStore();
   const { data, loading, refetch } = useApi<{ entries: any[] }>("/api/journal?limit=500");
+  const { data: boardsData } = useApi<{ items: any[] }>("/api/boards?limit=500");
+  const { data: accessoriesData } = useApi<{ items: any[] }>("/api/accessories?limit=500");
+  const { data: ordersData } = useApi<{ items: any[] }>("/api/orders?limit=500");
+  const { data: suppliersData } = useApi<{ items: any[] }>("/api/suppliers?limit=500");
   const rows = data?.entries ?? [];
+  const boards = boardsData?.items ?? [];
+  const accessories = accessoriesData?.items ?? [];
+  const allOrders = ordersData?.items ?? [];
+  const suppliersList = suppliersData?.items ?? [];
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [payFilter, setPayFilter] = useState("");
@@ -89,13 +97,16 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
 
   const calcIncome = (arr: any[]) => arr.filter(r => r.entry_type === "دفعة واردة من معرض" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
   const calcExpense = (arr: any[]) => arr.filter(r => ["مشتريات", "نثريات"].includes(r.entry_type)).reduce((s, r) => s + Number(r.amount), 0);
+  const calcPayout = (arr: any[]) => arr.filter(r => r.entry_type === "دفعة صادرة لمورد" && !r.is_passthrough).reduce((s, r) => s + Number(r.amount), 0);
 
   const todayIncome = calcIncome(todayRows);
   const todayExpense = calcExpense(todayRows);
   const weekIncome = calcIncome(weekRows);
   const weekExpense = calcExpense(weekRows);
-  const totalIncome = calcIncome(filtered);
-  const totalExpense = calcExpense(filtered);
+  const totalIncome = calcIncome(rows);
+  const totalExpense = calcExpense(rows);
+  const totalPayout = calcPayout(rows);
+  const totalNet = totalIncome - totalExpense - totalPayout;
 
   // ====== الرصيد الجاري (Running Balance) ======
   // رصيد أول اليوم = (الوارد التراكمي − المصروف التراكمي) لكل الأيام قبل اليوم.
@@ -121,13 +132,71 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         subtitle={showSummary ? "صندوق الرصيد + ملخص الأسبوع" : "أدخل أي حركة من هنا — شراء، نثريات، وارد، بحث"}
         helpTitle="اليومية"
         helpDescription="هنا تدخل كل حاجة من صفحة واحدة: اضغط أي زر في الأزرار السريعة (شراء ألواح، نثريات، دفعة من معرض...)، يفتح فورم جنبها. كل حاجة بتسجل في اليومية تلقائياً."
-        backHref="/dashboard"
       />
 
       {!canSee ? (
         <div className="card text-center text-gray-500 py-12">🔒 هذه الصفحة للمصنع فقط.</div>
       ) : (
         <>
+          {/* ===== ملخص المخزون والأوردرات ===== */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <div className="card bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+              <div className="text-xs opacity-90">قيمة المخزون</div>
+              <div className="text-2xl font-extrabold">{formatCurrency(
+                boards.reduce((s: number, b: any) => s + (Number(b.unit_price ?? 0) * Number(b.quantity_remaining ?? 0)), 0)
+                + accessories.reduce((s: number, a: any) => s + (Number(a.unit_price ?? 0) * Number(a.quantity_remaining ?? 0)), 0)
+              )}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">{boards.length + accessories.length} صنف</div>
+            </div>
+            <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+              <div className="text-xs opacity-90">أوردرات مفتوحة</div>
+              <div className="text-2xl font-extrabold">{allOrders.filter((o: any) => o.status === "مفتوح" || o.status === "قيد التنفيذ").length}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">قيد التنفيذ والمفتوحة</div>
+            </div>
+            <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+              <div className="text-xs opacity-90">أوردرات مكتملة (الشهر)</div>
+              <div className="text-2xl font-extrabold">{allOrders.filter((o: any) => {
+                const d = new Date(o.created_at); const now = new Date();
+                return (o.status === "مكتمل" || o.status === "تم التسليم") && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+              }).length}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">هذا الشهر</div>
+            </div>
+            <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+              <div className="text-xs opacity-90">الموردون</div>
+              <div className="text-2xl font-extrabold">{suppliersList.length}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">مورد نشط</div>
+            </div>
+            <div className="card bg-gradient-to-br from-gray-500 to-gray-700 text-white">
+              <div className="text-xs opacity-90">إجمالي الأوردرات</div>
+              <div className="text-2xl font-extrabold">{allOrders.length}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">كل الأوردرات</div>
+            </div>
+          </div>
+
+          {/* ===== ملخص إجمالي كل الفلوس ===== */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+              <div className="text-xs opacity-90">إجمالي الوارد</div>
+              <div className="text-2xl font-extrabold">{formatCurrency(totalIncome)}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">كل التحويلات الواردة من المعارض</div>
+            </div>
+            <div className="card bg-gradient-to-br from-red-400 to-red-600 text-white">
+              <div className="text-xs opacity-90">إجمالي المصروف (مشتريات)</div>
+              <div className="text-2xl font-extrabold">{formatCurrency(totalExpense)}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">مشتريات ألواح + إكسسوارات + نثريات</div>
+            </div>
+            <div className="card bg-gradient-to-br from-orange-400 to-orange-600 text-white">
+              <div className="text-xs opacity-90">إجمالي المدفوعات (موردين)</div>
+              <div className="text-2xl font-extrabold">{formatCurrency(totalPayout)}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">دفوع صادرة للموردين</div>
+            </div>
+            <div className={`card bg-gradient-to-br ${totalNet >= 0 ? "from-blue-500 to-blue-700" : "from-red-500 to-red-700"} text-white`}>
+              <div className="text-xs opacity-90">صافي الرصيد الحالي</div>
+              <div className="text-2xl font-extrabold">{formatCurrency(totalNet)}</div>
+              <div className="text-[10px] opacity-70 mt-0.5">الوارد − المصروف − المدفوعات</div>
+            </div>
+          </div>
+
           {/* ===== ملخص اليوم + آخر 7 أيام ===== */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
             {/* تقرير اليوم */}

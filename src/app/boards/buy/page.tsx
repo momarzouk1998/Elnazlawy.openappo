@@ -85,7 +85,7 @@ export default function BuyBoardsPage() {
             {filtered.length === 0 ? <div className="text-gray-400 text-center py-6">لا توجد نتائج</div> : filtered.map((b) => (
               <div key={b.id} onClick={() => selectBoard(b)} className={"p-3 cursor-pointer rounded-lg transition " + (selectedId === b.id ? "bg-brand-orange text-white" : "hover:bg-gray-50")}>
                 <div className="font-medium text-sm">{b.item_name}</div>
-                 <div className={"text-xs " + (selectedId === b.id ? "text-white opacity-80" : "text-gray-500")}>{b.code} • متوفر: {b.quantity_remaining} • سعر: {formatCurrency(Number(b.unit_price ?? 0))}</div>
+                 <div className={"text-xs " + (selectedId === b.id ? "text-white opacity-80" : "text-gray-500")}>{b.code} • متوفر: {Number(b.quantity_remaining ?? 0)} • سعر: {formatCurrency(Number(b.unit_price ?? 0))}</div>
               </div>
             ))}
           </div>
@@ -96,7 +96,7 @@ export default function BuyBoardsPage() {
           {selected && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
               <div className="font-medium text-brand-black">{selected.item_name}</div>
-              <div className="text-gray-600 text-xs">كود: {selected.code} • المتاح حالياً: {selected.quantity_remaining} • آخر سعر: {formatCurrency(Number(selected.unit_price ?? 0))}</div>
+              <div className="text-gray-600 text-xs">كود: {selected.code} • المتاح حالياً: {Number(selected.quantity_remaining ?? 0)} • آخر سعر: {formatCurrency(Number(selected.unit_price ?? 0))}</div>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">

@@ -15,7 +15,7 @@ import RowEditor, { type FieldDef } from "@/components/ui/RowEditor"
 
 const boardFields: FieldDef[] = [
   { name: "item_name", label: "اسم الصنف", required: true },
-  { name: "code", label: "الكود", required: true },
+  { name: "code", label: "الكود (اختياري)" },
   { name: "material_type", label: "الخامة" },
   { name: "unit_price", label: "سعر الوحدة", type: "number" },
   { name: "quantity_in", label: "الكمية المبدئية", type: "number" },
@@ -48,7 +48,7 @@ export default function BoardsPage() {
 
   return (
     <DashboardLayout profile={profile}>
-      <PageHeader title="مخزون الألواح" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الألواح" helpDescription="من هنا بتدير ألواح المصنع. الشراء والإضافة الجديدة من صفحة اليومية." backHref="/dashboard" actions={
+      <PageHeader title="مخزون الألواح" subtitle={rows.length + " صنف إجمالي"} helpTitle="مخزون الألواح" helpDescription="من هنا بتدير ألواح المصنع. الشراء والإضافة الجديدة من صفحة اليومية." backHref="/journal" actions={
         <Button variant="secondary" onClick={() => exportToExcel(filtered.map(({ id, supplier_name, total_price, ...rest }: any) => rest as any), "boards_inventory")}>📥 تصدير</Button>
       } />
       {/* إجمالي المخزون */}

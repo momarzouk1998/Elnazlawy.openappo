@@ -71,7 +71,7 @@ export default function WorkersPage() {
         subtitle={rows.length + " عامل"}
         helpTitle="العمال"
         helpDescription="قائمة عمال المصنع. مصروفات (أجور) كل عامل بتتسجل من النثريات باختيار تصنيف 'أجور عمال' واختيار العامل. الإجمالي هنا بيتجمّع تلقائياً."
-        backHref="/dashboard"
+        backHref="/journal"
         actions={
           <>
             <Button variant="secondary" onClick={() => exportToExcel(rowsWithStats, "workers")}>📥 تصدير</Button>

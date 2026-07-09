@@ -14,7 +14,6 @@ export interface CurrentProfile {
 
 export const ALL_MODULES = [
   { key: 'journal', label: 'اليومية', icon: '💰', path: '/journal' },
-  { key: 'dashboard', label: 'لوحة التحكم', icon: '📊', path: '/dashboard' },
   { key: 'suppliers', label: 'الموردين', icon: '🏭', path: '/suppliers' },
   { key: 'boards_inventory', label: 'مخزون الألواح', icon: '📋', path: '/boards' },
   { key: 'accessories_inventory', label: 'مخزون الاكسسوارات', icon: '🔩', path: '/accessories' },
@@ -25,6 +24,7 @@ export const ALL_MODULES = [
   { key: 'workers', label: 'العمال', icon: '🧑‍🔧', path: '/workers' },
   { key: 'contractors', label: 'المقاولين', icon: '🔨', path: '/contractors' },
   { key: 'reports', label: 'التقارير', icon: '📈', path: '/reports' },
+  { key: 'budget', label: 'الميزانية', icon: '📊', path: '/budget' },
   { key: 'users', label: 'المستخدمين', icon: '⚙️', path: '/admin/users', adminOnly: true },
   { key: 'material_types', label: 'قوائم الاختيارات', icon: '🏷️', path: '/admin/material-types' },
 ] as const;

@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         password_hash: passwordHash,
         role: userRole,
         branch_id: branch_id || null,
-        visible_modules: visible_modules || ['dashboard', 'orders'],
+        visible_modules: visible_modules || ['journal', 'orders'],
         permissions: permissions || {},
       },
       select: { id: true, username: true, full_name: true, role: true, branch_id: true, is_active: true, created_at: true },

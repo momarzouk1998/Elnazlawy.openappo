@@ -8,12 +8,12 @@ export async function proxy(request: NextRequest) {
   // Public paths — no auth needed
   const publicPaths = ['/login', '/register'];
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    // If already logged in, redirect to dashboard
+    // If already logged in, redirect to journal
     const token = request.cookies.get(COOKIE_NAME)?.value;
     if (token) {
       const payload = await verifySession(token);
       if (payload) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+        return NextResponse.redirect(new URL('/journal', request.url));
       }
     }
     return NextResponse.next();

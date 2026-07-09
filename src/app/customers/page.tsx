@@ -53,7 +53,7 @@ export default function CustomersPage() {
         subtitle="عملاء المصنع عبر المعارض"
         helpTitle="العملاء"
         helpDescription="هنا بتسجل العملاء بتوع المعارض. كل عميل مرتبط بمعرض محدد. صفحة العميل بتعرض كل أوردراته — بما فيها أوردرات الصيانة اللاحقة — في مكان واحد."
-        backHref="/dashboard"
+        backHref="/journal"
         actions={<>
           <Button variant="secondary" onClick={() => exportToExcel(filtered, "customers")}>📥 تصدير</Button>
           <Button onClick={() => router.push("/customers/new")}>+ عميل جديد</Button>

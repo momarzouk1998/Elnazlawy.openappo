@@ -102,7 +102,7 @@ export default function ReportsPage() {
         subtitle="استخراج بيانات تفصيلية وتصديرها Excel"
         helpTitle="التقارير"
         helpDescription="اختار نوع التقرير، حدد الفترة (لو التقرير بيحتاج تاريخ)، اضغط 'توليد'، ثم 'تصدير Excel' لتحميله."
-        backHref="/dashboard"
+        backHref="/journal"
       />
 
       <div className="card mb-4">
