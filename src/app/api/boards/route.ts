@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     const item = await prisma.boards_inventory.create({
       data: {
         item_name: item_name.trim(),
-        material_type: material_type || '',
+        material_type: (material_type || '').trim(),
         code: autoCode,
         supplier_id: supplier_id || null,
         unit_price,

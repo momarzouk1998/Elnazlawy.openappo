@@ -40,6 +40,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'لا توجد بيانات للتعديل' } }, { status: 400 });
     }
+    // Normalize text fields
+    if (data.material_type !== undefined) data.material_type = (data.material_type || '').trim();
+    if (data.item_name !== undefined) data.item_name = (data.item_name || '').trim();
     data.updated_at = new Date();
 
     const item = await prisma.boards_inventory.update({ where: { id }, data });

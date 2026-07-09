@@ -1,5 +1,5 @@
-﻿"use client"
-import { useMemo, useState } from "react"
+"use client"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useUserStore } from "@/store/user-store"
@@ -34,12 +34,23 @@ export default function BoardsPage() {
   const [materialFilter, setMaterialFilter] = useState("")
   const [availableOnly, setAvailableOnly] = useState(false)
 
-  const materialTypes = useMemo(() => Array.from(new Set(rows.map((r) => r.material_type).filter(Boolean))), [rows])
+  const [materialTypes, setMaterialTypes] = useState<string[]>([])
+
+  // Load material types from the normalized lookup table (no duplicates)
+  useEffect(() => {
+    fetch("/api/material-types?category=board&limit=500")
+      .then(r => r.json())
+      .then(d => {
+        const items = d?.data?.items ?? []
+        setMaterialTypes(items.map((m: any) => m.name).sort())
+      })
+      .catch(() => {})
+  }, [])
 
   const filtered = useMemo(() => rows.filter((b) => {
     const matchSearch = !search || b.item_name.toLowerCase().includes(search.toLowerCase()) || (b.code ?? "").toLowerCase().includes(search.toLowerCase())
     const matchSup = !supplierFilter || String(b.supplier_id) === supplierFilter
-    const matchMat = !materialFilter || b.material_type === materialFilter
+    const matchMat = !materialFilter || (b.material_type || "").trim().toLowerCase() === materialFilter.trim().toLowerCase()
     const matchAvail = !availableOnly || b.quantity_remaining > 0
     return matchSearch && matchSup && matchMat && matchAvail
   }), [rows, search, supplierFilter, materialFilter, availableOnly])
@@ -80,7 +91,10 @@ export default function BoardsPage() {
         <FilterBar>
           <div className="flex-1 min-w-[200px]"><SearchBox value={search} onChange={setSearch} placeholder="ابحث بالاسم أو الكود..." /></div>
           <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white"><option value="">كل الموردين</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-          <select value={materialFilter} onChange={(e) => setMaterialFilter(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white"><option value="">كل الخامات</option>{materialTypes.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+          <select value={materialFilter} onChange={(e) => setMaterialFilter(e.target.value)} className="px-3 py-2.5 border border-gray-300 rounded-lg bg-white min-w-[140px]">
+            <option value="">كل الخامات</option>
+            {materialTypes.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
           <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={availableOnly} onChange={(e) => setAvailableOnly(e.target.checked)} className="accent-brand-orange" />المتوفر فقط</label>
           <div className="text-sm text-gray-500 mr-auto">النتائج: <strong>{filtered.length}</strong></div>
         </FilterBar>

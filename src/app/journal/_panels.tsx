@@ -26,6 +26,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [isNew, setIsNew] = useState(false);
+  const [materialTypeId, setMaterialTypeId] = useState("");
   const [form, setForm] = useState({
     item_id: "", item_name: "", code: "", material_type: "",
     quantity: "", unit_price: "", supplier_id: "",
@@ -121,6 +122,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
 
         setMsg(`✅ تم إضافة وشراء ${form.quantity} × ${form.item_name}`);
         setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
+        setMaterialTypeId("");
         setQ(""); setIsNew(false);
         onSaved?.();
       } finally { setSaving(false); }
@@ -146,6 +148,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
         setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
         setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
+        setMaterialTypeId("");
         setQ(""); setIsNew(false);
         onSaved?.();
       } finally { setSaving(false); }
@@ -189,8 +192,16 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
       )}
       {isNew && cat === "board" && (
-        <Input label="الخامة" value={form.material_type} onChange={e => setForm({ ...form, material_type: e.target.value })}
-          placeholder="مثال: مرفات، كونتر..." />
+        <Combobox
+          label="الخامة"
+          placeholder="ابحث عن خامة أو اكتب جديدة..."
+          endpoint="/api/material-types?category=board&limit=500"
+          value={materialTypeId}
+          onChange={(id, name) => { setMaterialTypeId(id); setForm(f => ({ ...f, material_type: name || "" })); }}
+          createFields={{ category: "board" }}
+          autoCreateOnBlur
+          hint="💡 اختار خامة موجودة أو اكتب اسم جديد وهيتحفظ تلقائياً"
+        />
       )}
       {isNew && cat === "accessory" && (
         <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />

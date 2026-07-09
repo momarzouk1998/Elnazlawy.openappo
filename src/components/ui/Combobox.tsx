@@ -18,6 +18,8 @@ interface ComboboxProps {
   createFields?: Record<string, any>;
   /** Whether to allow creating new options inline (default true) */
   allowCreate?: boolean;
+  /** Auto-create new option on blur (no button needed). Requires allowCreate=true */
+  autoCreateOnBlur?: boolean;
   hint?: string;
 }
 
@@ -34,6 +36,7 @@ export default function Combobox({
   onChange,
   createFields,
   allowCreate = true,
+  autoCreateOnBlur = false,
   hint,
 }: ComboboxProps) {
   const [query, setQuery] = useState("");
@@ -79,21 +82,59 @@ export default function Combobox({
     if (found) setSelectedName(found.name);
   }, [value, options]);
 
+  // Auto-create on blur helper
+  async function autoCreateIfNeeded() {
+    const name = query.trim();
+    if (!name || !allowCreate || !autoCreateOnBlur) return;
+    const exact = options.some((o) => o.name.trim().toLowerCase() === name.toLowerCase());
+    if (exact) {
+      // select existing match
+      const match = options.find((o) => o.name.trim().toLowerCase() === name.toLowerCase())!;
+      handleSelect(match);
+      return;
+    }
+    // auto-create
+    setCreating(true);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, ...(createFields || {}) }),
+      });
+      const json = await res.json();
+      if (json?.ok && json?.data?.id) {
+        const newOpt: ComboboxOption = { id: String(json.data.id), name: json.data.name || name };
+        setOptions((prev) => [...prev, newOpt]);
+        setSelectedName(newOpt.name);
+        setQuery("");
+        setOpen(false);
+        onChange(newOpt.id, newOpt.name);
+      }
+    } catch { /* silent */ } finally {
+      setCreating(false);
+    }
+  }
+
   // Close on outside click
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
-        // restore selected name if open and no selection made
-        const found = options.find((o) => o.id === value);
-        setQuery("");
-        if (found) setSelectedName(found.name);
-        else if (!value) setSelectedName("");
+        if (autoCreateOnBlur && query.trim()) {
+          autoCreateIfNeeded();
+        } else {
+          // restore selected name if open and no selection made
+          const found = options.find((o) => o.id === value);
+          setQuery("");
+          if (found) setSelectedName(found.name);
+          else if (!value) setSelectedName("");
+        }
       }
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [options, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options, value, query, autoCreateOnBlur]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return options.slice(0, 20);
@@ -168,6 +209,14 @@ export default function Combobox({
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
+            onBlur={() => {
+              // delay to allow click events on dropdown items
+              setTimeout(() => {
+                if (autoCreateOnBlur && query.trim() && open) {
+                  autoCreateIfNeeded();
+                }
+              }, 200);
+            }}
             placeholder={selectedName || placeholder}
             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange/30 focus:border-brand-orange"
           />
