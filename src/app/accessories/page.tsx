@@ -57,18 +57,26 @@ export default function AccessoriesPage() {
       } />
       {/* إجمالي المخزون */}
       {rows.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
-            <div className="text-xs opacity-90">عدد الأصناف المتبقية</div>
-            <div className="text-2xl font-extrabold">{rows.filter((a: any) => a.quantity_remaining > 0).length}</div>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
           <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
-            <div className="text-xs opacity-90">إجمالي الكمية المتبقية</div>
-            <div className="text-2xl font-extrabold">{rows.reduce((s: number, a: any) => s + Number(a.quantity_remaining || 0), 0)}</div>
+            <div className="text-xs opacity-90">إجمالي الداخل</div>
+            <div className="text-2xl font-extrabold">{filtered.reduce((s: number, a: any) => s + Number(a.quantity_in ?? 0), 0)}</div>
           </div>
-          <div className="col-span-2 md:col-span-1 card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-            <div className="text-xs opacity-90">قيمة المخزون الحالي</div>
-            <div className="text-2xl font-extrabold">{formatCurrency(rows.reduce((s: number, a: any) => s + (Number(a.unit_price || 0) * Number(a.quantity_remaining || 0)), 0))}</div>
+          <div className="card bg-gradient-to-br from-red-400 to-red-600 text-white">
+            <div className="text-xs opacity-90">إجمالي المستخدم</div>
+            <div className="text-2xl font-extrabold">{filtered.reduce((s: number, a: any) => s + Number(a.quantity_used ?? 0), 0)}</div>
+          </div>
+          <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+            <div className="text-xs opacity-90">إجمالي المتبقي</div>
+            <div className="text-2xl font-extrabold">{filtered.reduce((s: number, a: any) => s + Number(a.quantity_remaining ?? 0), 0)}</div>
+          </div>
+          <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+            <div className="text-xs opacity-90">عدد الأصناف</div>
+            <div className="text-2xl font-extrabold">{filtered.length}</div>
+          </div>
+          <div className="col-span-2 md:col-span-1 card bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+            <div className="text-xs opacity-90">قيمة المخزون</div>
+            <div className="text-2xl font-extrabold">{formatCurrency(filtered.reduce((s: number, a: any) => s + (Number(a.unit_price ?? 0) * Number(a.quantity_remaining ?? 0)), 0))}</div>
           </div>
         </div>
       )}
@@ -87,9 +95,9 @@ export default function AccessoriesPage() {
         { key: "type", label: "النوع" },
         { key: "supplier_name", label: "المورد" },
         { key: "unit_price", label: "السعر", render: (r: any) => formatCurrency(Number(r.unit_price ?? 0)) },
-        { key: "quantity_in", label: "الداخل" },
-        { key: "quantity_used", label: "المستخدم" },
-        { key: "quantity_remaining", label: "المتبقي", render: (r: any) => <span className={r.quantity_remaining > 0 ? "font-bold text-green-600" : "text-gray-400"}>{r.quantity_remaining}</span> },
+        { key: "quantity_in", label: "الداخل", render: (r: any) => Number(r.quantity_in ?? 0) },
+        { key: "quantity_used", label: "المستخدم", render: (r: any) => Number(r.quantity_used ?? 0) },
+        { key: "quantity_remaining", label: "المتبقي", render: (r: any) => <span className={Number(r.quantity_remaining ?? 0) > 0 ? "font-bold text-green-600" : "text-gray-400"}>{Number(r.quantity_remaining ?? 0)}</span> },
         { key: "total_price", label: "الإجمالي", render: (r: any) => <span className="font-bold">{formatCurrency(Number(r.total_price ?? 0))}</span> },
         { key: "_actions", label: "إجراءات", render: (r: any) => <RowEditor row={r} apiBase="/api/accessories" fields={accessoryFields} entityLabel="الاكسسوار" deleteHint="لا يمكن حذف هذا الصنف لأنه مُستخدم في أوردرات أو مُسجّل في اليومية" /> },
       ]} />
