@@ -56,7 +56,16 @@ export default function Combobox({
       .then((json) => {
         if (!active) return;
         const items = json?.data?.items ?? json?.items ?? [];
-        const mapped = items.map((it: any) => ({ id: String(it.id), name: it.name }));
+        const seen = new Set<string>();
+        const mapped: ComboboxOption[] = [];
+        for (const it of items) {
+          const rawName = (it.name || '').trim();
+          const lowerName = rawName.toLowerCase();
+          if (!seen.has(lowerName)) {
+            seen.add(lowerName);
+            mapped.push({ id: String(it.id), name: rawName });
+          }
+        }
         setOptions(mapped);
         // Sync the display name when value changes externally
         if (value) {

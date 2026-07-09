@@ -42,7 +42,8 @@ export default function BoardsPage() {
       .then(r => r.json())
       .then(d => {
         const items = d?.data?.items ?? []
-        setMaterialTypes(items.map((m: any) => m.name).sort())
+        const uniqueNames = Array.from(new Set(items.map((m: any) => (m.name || '').trim()))).sort()
+        setMaterialTypes(uniqueNames as string[])
       })
       .catch(() => {})
   }, [])
