@@ -17,17 +17,15 @@ export default function SupplierDetailPage() {
 
   const boards = boardsData?.items?.filter((b: any) => b.supplier_id === parseInt(id)) || [];
   const accessories = accData?.items?.filter((a: any) => a.supplier_id === parseInt(id)) || [];
-  const purchases = journalData?.entries || [];
+  const journalEntries = journalData?.entries || [];
 
   if (!initialized) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-brand-orange border-t-transparent rounded-full"></div></div>;
   if (!user) return null;
   if (!supplier && !loading) return <DashboardLayout profile={user}><div className="card">المورد غير موجود</div></DashboardLayout>;
 
-  // المدفوعات الفعلية لهذا المورد (غير التمريرية)
-  const actualPayments = purchases.filter((p: any) => !p.is_pass_through);
-  const totalPayments = actualPayments.reduce((s: number, p: any) => s + parseFloat(p.amount || 0), 0);
-  const totalItemsValue = [...boards, ...accessories].reduce((s: number, it: any) => s + (it.unit_price * it.quantity_remaining), 0);
-  const balance = totalPayments - totalItemsValue;
+  const totalPurchases = journalEntries.filter((p: any) => ['مشتريات', 'purchase'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const totalPayments = journalEntries.filter((p: any) => ['دفعة صادرة لمورد', 'outgoing_to_supplier'].includes(p.entry_type)).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const balance = totalPurchases - totalPayments;
 
   return (
     <DashboardLayout profile={user}>
@@ -39,23 +37,23 @@ export default function SupplierDetailPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="card">
-          <div className="text-sm text-gray-500">إجمالي الأصناف</div>
+          <div className="text-sm text-gray-500">إجمالي الأصناف بالمخزن</div>
           <div className="text-2xl font-extrabold text-brand-black">{boards.length + accessories.length}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-500">قيمة المخزون المتبقي</div>
-          <div className="text-2xl font-extrabold text-brand-orange">{formatCurrency(totalItemsValue)}</div>
+          <div className="text-sm text-gray-500">إجمالي قيمة المشتريات</div>
+          <div className="text-2xl font-extrabold text-red-600">{formatCurrency(totalPurchases)}</div>
         </div>
         <div className="card">
-          <div className="text-sm text-gray-500">إجمالي المدفوعات</div>
-          <div className="text-2xl font-extrabold text-red-600">{formatCurrency(totalPayments)}</div>
+          <div className="text-sm text-gray-500">إجمالي المدفوعات للمورد</div>
+          <div className="text-2xl font-extrabold text-green-600">{formatCurrency(totalPayments)}</div>
         </div>
-        <div className={`card ${balance >= 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
-          <div className="text-sm text-gray-500">الرصيد</div>
-          <div className={`text-2xl font-extrabold ${balance >= 0 ? "text-red-600" : "text-green-600"}`}>
-            {balance >= 0 ? `عليك ${formatCurrency(balance)}` : `لك ${formatCurrency(Math.abs(balance))}`}
+        <div className={`card ${balance > 0 ? "bg-red-50 border-red-200" : balance < 0 ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"}`}>
+          <div className="text-sm text-gray-500">الرصيد الحالي</div>
+          <div className={`text-2xl font-extrabold ${balance > 0 ? "text-red-600" : balance < 0 ? "text-emerald-600" : "text-gray-500"}`}>
+            {balance > 0 ? `عليه ${formatCurrency(balance)} (لصالح المورد)` : balance < 0 ? `دفع بزيادة ${formatCurrency(Math.abs(balance))} (لصالح المصنع)` : '0'}
           </div>
-          <div className="text-[10px] text-gray-400 mt-1">{balance >= 0 ? "دفعتله أكتر من قيمة المخزون" : "المخزون أكتر من اللي دفعت"}</div>
+          <div className="text-[10px] text-gray-400 mt-1">{balance > 0 ? "المصنع مديون للمورد" : balance < 0 ? "المصنع له فلوس عند المورد" : "الحساب مصفر"}</div>
         </div>
       </div>
 

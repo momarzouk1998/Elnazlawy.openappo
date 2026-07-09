@@ -31,8 +31,9 @@ const supplierFields: FieldDef[] = [
 export default function SuppliersPage() {
   const router = useRouter();
   const { user, initialized } = useUserStore();
-  const { data, loading, refetch } = useApi<{ items: any[]; total: number }>('/api/suppliers?limit=500');
+  const { data, loading, refetch } = useApi<{ items: any[]; total: number, stats: any }>('/api/suppliers?limit=500');
   const rows = data?.items || [];
+  const stats = data?.stats || { totalDebt: 0, totalCredit: 0, suppliersCount: 0 };
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
 
@@ -51,13 +52,31 @@ export default function SuppliersPage() {
         title="الموردون"
         subtitle="إدارة شركات توريد الخامات"
         helpTitle="الموردون"
-        helpDescription="هنا بتسجل الـ 7 شركات اللي بتشتري منهم ألواح واكسسوارات."
+        helpDescription="هنا بتسجل الـ 7 شركات اللي بتشتري منهم ألواح واكسسوارات، وتقدر تتابع حساباتهم (دائن ومدين)."
         backHref="/journal"
         actions={<>
           <Button variant="secondary" onClick={() => exportToExcel(filtered, "suppliers")}>📥 تصدير Excel</Button>
           <Button onClick={() => router.push("/suppliers/new")}>+ مورد جديد</Button>
         </>}
       />
+
+      {/* كاردات الإحصائيات */}
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4">
+            <div className="text-sm opacity-90 mb-1">إجمالي عدد الموردين</div>
+            <div className="text-2xl font-bold">{stats.suppliersCount}</div>
+          </div>
+          <div className="card bg-gradient-to-br from-red-500 to-red-600 text-white p-4">
+            <div className="text-sm opacity-90 mb-1">إجمالي الديون المستحقة (لصالح الموردين)</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalDebt)}</div>
+          </div>
+          <div className="card bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-4">
+            <div className="text-sm opacity-90 mb-1">إجمالي الأرصدة المقدمة (لصالح المصنع)</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalCredit)}</div>
+          </div>
+        </div>
+      )}
 
       <div className="card mb-4">
         <FilterBar>
@@ -78,6 +97,12 @@ export default function SuppliersPage() {
         emptyMessage="لا يوجد موردون. ابدأ بإضافة مورد جديد."
         columns={[
           { key: "name", label: "اسم الشركة", render: (r: any) => <Link href={`/suppliers/${r.id}`} className="font-semibold text-brand-orange hover:underline">{r.name}</Link> },
+          { key: "balance", label: "الرصيد", render: (r: any) => {
+              if (r.balance === 0) return <span className="text-gray-500 font-bold">0</span>;
+              if (r.balance > 0) return <span className="text-red-600 font-bold" title="المصنع مديون للمورد بمبلغ" dir="ltr">{formatCurrency(r.balance)} (له)</span>;
+              return <span className="text-green-600 font-bold" title="المصنع دفع بزيادة" dir="ltr">{formatCurrency(Math.abs(r.balance))} (عليه)</span>;
+            }
+          },
           { key: "payment_type", label: "نوع التعامل", render: (r: any) => PAYMENT_METHOD_LABELS[r.payment_type] || r.payment_type },
           { key: "phone", label: "رقم التواصل", render: (r: any) => r.phone || "-" },
           { key: "notes", label: "ملاحظات", render: (r: any) => <span className="text-gray-500 text-xs">{r.notes || "-"}</span> },
