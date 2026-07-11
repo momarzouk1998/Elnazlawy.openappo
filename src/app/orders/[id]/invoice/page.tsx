@@ -24,7 +24,8 @@ export default function InvoicePage() {
       fetch(`/api/orders/${id}/extra-costs`).then(r => r.json()),
     ]).then(([mRes, cRes, eRes, exRes]) => {
       setMaterials(mRes?.data ?? []);
-      setCosts(cRes?.data?.costs ?? null);
+      // costs come directly on data (not data.costs)
+      setCosts(cRes?.data ?? null);
       setExternal(eRes?.data ?? []);
       setExtraCosts(exRes?.data ?? []);
     });
@@ -33,8 +34,18 @@ export default function InvoicePage() {
   if (loading) return <div className="p-8 text-center">جاري التحميل...</div>;
   if (!order) return <div className="p-8 text-center">الأوردر غير موجود</div>;
 
-  const boardsCost = materials?.filter((m: any) => m.inventory_table === 'boards_inventory').reduce((s: number, m: any) => s + m.line_total, 0) || 0;
-  const accCost = materials?.filter((m: any) => m.inventory_table === 'accessories_inventory').reduce((s: number, m: any) => s + m.line_total, 0) || 0;
+  const boardsCost = Number(costs?.boards_cost ?? 0);
+  const accCost = Number(costs?.accessories_cost ?? 0);
+  const materialsCost = materials?.reduce((s: number, m: any) => s + Number(m.line_total ?? 0), 0) || 0;
+  const extraCostsSum = extraCosts?.reduce((s: number, e: any) => s + Number(e.amount ?? 0), 0) || 0;
+  const grandTotal = Number(costs?.order_total ?? 0) || (
+    materialsCost +
+    Number(costs?.installation_cost ?? 0) +
+    Number(costs?.internal_transport_cost ?? 0) +
+    Number(costs?.external_transport_cost ?? 0) +
+    Number(costs?.factory_commission ?? 0) +
+    extraCostsSum
+  );
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 print:p-0 print:bg-white">
@@ -121,7 +132,7 @@ export default function InvoicePage() {
 
         <div className="bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white p-4 rounded-xl flex items-center justify-between">
           <span className="font-bold">الإجمالي الكلي</span>
-          <span className="text-2xl font-extrabold">{formatCurrency(costs?.order_total)}</span>
+          <span className="text-2xl font-extrabold">{formatCurrency(grandTotal)}</span>
         </div>
 
         {external && external.length > 0 && (

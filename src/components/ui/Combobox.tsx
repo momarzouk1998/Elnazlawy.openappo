@@ -22,6 +22,8 @@ interface ComboboxProps {
   autoCreateOnBlur?: boolean;
   hint?: string;
   nameKey?: string;
+  /** When set, shows a clear/none option at the top of dropdown with this label (e.g. "— بدون مورد —") */
+  clearLabel?: string;
 }
 
 /**
@@ -40,6 +42,7 @@ export default function Combobox({
   autoCreateOnBlur = false,
   hint,
   nameKey = "name",
+  clearLabel,
 }: ComboboxProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -236,8 +239,19 @@ export default function Combobox({
         {open && (
           <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
             {loading && <div className="px-4 py-3 text-sm text-gray-400">جاري التحميل...</div>}
-            {!loading && filtered.length === 0 && !canCreate && (
+            {!loading && filtered.length === 0 && !canCreate && !clearLabel && (
               <div className="px-4 py-3 text-sm text-gray-400">لا توجد نتائج</div>
+            )}
+            {clearLabel && (
+              <button
+                type="button"
+                onClick={() => { onChange("", ""); setSelectedName(""); setQuery(""); setOpen(false); }}
+                className={`w-full text-right px-4 py-2.5 hover:bg-gray-100 border-b border-gray-100 text-gray-500 ${
+                  !value ? "bg-gray-50 font-semibold" : ""
+                }`}
+              >
+                {clearLabel}
+              </button>
             )}
             {filtered.map((opt) => (
               <button

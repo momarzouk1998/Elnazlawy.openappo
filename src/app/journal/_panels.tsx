@@ -199,7 +199,7 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       {/* بحث + اختيار */}
       <div>
         <Input label={`ابحث عن ${catLabel}...`} value={q} onChange={e => handleQChange(e.target.value)}
-          placeholder="اكتب اسم أو كود... لو موجود تختاره، لو مش موجود تضيفه" />
+          placeholder="اكتب الاسم لو موجود تختاره، لو مش موجود تضيفه" />
         {!isNew && q.trim() && (
           <div className="mt-1 max-h-40 overflow-y-auto divide-y border rounded-lg">
             {filtered.map(it => (
@@ -249,8 +249,15 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       )}
 
       {/* المورد */}
-      <Select label="المورد" value={form.supplier_id} onChange={e => setForm({ ...form, supplier_id: e.target.value })}
-        options={[{ value: "", label: "— بدون مورد —" }, ...suppliers.map((s: any) => ({ value: String(s.id), label: s.name }))]} />
+      <Combobox
+        label="المورد"
+        placeholder="ابحث عن مورد..."
+        endpoint="/api/suppliers?limit=500"
+        value={form.supplier_id}
+        onChange={(id) => setForm({ ...form, supplier_id: id })}
+        allowCreate={false}
+        clearLabel="— بدون مورد —"
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <Input label="الكمية *" type="number" step="0.01" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} required />

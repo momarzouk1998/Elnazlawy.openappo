@@ -95,6 +95,15 @@ export default function NewOrderForm() {
   }
 
   useEffect(() => {
+    if (!editingId && !order.branch_id && branches.length > 0) {
+      const defaultBranch = branches.find((b: any) => b.name === "مزايا" || b.name === "مازايا");
+      if (defaultBranch) {
+        setOrder(prev => ({ ...prev, branch_id: String(defaultBranch.id) }));
+      }
+    }
+  }, [branches, editingId, order.branch_id]);
+
+  useEffect(() => {
     if (!editingId) return
     ;(async () => {
       const [ordRes, matsRes, extRes, extraRes] = await Promise.all([
@@ -285,22 +294,25 @@ export default function NewOrderForm() {
 
       {tab === "info" && (
         <div className="card max-w-3xl space-y-4">
-          <Input label="اسم الأوردر *" value={order.order_name} onChange={(e) => setOrder({ ...order, order_name: e.target.value })} placeholder="مثال: أوضة نوم محمد" required />
+          {/* Row 1: اسم الأوردر + المعرض */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select label="العميل" value={order.customer_id} onChange={(e) => setCustomer(e.target.value)} options={[{ value: "", label: "— بدون عميل —" }, ...customers.map((c) => ({ value: String(c.id), label: c.name }))]} />
+            <Input label="اسم الأوردر *" value={order.order_name} onChange={(e) => setOrder({ ...order, order_name: e.target.value })} placeholder="مثال: أوضة نوم محمد" required />
             <Select label="المعرض" value={order.branch_id} onChange={(e) => setOrder({ ...order, branch_id: e.target.value })} options={[{ value: "", label: "— اختر —" }, ...branches.map((b) => ({ value: String(b.id), label: b.name }))]} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Row 2: نوع الأوردر + الحالة + عدد العمال */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Select label="نوع الأوردر" value={order.order_type} onChange={(e) => setOrder({ ...order, order_type: e.target.value })} options={[{ value: "تصنيع جديد", label: "تصنيع جديد" }, { value: "صيانة", label: "صيانة" }]} />
-            {order.order_type === "صيانة" && (
-              <Select label="الأوردر الأصلي" value={order.parent_order_id} onChange={(e) => setOrder({ ...order, parent_order_id: e.target.value })} options={[{ value: "", label: "— اختر —" }, ...allOrders.map((o) => ({ value: String(o.id), label: o.order_name }))]} />
-            )}
+            <Select label="الحالة" value={order.status} onChange={(e) => setOrder({ ...order, status: e.target.value })} options={[{ value: "مفتوح", label: "مفتوح" }, { value: "قيد التنفيذ", label: "قيد التنفيذ" }, { value: "مكتمل", label: "مكتمل" }, { value: "تم التسليم", label: "تم التسليم" }]} />
+            <Input label="عدد العمال" type="number" min="0" value={order.workers_count} onChange={(e) => setOrder({ ...order, workers_count: e.target.value })} placeholder="0" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {order.order_type === "صيانة" && (
+            <Select label="الأوردر الأصلي" value={order.parent_order_id} onChange={(e) => setOrder({ ...order, parent_order_id: e.target.value })} options={[{ value: "", label: "— اختر —" }, ...allOrders.map((o) => ({ value: String(o.id), label: o.order_name }))]} />
+          )}
+          {/* Row 3: العميل + تاريخ البدء + تاريخ الانتهاء */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Select label="العميل" value={order.customer_id} onChange={(e) => setOrder({ ...order, customer_id: e.target.value })} options={[{ value: "", label: "— بدون عميل —" }, ...customers.map((c) => ({ value: String(c.id), label: c.name }))]} />
             <Input label="تاريخ البدء" type="date" value={order.start_date} onChange={(e) => setOrder({ ...order, start_date: e.target.value })} />
             <Input label="تاريخ الانتهاء" type="date" value={order.end_date} onChange={(e) => setOrder({ ...order, end_date: e.target.value })} />
-            <Input label="عدد العمال" type="number" min="0" value={order.workers_count} onChange={(e) => setOrder({ ...order, workers_count: e.target.value })} placeholder="0" />
-            <Select label="الحالة" value={order.status} onChange={(e) => setOrder({ ...order, status: e.target.value })} options={[{ value: "مفتوح", label: "مفتوح" }, { value: "قيد التنفيذ", label: "قيد التنفيذ" }, { value: "مكتمل", label: "مكتمل" }, { value: "تم التسليم", label: "تم التسليم" }]} />
           </div>
           <Textarea label="ملاحظات عامة" rows={4} value={order.notes} onChange={(e) => setOrder({ ...order, notes: e.target.value })} />
         </div>
