@@ -139,7 +139,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
       ) : (
         <>
           {/* ===== ملخص المخزون والأوردرات ===== */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <div className="card bg-gradient-to-br from-amber-500 to-orange-600 text-white">
               <div className="text-xs opacity-90">قيمة المخزون</div>
               <div className="text-2xl font-extrabold">{formatCurrency(
@@ -160,11 +160,6 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 return (o.status === "مكتمل" || o.status === "تم التسليم") && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
               }).length}</div>
               <div className="text-[10px] opacity-70 mt-0.5">هذا الشهر</div>
-            </div>
-            <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white">
-              <div className="text-xs opacity-90">الموردون</div>
-              <div className="text-2xl font-extrabold">{suppliersList.length}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">مورد نشط</div>
             </div>
             <div className="card bg-gradient-to-br from-gray-500 to-gray-700 text-white">
               <div className="text-xs opacity-90">إجمالي الأوردرات</div>

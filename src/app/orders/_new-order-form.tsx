@@ -219,7 +219,8 @@ export default function NewOrderForm() {
         quantity_used: u.quantity,
         unit_price_snapshot: u.unit_price,
       }))
-      await mutate("POST", "/api/orders/" + orderId + "/materials", mats)
+      const matRes = await mutate("POST", "/api/orders/" + orderId + "/materials", mats)
+      if (matRes.error) { setError("خطأ في حفظ المواد: " + matRes.error); return }
     }
 
     await mutate("PATCH", "/api/orders/" + orderId, costs)

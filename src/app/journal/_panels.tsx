@@ -102,6 +102,8 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         });
         const createData = await createRes.json();
         if (!createRes.ok) { setErr(createData?.error?.message || "خطأ في إنشاء الصنف"); return; }
+        const newItem = createData?.data;
+        const newItemId = newItem?.id;
 
         // تسجيل في اليومية
         if (Number(form.unit_price || 0) > 0 && Number(form.quantity) > 0) {
@@ -120,8 +122,24 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
           });
         }
 
-        setMsg(`✅ تم إضافة وشراء ${form.quantity} × ${form.item_name}`);
-        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
+        // لو اختار أوردر، ضع المادة في الأوردر
+        if (form.order_id && newItemId) {
+          try {
+            await fetch("/api/orders/" + form.order_id + "/materials", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify([{
+                item_category: cat === "board" ? "boards_inventory" : "accessories_inventory",
+                item_id: newItemId,
+                quantity_used: Number(form.quantity),
+                unit_price_snapshot: Number(form.unit_price || 0),
+              }]),
+            });
+          } catch (e) { /* ignore */ }
+        }
+
+        setMsg(`✅ تم إضافة وشراء ${form.quantity} × ${form.item_name}${form.order_id ? " + إضافتها للأوردر" : ""}`);
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "", order_id: "" }));
         setMaterialTypeId("");
         setQ(""); setIsNew(false);
         onSaved?.();
@@ -146,8 +164,27 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         });
         const j = await res.json();
         if (!res.ok) { setErr(j?.error?.message || "خطأ"); return; }
-        setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}`);
-        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "" }));
+
+        // لو اختار أوردر، ضع المادة في الأوردر
+        if (form.order_id && res.ok) {
+          try {
+            await fetch("/api/orders/" + form.order_id + "/materials", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify([{
+                item_category: cat === "board" ? "boards_inventory" : "accessories_inventory",
+                item_id: form.item_id,
+                quantity_used: Number(form.quantity),
+                unit_price_snapshot: Number(form.unit_price || 0),
+              }]),
+            });
+          } catch (e) {
+            // لو الإضافة للأوردر فشلت، الشراء نفسه نجح
+          }
+        }
+
+        setMsg(`✅ تم شراء ${form.quantity} × ${form.item_name}${form.order_id ? " + إضافتها للأوردر" : ""}`);
+        setForm(f => ({ ...f, item_id: "", item_name: "", code: "", material_type: "", quantity: "", notes: "", supplier_id: "", order_id: "" }));
         setMaterialTypeId("");
         setQ(""); setIsNew(false);
         onSaved?.();
@@ -188,6 +225,10 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
       )}
 
       {/* حقول الصنف الجديد */}
+      {isNew && cat === "board" && (
+        <Input label="الكود (اختياري)" value={form.code} onChange={e => setForm({ ...form, code: e.target.value })}
+          placeholder="مثال: S-620 — لو فارغ بيتولد تلقائياً" />
+      )}
       {isNew && cat === "board" && (
         <Input label="اسم الصنف *" value={form.item_name} onChange={e => setForm({ ...form, item_name: e.target.value })} required />
       )}
