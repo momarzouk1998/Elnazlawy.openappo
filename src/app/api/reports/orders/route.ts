@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       data: {
-        orders: dataR,
+        orders: dataR.map((r: any) => ({ ...r, id: r.order_id })),
         pagination: { page, limit, total, pages: Math.ceil(total / limit) },
         summary: {
           total_orders: parseInt(summaryR[0].total_orders),

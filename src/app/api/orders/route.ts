@@ -85,6 +85,7 @@ export async function GET(request: Request) {
     // Serializing decimals properly for client
     const items = data.map((r: any) => ({
       ...r,
+      id: r.order_id,
       boards_cost: Number(r.boards_cost ?? 0),
       accessories_cost: Number(r.accessories_cost ?? 0),
       installation_cost: Number(r.installation_cost ?? 0),
