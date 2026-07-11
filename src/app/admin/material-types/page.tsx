@@ -77,7 +77,7 @@ export default function MaterialTypesPage() {
         </div>
       </div>
 
-      <div className="card mb-6 bg-gradient-to-br from-orange-50 to-white border border-orange-100">
+      <div className="card mb-6 bg-brand-orange-light border border-brand-orange/20">
         <h3 className="text-sm font-bold text-gray-700 mb-3">➕ إضافة نوع جديد</h3>
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[220px]">
@@ -97,7 +97,7 @@ export default function MaterialTypesPage() {
         columns={[
           {
             key: "category", label: "التصنيف",
-            render: r => <span className={`badge ${r.category === "board" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
+            render: r => <span className={`badge border ${r.category === "board" ? "bg-brand-orange-light text-brand-orange-dark border-brand-orange/20" : "bg-white text-brand-black border-gray-200"}`}>
               {CATEGORY_LABELS[r.category] || r.category}
             </span>,
           },

@@ -95,10 +95,10 @@ export default function UsersPage() {
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <StatCard label="إجمالي الموظفين" value={users.length} icon="👥" color="bg-blue-500" />
-        <StatCard label="الموظفون" value={branchCount} icon="👤" color="bg-green-500" />
-        <StatCard label="المدراء" value={adminCount} icon="👑" color="bg-orange-500" />
-        <StatCard label="معطلة" value={disabledCount} icon="🔒" color="bg-red-500" />
+        <StatCard label="إجمالي الموظفين" value={users.length} icon="👥" />
+        <StatCard label="الموظفون" value={branchCount} icon="👤" />
+        <StatCard label="المدراء" value={adminCount} icon="👑" />
+        <StatCard label="معطلة" value={disabledCount} icon="🔒" />
       </div>
 
       <div className="card overflow-x-auto">
@@ -146,7 +146,7 @@ export default function UsersPage() {
                   })()}
                 </td>
                 <td className="px-3 py-3 text-center align-middle">
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${u.role === "admin" ? "bg-orange-100 text-orange-800 border border-orange-200" : "bg-blue-100 text-blue-800 border border-blue-200"}`}>
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${u.role === "admin" ? "bg-brand-orange-light text-brand-orange-dark border border-brand-orange/20" : "bg-gray-100 text-brand-black border border-gray-200"}`}>
                     <span>{u.role === "admin" ? "👑" : "👤"}</span>
                     <span>{u.role === "admin" ? "مدير المصنع" : "موظف"}</span>
                   </span>
@@ -183,12 +183,12 @@ export default function UsersPage() {
   );
 }
 
-function StatCard({ label, value, icon, color }: { label: string; value: number; icon: string; color: string }) {
+function StatCard({ label, value, icon }: { label: string; value: number; icon: string }) {
   return (
-    <div className={`${color} text-white rounded-xl p-4 shadow-elevated`}>
+    <div className="card bg-white border-r-4 border-brand-orange p-4 flex flex-col justify-between">
       <div className="text-2xl mb-1">{icon}</div>
-      <div className="text-2xl font-extrabold">{value}</div>
-      <div className="text-xs opacity-90">{label}</div>
+      <div className="text-2xl font-extrabold text-brand-black">{value}</div>
+      <div className="text-xs text-gray-500 mt-1">{label}</div>
     </div>
   );
 }

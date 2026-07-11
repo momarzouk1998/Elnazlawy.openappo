@@ -151,7 +151,7 @@ export default function NewJournalForm() {
             </label>
           </>
         )}
-        {form.entry_type === "نثريات" && <div className="bg-purple-50 text-purple-700 text-sm p-3 rounded-lg">💡 الأفضل تسجيل النثريات من صفحة "النثريات" — هتترتبط هنا تلقائياً.</div>}
+        {form.entry_type === "نثريات" && <div className="bg-brand-orange-light border border-brand-orange/20 text-brand-orange-dark text-sm p-3 rounded-lg">💡 الأفضل تسجيل النثريات من صفحة "النثريات" — هتترتبط هنا تلقائياً.</div>}
 
         <Combobox
           label="الأوردر المرتبط (اختياري)"

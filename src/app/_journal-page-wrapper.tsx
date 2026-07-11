@@ -37,14 +37,14 @@ type PanelKey =
 interface ActionBtn { key: PanelKey; icon: string; label: string; color: string; }
 
 const ACTIONS: ActionBtn[] = [
-  { key: "board", icon: "🪵", label: "شراء ألواح", color: "from-amber-500 to-orange-600" },
-  { key: "accessory", icon: "🔩", label: "شراء إكسسوارات", color: "from-violet-500 to-purple-600" },
-  { key: "overhead", icon: "💵", label: "نثريات / أجور عمال", color: "from-pink-500 to-rose-600" },
-  { key: "income", icon: "📥", label: "دفعة من معرض", color: "from-green-500 to-emerald-600" },
-  { key: "search", icon: "🔍", label: "بحث في المخزن", color: "from-blue-500 to-blue-700" },
-  { key: "today", icon: "📅", label: "تقرير اليوم", color: "from-cyan-500 to-teal-600" },
-  { key: "workers", icon: "🧑‍🔧", label: "تقرير العمال", color: "from-indigo-500 to-indigo-700" },
-  { key: "filter", icon: "📋", label: "الحركات المالية", color: "from-gray-500 to-gray-700" },
+  { key: "board", icon: "🪵", label: "شراء ألواح", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "accessory", icon: "🔩", label: "شراء إكسسوارات", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "overhead", icon: "💵", label: "نثريات / أجور عمال", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "income", icon: "📥", label: "دفعة من معرض", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "search", icon: "🔍", label: "بحث في المخزن", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "today", icon: "📅", label: "تقرير اليوم", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "workers", icon: "🧑‍🔧", label: "تقرير العمال", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
+  { key: "filter", icon: "📋", label: "الحركات المالية", color: "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white" },
 ];
 
 const PANEL_TITLES: Record<Exclude<PanelKey, null>, string> = {
@@ -139,52 +139,52 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
         <>
           {/* ===== ملخص المخزون والأوردرات ===== */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <div className="card bg-gradient-to-br from-amber-500 to-orange-600 text-white">
-              <div className="text-xs opacity-90">قيمة المخزون</div>
-              <div className="text-2xl font-extrabold">{formatCurrency(
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">قيمة المخزون</div>
+              <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(
                 boards.reduce((s: number, b: any) => s + (Number(b.unit_price ?? 0) * Number(b.quantity_remaining ?? 0)), 0)
                 + accessories.reduce((s: number, a: any) => s + (Number(a.unit_price ?? 0) * Number(a.quantity_remaining ?? 0)), 0)
               )}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">{boards.length + accessories.length} صنف</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{boards.length + accessories.length} صنف</div>
             </div>
-            <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white">
-              <div className="text-xs opacity-90">أوردرات مفتوحة</div>
-              <div className="text-2xl font-extrabold">{allOrders.filter((o: any) => o.status === "مفتوح" || o.status === "قيد التنفيذ").length}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">قيد التنفيذ والمفتوحة</div>
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">أوردرات مفتوحة</div>
+              <div className="text-2xl font-extrabold text-brand-black">{allOrders.filter((o: any) => o.status === "مفتوح" || o.status === "قيد التنفيذ").length}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">قيد التنفيذ والمفتوحة</div>
             </div>
-            <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-              <div className="text-xs opacity-90">أوردرات مكتملة (الشهر)</div>
-              <div className="text-2xl font-extrabold">{allOrders.filter((o: any) => {
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">أوردرات مكتملة (الشهر)</div>
+              <div className="text-2xl font-extrabold text-brand-black">{allOrders.filter((o: any) => {
                 const d = new Date(o.created_at); const now = new Date();
                 return (o.status === "مكتمل" || o.status === "تم التسليم") && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
               }).length}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">هذا الشهر</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">هذا الشهر</div>
             </div>
-            <div className="card bg-gradient-to-br from-gray-500 to-gray-700 text-white">
-              <div className="text-xs opacity-90">إجمالي الأوردرات</div>
-              <div className="text-2xl font-extrabold">{allOrders.length}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">كل الأوردرات</div>
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">إجمالي الأوردرات</div>
+              <div className="text-2xl font-extrabold text-brand-black">{allOrders.length}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">كل الأوردرات</div>
             </div>
           </div>
 
           {/* ===== ملخص إجمالي كل الفلوس ===== */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-              <div className="text-xs opacity-90">إجمالي الوارد</div>
-              <div className="text-2xl font-extrabold">{formatCurrency(totalIncome)}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">كل التحويلات الواردة من المعارض</div>
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">إجمالي الوارد</div>
+              <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(totalIncome)}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">كل التحويلات الواردة من المعارض</div>
             </div>
-            <div className="card bg-gradient-to-br from-red-400 to-red-600 text-white">
-              <div className="text-xs opacity-90">إجمالي المصروف (مشتريات)</div>
-              <div className="text-2xl font-extrabold">{formatCurrency(totalExpense)}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">مشتريات ألواح + إكسسوارات + نثريات</div>
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">إجمالي المصروف (مشتريات)</div>
+              <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(totalExpense)}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">مشتريات ألواح + إكسسوارات + نثريات</div>
             </div>
-            <div className="card bg-gradient-to-br from-orange-400 to-orange-600 text-white">
-              <div className="text-xs opacity-90">إجمالي المدفوعات (موردين)</div>
-              <div className="text-2xl font-extrabold">{formatCurrency(totalPayout)}</div>
-              <div className="text-[10px] opacity-70 mt-0.5">دفوع صادرة للموردين</div>
+            <div className="card bg-white border-r-4 border-brand-orange">
+              <div className="text-xs text-gray-500">إجمالي المدفوعات (موردين)</div>
+              <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(totalPayout)}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">دفوع صادرة للموردين</div>
             </div>
-            <div className={`card bg-gradient-to-br ${totalNet >= 0 ? "from-blue-500 to-blue-700" : "from-red-500 to-red-700"} text-white`}>
+            <div className="card bg-gradient-to-br from-brand-orange to-brand-orange-dark text-white">
               <div className="text-xs opacity-90">صافي الرصيد الحالي</div>
               <div className="text-2xl font-extrabold">{formatCurrency(totalNet)}</div>
               <div className="text-[10px] opacity-70 mt-0.5">الوارد − المصروف − المدفوعات</div>
@@ -194,22 +194,22 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
           {/* ===== ملخص اليوم + آخر 7 أيام ===== */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
             {/* تقرير اليوم */}
-            <div className="card border-2 border-cyan-300 bg-gradient-to-br from-cyan-50 to-white">
-              <div className="text-xs font-bold text-cyan-700 mb-2">📅 تقرير اليوم ({formatDate(todayKey)})</div>
+            <div className="card bg-white border border-gray-200">
+              <div className="text-xs font-bold text-gray-700 mb-2 border-b pb-2">📅 تقرير اليوم ({formatDate(todayKey)})</div>
               <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-white/60 rounded p-1.5"><div className="text-[10px] text-gray-500">رصيد أول اليوم</div><div className="font-bold text-gray-700 text-sm">{formatCurrency(openingBalance)}</div></div>
-                <div className="bg-green-50 rounded p-1.5"><div className="text-[10px] text-gray-500">+ وارد اليوم</div><div className="font-bold text-green-600 text-sm">{formatCurrency(todayIncome)}</div></div>
-                <div className="bg-red-50 rounded p-1.5"><div className="text-[10px] text-gray-500">− مصروف اليوم</div><div className="font-bold text-red-600 text-sm">{formatCurrency(todayExpense)}</div></div>
-                <div className={`rounded p-1.5 ${closingBalance >= 0 ? "bg-blue-50" : "bg-red-100"}`}><div className="text-[10px] text-gray-500">= المتبقي (آخر اليوم)</div><div className={`font-bold text-sm ${closingBalance >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(closingBalance)}</div></div>
+                <div className="bg-gray-50 rounded p-1.5"><div className="text-[10px] text-gray-500">رصيد أول اليوم</div><div className="font-bold text-gray-700 text-sm">{formatCurrency(openingBalance)}</div></div>
+                <div className="bg-brand-orange-light rounded p-1.5"><div className="text-[10px] text-gray-500">+ وارد اليوم</div><div className="font-bold text-brand-orange-dark text-sm">{formatCurrency(todayIncome)}</div></div>
+                <div className="bg-gray-50 rounded p-1.5"><div className="text-[10px] text-gray-500">− مصروف اليوم</div><div className="font-bold text-gray-700 text-sm">{formatCurrency(todayExpense)}</div></div>
+                <div className="bg-white border rounded p-1.5"><div className="text-[10px] text-gray-500">= المتبقي (آخر اليوم)</div><div className="font-bold text-brand-black text-sm">{formatCurrency(closingBalance)}</div></div>
               </div>
             </div>
             {/* تقرير آخر 7 أيام */}
-            <div className="card border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-white">
-              <div className="text-xs font-bold text-blue-700 mb-2">📆 آخر 7 أيام</div>
+            <div className="card bg-white border border-gray-200">
+              <div className="text-xs font-bold text-gray-700 mb-2 border-b pb-2">📆 آخر 7 أيام</div>
               <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-green-50 rounded p-1.5"><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-green-600 text-sm">{formatCurrency(weekIncome)}</div></div>
-                <div className="bg-red-50 rounded p-1.5"><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-red-600 text-sm">{formatCurrency(weekExpense)}</div></div>
-                <div className="col-span-2 bg-blue-50 rounded p-1.5"><div className="text-[10px] text-gray-500">صافي الأسبوع</div><div className={`font-bold text-sm ${weekIncome - weekExpense >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(weekIncome - weekExpense)}</div></div>
+                <div className="bg-brand-orange-light rounded p-1.5"><div className="text-[10px] text-gray-500">وارد</div><div className="font-bold text-brand-orange-dark text-sm">{formatCurrency(weekIncome)}</div></div>
+                <div className="bg-gray-50 rounded p-1.5"><div className="text-[10px] text-gray-500">مصروف</div><div className="font-bold text-gray-700 text-sm">{formatCurrency(weekExpense)}</div></div>
+                <div className="col-span-2 bg-white border rounded p-1.5"><div className="text-[10px] text-gray-500">صافي الأسبوع</div><div className="font-bold text-brand-black text-sm">{formatCurrency(weekIncome - weekExpense)}</div></div>
               </div>
             </div>
           </div>
@@ -220,7 +220,7 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
               <button
                 key={a.key}
                 onClick={() => setActivePanel(activePanel === a.key ? null : a.key)}
-                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${a.color} p-4 text-white shadow-md transition hover:scale-105 ${activePanel === a.key ? "ring-4 ring-offset-2 ring-brand-orange" : ""}`}
+                className={`group relative overflow-hidden rounded-2xl border-2 ${a.color} bg-white p-4 shadow-sm transition-all hover:-translate-y-1 ${activePanel === a.key ? "ring-2 ring-offset-2 ring-brand-orange" : ""}`}
               >
                 <div className="text-3xl mb-1">{a.icon}</div>
                 <div className="text-xs font-bold leading-tight">{a.label}</div>
@@ -304,28 +304,24 @@ export default function JournalPageWrapper({ showSummary = false }: { showSummar
                 {activePanel === "today" && (
                   <div>
                     {/* ملخص الرصيد الجاري */}
-                    <div className="bg-gradient-to-l from-cyan-50 to-white border-2 border-cyan-200 rounded-xl p-4 mb-4">
-                      <div className="text-sm font-bold text-cyan-800 mb-3">💰 الرصيد الجاري — {formatDate(todayKey)} ({dayNames[new Date().getDay()]})</div>
+                    <div className="card bg-white border-r-4 border-brand-orange mb-4">
+                      <div className="text-sm font-bold text-brand-orange mb-3">💰 الرصيد الجاري — {formatDate(todayKey)} ({dayNames[new Date().getDay()]})</div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="bg-white rounded-lg p-3 text-center border">
+                        <div className="bg-gray-50 rounded-lg p-3 text-center border">
                           <div className="text-xs text-gray-500 mb-1">رصيد أول اليوم</div>
                           <div className="font-bold text-gray-700">{formatCurrency(openingBalance)}</div>
-                          <div className="text-[10px] text-gray-400 mt-1">المتبقي من الأيام السابقة</div>
                         </div>
-                        <div className="bg-green-50 rounded-lg p-3 text-center border border-green-200">
-                          <div className="text-xs text-green-600 mb-1">+ وارد اليوم</div>
-                          <div className="font-bold text-green-700">{formatCurrency(todayIncome)}</div>
-                          <div className="text-[10px] text-gray-400 mt-1">تحويلات من المعرض</div>
+                        <div className="bg-orange-50 rounded-lg p-3 text-center border border-brand-orange/20">
+                          <div className="text-xs text-brand-orange-dark mb-1">+ وارد اليوم</div>
+                          <div className="font-bold text-brand-orange-dark">{formatCurrency(todayIncome)}</div>
                         </div>
-                        <div className="bg-red-50 rounded-lg p-3 text-center border border-red-200">
-                          <div className="text-xs text-red-600 mb-1">− مصروف اليوم</div>
-                          <div className="font-bold text-red-700">{formatCurrency(todayExpense)}</div>
-                          <div className="text-[10px] text-gray-400 mt-1">مشتريات + نثريات</div>
+                        <div className="bg-gray-50 rounded-lg p-3 text-center border">
+                          <div className="text-xs text-gray-500 mb-1">− مصروف اليوم</div>
+                          <div className="font-bold text-gray-700">{formatCurrency(todayExpense)}</div>
                         </div>
-                        <div className={`rounded-lg p-3 text-center border-2 ${closingBalance >= 0 ? "bg-blue-50 border-blue-300" : "bg-red-100 border-red-300"}`}>
-                          <div className={`text-xs mb-1 ${closingBalance >= 0 ? "text-blue-600" : "text-red-600"}`}>= المتبقي (آخر اليوم)</div>
-                          <div className={`font-bold text-lg ${closingBalance >= 0 ? "text-blue-700" : "text-red-700"}`}>{formatCurrency(closingBalance)}</div>
-                          <div className="text-[10px] text-gray-400 mt-1">ده اللي هتبدأ بيه بكره</div>
+                        <div className={`rounded-lg p-3 text-center border ${closingBalance >= 0 ? "bg-orange-100 border-brand-orange" : "bg-red-100 border-red-300"}`}>
+                          <div className={`text-xs mb-1 ${closingBalance >= 0 ? "text-brand-orange-dark" : "text-red-600"}`}>= المتبقي (رصيد الدرج)</div>
+                          <div className={`font-bold text-lg ${closingBalance >= 0 ? "text-brand-black" : "text-red-700"}`}>{formatCurrency(closingBalance)}</div>
                         </div>
                       </div>
                       {todayNet !== 0 && (

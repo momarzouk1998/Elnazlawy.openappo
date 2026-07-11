@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -89,7 +89,7 @@ export default function OrdersPage() {
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">من تاريخ</label><input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" /></div>
                 <div><label className="block text-sm font-medium text-gray-700 mb-1">إلى تاريخ</label><input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-full px-3 py-2 border rounded-lg" /></div>
               </div>
-              {activeFiltersCount > 0 && <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">تم تطبيق {activeFiltersCount} فلتر (يمكن دمجهم معاً)</div>}
+              {activeFiltersCount > 0 && <div className="text-xs text-brand-orange-dark bg-brand-orange-light border border-brand-orange/20 p-2 rounded">تم تطبيق {activeFiltersCount} فلتر (يمكن دمجهم معاً)</div>}
             </div>
             <div className="flex justify-between gap-2 pt-4 mt-4 border-t"><Button variant="secondary" onClick={clearFilters}>مسح الفلاتر</Button><Button onClick={() => setFilterOpen(false)}>تطبيق</Button></div>
           </div>

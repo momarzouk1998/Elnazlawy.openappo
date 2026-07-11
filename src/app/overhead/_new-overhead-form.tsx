@@ -97,7 +97,7 @@ export default function NewOverheadForm() {
         <Select label="طريقة الدفع" value={form.payment_method} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} options={Object.entries(PAYMENT_METHOD_LABELS).filter(([k]) => k !== "both" && k !== "كلاهما").map(([k, v]) => ({ value: k, label: v }))} />
         <Textarea label="ملاحظات" rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         {error && <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm">{error}</div>}
-        {form.amount && <div className="bg-blue-50 p-3 rounded-lg text-sm">سيتم تسجيل الحركة تلقائياً في اليومية بمبلغ <strong>{formatCurrency(Number(form.amount))}</strong>{isWages && workerName && <> للعامل <strong>{workerName}</strong></>}</div>}
+        {form.amount && <div className="bg-brand-orange-light border border-brand-orange/20 text-brand-orange-dark p-3 rounded-lg text-sm">سيتم تسجيل الحركة تلقائياً في اليومية بمبلغ <strong>{formatCurrency(Number(form.amount))}</strong>{isWages && workerName && <> للعامل <strong>{workerName}</strong></>}</div>}
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="secondary" onClick={() => router.back()}>إلغاء</Button>
           <Button type="submit" loading={saving}>حفظ</Button>

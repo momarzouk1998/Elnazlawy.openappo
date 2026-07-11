@@ -63,15 +63,15 @@ export default function SuppliersPage() {
       {/* كاردات الإحصائيات */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white p-4">
-            <div className="text-sm opacity-90 mb-1">إجمالي عدد الموردين</div>
-            <div className="text-2xl font-bold">{stats.suppliersCount}</div>
+          <div className="card bg-white border-r-4 border-brand-orange p-4">
+            <div className="text-sm text-gray-500 mb-1">إجمالي عدد الموردين</div>
+            <div className="text-2xl font-bold text-brand-black">{stats.suppliersCount}</div>
           </div>
-          <div className="card bg-gradient-to-br from-red-500 to-red-600 text-white p-4">
-            <div className="text-sm opacity-90 mb-1">إجمالي الديون المستحقة (لصالح الموردين)</div>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalDebt)}</div>
+          <div className="card bg-white border-r-4 border-brand-orange p-4">
+            <div className="text-sm text-gray-500 mb-1">إجمالي الديون المستحقة (لصالح الموردين)</div>
+            <div className="text-2xl font-bold text-brand-black">{formatCurrency(stats.totalDebt)}</div>
           </div>
-          <div className="card bg-gradient-to-br from-emerald-500 to-emerald-600 text-white p-4">
+          <div className="card bg-gradient-to-br from-brand-orange to-brand-orange-dark text-white p-4">
             <div className="text-sm opacity-90 mb-1">إجمالي الأرصدة المقدمة (لصالح المصنع)</div>
             <div className="text-2xl font-bold">{formatCurrency(stats.totalCredit)}</div>
           </div>

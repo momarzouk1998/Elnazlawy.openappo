@@ -62,22 +62,22 @@ export default function BudgetPage() {
 
       {/* ===== كاردات الملخص (بتتغير مع الفلتر) ===== */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="card bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-          <div className="text-xs opacity-90">📥 الوارد (تحويلات)</div>
-          <div className="text-2xl font-extrabold">{formatCurrency(fIncome)}</div>
-          <div className="text-[10px] opacity-70 mt-0.5">إجمالي: {formatCurrency(allIncome)}</div>
+        <div className="card bg-white border-r-4 border-brand-orange">
+          <div className="text-xs text-gray-500">📥 الوارد (تحويلات)</div>
+          <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(fIncome)}</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">إجمالي: {formatCurrency(allIncome)}</div>
         </div>
-        <div className="card bg-gradient-to-br from-red-400 to-red-600 text-white">
-          <div className="text-xs opacity-90">📤 المصروف (مشتريات + نثريات)</div>
-          <div className="text-2xl font-extrabold">{formatCurrency(fExpense)}</div>
-          <div className="text-[10px] opacity-70 mt-0.5">إجمالي: {formatCurrency(allExpense)}</div>
+        <div className="card bg-white border-r-4 border-brand-orange">
+          <div className="text-xs text-gray-500">📤 المصروف (مشتريات + نثريات)</div>
+          <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(fExpense)}</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">إجمالي: {formatCurrency(allExpense)}</div>
         </div>
-        <div className="card bg-gradient-to-br from-orange-400 to-orange-600 text-white">
-          <div className="text-xs opacity-90">💸 دفوع للموردين</div>
-          <div className="text-2xl font-extrabold">{formatCurrency(fPayout)}</div>
-          <div className="text-[10px] opacity-70 mt-0.5">إجمالي: {formatCurrency(allPayout)}</div>
+        <div className="card bg-white border-r-4 border-brand-orange">
+          <div className="text-xs text-gray-500">💸 دفوع للموردين</div>
+          <div className="text-2xl font-extrabold text-brand-black">{formatCurrency(fPayout)}</div>
+          <div className="text-[10px] text-gray-400 mt-0.5">إجمالي: {formatCurrency(allPayout)}</div>
         </div>
-        <div className={`card bg-gradient-to-br ${fNet >= 0 ? "from-blue-500 to-blue-700" : "from-red-500 to-red-700"} text-white`}>
+        <div className="card bg-gradient-to-br from-brand-orange to-brand-orange-dark text-white">
           <div className="text-xs opacity-90">💰 صافي الرصيد</div>
           <div className="text-2xl font-extrabold">{formatCurrency(fNet)}</div>
           <div className="text-[10px] opacity-70 mt-0.5">وارد − مصروف − دفوع</div>

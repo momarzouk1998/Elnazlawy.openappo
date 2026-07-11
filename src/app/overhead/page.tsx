@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useUserStore } from "@/store/user-store"
@@ -45,9 +45,9 @@ export default function OverheadPage() {
     <DashboardLayout profile={profile}>
       <PageHeader title="النثريات" subtitle="مصاريف تشغيل المصنع العامة" helpTitle="النثريات" helpDescription="كهرباء، أجور عمال، شحن، إلخ." backHref="/journal" actions={<Button onClick={() => router.push("/overhead/new")}>+ نثريات جديدة</Button>} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <div className="card bg-gradient-to-br from-purple-500 to-purple-700 text-white"><div className="text-xs opacity-90">إجمالي النثريات</div><div className="text-2xl font-extrabold">{formatCurrency(total)}</div></div>
-        <div className="card bg-gradient-to-br from-blue-500 to-blue-700 text-white"><div className="text-xs opacity-90">آخر 7 أيام</div><div className="text-2xl font-extrabold">{formatCurrency(weekTotal)}</div></div>
-        <div className="card"><div className="text-xs text-gray-500">عدد السجلات</div><div className="text-2xl font-bold">{filtered.length}</div></div>
+        <div className="card bg-gradient-to-br from-brand-orange to-brand-orange-dark text-white"><div className="text-xs opacity-90">إجمالي النثريات</div><div className="text-2xl font-extrabold">{formatCurrency(total)}</div></div>
+        <div className="card bg-white border-r-4 border-brand-orange"><div className="text-xs text-gray-500">آخر 7 أيام</div><div className="text-2xl font-extrabold text-brand-black">{formatCurrency(weekTotal)}</div></div>
+        <div className="card bg-white border-r-4 border-brand-orange"><div className="text-xs text-gray-500">عدد السجلات</div><div className="text-2xl font-bold text-brand-black">{filtered.length}</div></div>
       </div>
       <div className="card mb-4">
         <FilterBar>

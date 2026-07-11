@@ -458,9 +458,9 @@ export default function NewOrderForm() {
               </div>
             )}
             {extraCostsTotal > 0 && (
-              <div className="flex justify-between p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+              <div className="flex justify-between p-2 bg-brand-orange-light border border-brand-orange/20 rounded text-sm text-brand-orange-dark">
                 <span>إجمالي التكاليف الإضافية:</span>
-                <strong className="text-yellow-700">{formatCurrency(extraCostsTotal)}</strong>
+                <strong>{formatCurrency(extraCostsTotal)}</strong>
               </div>
             )}
           </div>

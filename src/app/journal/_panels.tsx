@@ -280,9 +280,9 @@ function UnifiedItemPurchaseForm({ cat, onSaved }: { cat: "board" | "accessory";
         <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
       </div>
       {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
-      {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
+      {msg && <div className="bg-brand-orange-light text-brand-orange-dark p-2 rounded text-sm">{msg}</div>}
       {total > 0 && (
-        <div className="bg-blue-50 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(total)}</strong> — هيُسجل في اليومية تلقائياً</div>
+        <div className="bg-brand-orange-light text-brand-orange-dark border border-brand-orange/20 p-2 rounded text-sm">الإجمالي: <strong>{formatCurrency(total)}</strong> — هيُسجل في اليومية تلقائياً</div>
       )}
       <Button type="submit" loading={saving} className="w-full">
         🛒 تسجيل {isNew ? "إضافة وشراء" : "الشراء"}
@@ -374,7 +374,7 @@ export function OverheadPanel({ onSaved }: { onSaved?: () => void }) {
         <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
       </div>
       {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
-      {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
+      {msg && <div className="bg-brand-orange-light text-brand-orange-dark p-2 rounded text-sm">{msg}</div>}
       <Button type="submit" loading={saving} className="w-full">💾 تسجيل المصروف</Button>
     </form>
   );
@@ -495,7 +495,7 @@ export function IncomePanel({ onSaved }: { onSaved?: () => void }) {
       <Select label="طريقة الدفع" value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value })} options={PAY_OPTS} />
       <Input label="ملاحظات" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
       {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
-      {msg && <div className="bg-green-50 text-green-700 p-2 rounded text-sm">{msg}</div>}
+      {msg && <div className="bg-brand-orange-light text-brand-orange-dark p-2 rounded text-sm">{msg}</div>}
       <Button type="submit" loading={saving} className="w-full">{form.direction === "out" ? "🔄 تسجيل التحويل" : "📥 تسجيل الوارد"}</Button>
     </form>
   );
@@ -562,7 +562,7 @@ export function InventorySearchPanel({ onOpenPurchase }: { onOpenPurchase?: (cat
             <tbody className="divide-y">
               {results.map(x => (
                 <tr key={x._type + x.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-2"><span className={`badge ${x._type === "لوح" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{x._type}</span></td>
+                  <td className="px-2 py-2"><span className={`badge border ${x._type === "لوح" ? "bg-brand-orange-light text-brand-orange-dark border-brand-orange/20" : "bg-white text-brand-black border-gray-200"}`}>{x._type}</span></td>
                   <td className="px-2 py-2 font-medium">{x.item_name}</td>
                   <td className="px-2 py-2"><code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{x.code}</code></td>
                   <td className={`px-2 py-2 font-bold ${x.quantity_remaining > 0 ? "text-green-600" : "text-red-500"}`}>{x.quantity_remaining}</td>
@@ -654,14 +654,14 @@ export function WorkersReportPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-purple-50 p-3 rounded-lg text-center">
-          <div className="text-xs text-gray-600">عدد العمال ({dateFrom} → {dateTo})</div>
-          <div className="text-xl font-bold">{rows.filter(r => r.count > 0).length}</div>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="bg-white border-r-4 border-brand-orange p-3 rounded-lg text-center shadow-sm">
+          <div className="text-xs text-gray-500 mb-1">إجمالي الأجور</div>
+          <div className="font-extrabold text-xl text-brand-black">{formatCurrency(grandTotal)}</div>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg text-center">
-          <div className="text-xs text-gray-600">إجمالي الأجور</div>
-          <div className="text-xl font-bold">{formatCurrency(grandTotal)}</div>
+        <div className="bg-white border-r-4 border-brand-orange p-3 rounded-lg text-center shadow-sm">
+          <div className="text-xs text-gray-500 mb-1">عدد العمال (لهم حركات)</div>
+          <div className="font-extrabold text-xl text-brand-black">{rows.filter(r => r.count > 0).length}</div>
         </div>
       </div>
       <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">

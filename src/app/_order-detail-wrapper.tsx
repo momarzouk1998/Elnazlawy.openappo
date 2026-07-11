@@ -125,7 +125,7 @@ export default function OrderDetailPage() {
             <div className="card"><div className="text-xs text-gray-500">نقل داخلي</div><div className="font-bold">{formatCurrency(costs.internal_transport_cost)}</div></div>
             <div className="card"><div className="text-xs text-gray-500">نقل خارجي</div><div className="font-bold">{formatCurrency(costs.external_transport_cost)}</div></div>
             <div className="card"><div className="text-xs text-gray-500">عمولة المصنع</div><div className="font-bold">{formatCurrency(costs.factory_commission)}</div></div>
-            <div className={`card ${extraCostsTotal > 0 ? "bg-yellow-50 border-yellow-200" : ""}`}><div className="text-xs text-gray-500">تكاليف إضافية</div><div className="font-bold">{formatCurrency(extraCostsTotal)}</div></div>
+            <div className={`card ${extraCostsTotal > 0 ? "bg-brand-orange-light border border-brand-orange/20" : ""}`}><div className="text-xs text-gray-500">تكاليف إضافية</div><div className="font-bold">{formatCurrency(extraCostsTotal)}</div></div>
             <div className="card bg-gradient-to-l from-brand-orange to-brand-orange-dark text-white md:col-span-4"><div className="text-xs opacity-90">الإجمالي</div><div className="font-extrabold text-lg">{formatCurrency(costs.order_total)}</div></div>
           </div>
           {extraCosts.length > 0 && (
