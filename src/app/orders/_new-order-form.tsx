@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useUserStore } from "@/store/user-store"
@@ -68,7 +68,7 @@ export default function NewOrderForm() {
 
   const [searchItem, setSearchItem] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<"all" | "board" | "accessory">("all")
-  const [usedItems, setUsedItems] = useState<{ id: string; category: "board" | "accessory"; quantity: number; unit_price: number; name: string }[]>([])
+  const [usedItems, setUsedItems] = useState<{ id: string; category: "board" | "accessory"; quantity: number; original_quantity?: number; unit_price: number; name: string }[]>([])
 
   const [costs, setCosts] = useState({
     installation_cost: 0,
@@ -131,6 +131,7 @@ export default function NewOrderForm() {
         id: m.item_id,
         category: m.item_category === "accessories_inventory" ? "accessory" : "board",
         quantity: Number(m.quantity_used ?? 0),
+        original_quantity: Number(m.quantity_used ?? 0),
         unit_price: Number(m.unit_price_snapshot ?? 0),
         name: m.item_name ?? "-",
       })))
@@ -336,14 +337,14 @@ export default function NewOrderForm() {
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {usedItems.map((u, i) => {
-                  const item = items.find((it) => it.id === u.id && it.category === u.category)
-                  const exceeds = item && u.quantity > item.remaining
+                  const item = items.find((x) => x.id === u.id)
+                  const exceeds = item && u.quantity > (item.remaining + (u.original_quantity || 0))
                   return (
                     <div key={i} className={"p-3 rounded-lg border " + (exceeds ? "border-red-300 bg-red-50" : "border-gray-200")}>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="min-w-0">
                           <div className="font-medium text-sm truncate">{u.name}</div>
-                          <div className="text-xs text-gray-500">{u.category === "board" ? "لوح" : "اكسسوار"} • متوفر: {item?.remaining ?? 0}</div>
+                          <div className="text-xs text-gray-500">{u.category === "board" ? "لوح" : "اكسسوار"} • متوفر: {(item?.remaining ?? 0) + (u.original_quantity || 0)}</div>
                         </div>
                         <button onClick={() => removeUsed(i)} className="text-red-500 hover:bg-red-100 rounded px-2">✕</button>
                       </div>
@@ -352,7 +353,7 @@ export default function NewOrderForm() {
                         <div><label className="text-xs text-gray-500">سعر الوحدة</label><input type="number" step="0.01" value={u.unit_price} onChange={(e) => setUsedItems((s) => s.map((x, j) => j === i ? { ...x, unit_price: Number(e.target.value) } : x))} className="w-full px-2 py-1.5 border rounded text-sm" /></div>
                         <div><label className="text-xs text-gray-500">الإجمالي</label><div className="px-2 py-1.5 bg-gray-100 rounded text-sm font-bold">{formatCurrency(u.quantity * u.unit_price)}</div></div>
                       </div>
-                      {exceeds && <div className="text-xs text-red-600 mt-1">⚠️ الكمية المطلوبة أكبر من المتاح ({item?.remaining})</div>}
+                      {exceeds && <div className="text-xs text-red-600 mt-1">⚠️ الكمية المطلوبة أكبر من المتاح ({(item?.remaining || 0) + (u.original_quantity || 0)})</div>}
                     </div>
                   )
                 })}
