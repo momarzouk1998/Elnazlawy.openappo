@@ -55,12 +55,28 @@ jobs:
               exit 1
             fi
             echo "  GHCR image reachable."
+
             if ! docker service inspect elnazlawy-x9y8z7 >/dev/null 2>&1; then
-              echo "FATAL: Swarm service 'elnazlawy-x9y8z7' not found on this node."
-              docker logout ghcr.io >/dev/null 2>&1 || true
-              exit 1
+              echo "  Swarm service 'elnazlawy-x9y8z7' not found — creating it now."
+              # Build env flags from whatever env secrets the user has set.
+              # Add more --env entries as needed; missing secrets will produce
+              # an empty --env which Docker ignores safely.
+              ENV_FLAGS=(--env NODE_ENV=production --env PORT=3000)
+              [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
+              [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
+              [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
+              docker service create \
+                --name elnazlawy-x9y8z7 \
+                --replicas 1 \
+                --publish published=3002,target=3000 \
+                "${ENV_FLAGS[@]}" \
+                --restart-condition on-failure \
+                --restart-max-attempts 5 \
+                "$LOCAL_IMAGE"
+              echo "  Service created."
+            else
+              echo "  Swarm service exists."
             fi
-            echo "  Swarm service exists."
 
             echo "=== [3/8] Pulling latest image from GHCR ==="
             docker pull "$GHCR_IMAGE"
