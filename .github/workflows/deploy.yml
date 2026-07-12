@@ -26,29 +26,64 @@ jobs:
           script: |
             set -e
 
-            echo "=== [1/6] Pulling latest image from GHCR ==="
-            docker pull ghcr.io/momarzouk1998/elnazlawy.openappo:latest
+            # IMPORTANT: image name MUST match ${{ github.repository }} from build-and-push.yml
+            # github.repository = "momarzouk1998/elnazlawy-system"  =>  ghcr.io/momarzouk1998/elnazlawy-system:latest
+            GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy-system:latest"
+            LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
 
-            echo "=== [2/6] Tagging local image ==="
-            docker tag ghcr.io/momarzouk1998/elnazlawy.openappo:latest elnazlawy-x9y8z7:latest
+            echo "=== [1/8] Logging in to GHCR ==="
+            # GHCR_TOKEN must be a PAT with read:packages scope (stored in GitHub Secrets).
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            echo "=== [3/6] Updating swarm service ==="
-            docker service update --image elnazlawy-x9y8z7:latest --force elnazlawy-x9y8z7
+            echo "=== [2/8] Pre-flight checks ==="
+            if ! docker manifest inspect "$GHCR_IMAGE" >/dev/null 2>&1; then
+              echo "FATAL: Cannot inspect $GHCR_IMAGE after login."
+              echo "  -> build-and-push.yml may not have run yet (push to main first)."
+              echo "  -> GHCR_TOKEN may be wrong / expired / missing read:packages scope."
+              docker logout ghcr.io >/dev/null 2>&1 || true
+              exit 1
+            fi
+            echo "  GHCR image reachable."
+            if ! docker service inspect elnazlawy-x9y8z7 >/dev/null 2>&1; then
+              echo "FATAL: Swarm service 'elnazlawy-x9y8z7' not found on this node."
+              docker logout ghcr.io >/dev/null 2>&1 || true
+              exit 1
+            fi
+            echo "  Swarm service exists."
 
-            echo "=== [4/6] Waiting 20s for service to settle ==="
-            sleep 20
+            echo "=== [3/8] Pulling latest image from GHCR ==="
+            docker pull "$GHCR_IMAGE"
 
-            echo "=== [5/6] Service status ==="
+            echo "=== [4/8] Tagging local image ==="
+            docker tag "$GHCR_IMAGE" "$LOCAL_IMAGE"
+
+            echo "=== [5/8] Logging out of GHCR (rotate credentials) ==="
+            docker logout ghcr.io >/dev/null
+
+            echo "=== [6/8] Updating swarm service ==="
+            docker service update --image "$LOCAL_IMAGE" --force elnazlawy-x9y8z7
+
+            echo "=== [7/8] Waiting 25s for service to settle ==="
+            sleep 25
+
+            echo "=== Service status ==="
             docker service ps elnazlawy-x9y8z7 --no-trunc
 
             echo ""
-            echo "=== Internal health check ==="
-            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3002/ || echo "Internal check failed"
+            echo "=== Internal health check (127.0.0.1:3002) ==="
+            INT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:3002/ || echo "000")
+            echo "HTTP: $INT_CODE"
+            if [ "$INT_CODE" = "000" ]; then
+              echo "  -> 3002 not listening, trying 3000..."
+              INT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:3000/ || echo "000")
+              echo "HTTP (3000): $INT_CODE"
+            fi
 
-            echo "=== External health check ==="
-            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" https://elnazlawy.openappo.com/ || echo "External check failed"
+            echo "=== External health check (https://elnazlawy.openappo.com) ==="
+            EXT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://elnazlawy.openappo.com/ || echo "000")
+            echo "HTTP: $EXT_CODE"
 
-            echo "=== [6/6] Cleaning up old images ==="
+            echo "=== [8/8] Cleaning up old images ==="
             docker image prune -f
 
             echo ""
