@@ -52,8 +52,11 @@ jobs:
           script: |
             set -e
 
-            # Image name MUST match ${{ github.repository }} from build-and-push.yml
-            GHCR_IMAGE="ghcr.io/momarzouk1998/Elnazlawy.openappo:latest"
+            # Image name MUST match what build-and-push.yml pushes.
+            # github.repository = "momarzouk1998/Elnazlawy.openappo" (capital E)
+            # But GHCR normalizes the package name to lowercase: "elnazlawy.openappo"
+            # 404 on capital, 200/401 on lowercase — so we MUST use lowercase here.
+            GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
 
             echo "=== [1/8] Logging in to GHCR ==="
