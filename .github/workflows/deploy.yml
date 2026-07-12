@@ -48,19 +48,22 @@ jobs:
             echo "=== [1/8] Logging in to GHCR (using auto-provisioned GITHUB_TOKEN) ==="
             echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 
-            echo "=== [2/8] Pre-flight checks ==="
-            if ! docker manifest inspect "$GHCR_IMAGE" >/dev/null 2>&1; then
-              echo "FATAL: Cannot inspect $GHCR_IMAGE after login."
-              docker logout ghcr.io >/dev/null 2>&1 || true
-              exit 1
-            fi
-            echo "  GHCR image reachable."
+            echo "=== [2/8] Pulling latest image from GHCR ==="
+            docker pull "$GHCR_IMAGE"
 
+            echo "=== [3/8] Tagging local image ==="
+            docker tag "$GHCR_IMAGE" "$LOCAL_IMAGE"
+            echo "  Tagged as $LOCAL_IMAGE"
+
+            echo "=== [4/8] Logging out of GHCR (rotate credentials) ==="
+            docker logout ghcr.io >/dev/null
+
+            echo "=== [5/8] Ensure swarm service exists ==="
             if ! docker service inspect elnazlawy-x9y8z7 >/dev/null 2>&1; then
               echo "  Swarm service 'elnazlawy-x9y8z7' not found — creating it now."
               # Build env flags from whatever env secrets the user has set.
-              # Add more --env entries as needed; missing secrets will produce
-              # an empty --env which Docker ignores safely.
+              # Add more --env entries as needed; missing secrets produce
+              # no flag, which Docker handles safely.
               ENV_FLAGS=(--env NODE_ENV=production --env PORT=3000)
               [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
               [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
@@ -78,16 +81,7 @@ jobs:
               echo "  Swarm service exists."
             fi
 
-            echo "=== [3/8] Pulling latest image from GHCR ==="
-            docker pull "$GHCR_IMAGE"
-
-            echo "=== [4/8] Tagging local image ==="
-            docker tag "$GHCR_IMAGE" "$LOCAL_IMAGE"
-
-            echo "=== [5/8] Logging out of GHCR (rotate credentials) ==="
-            docker logout ghcr.io >/dev/null
-
-            echo "=== [6/8] Updating swarm service ==="
+            echo "=== [6/8] Updating swarm service to the new image ==="
             docker service update --image "$LOCAL_IMAGE" --force elnazlawy-x9y8z7
 
             echo "=== [7/8] Waiting 25s for service to settle ==="
