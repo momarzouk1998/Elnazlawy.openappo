@@ -18,29 +18,33 @@ jobs:
     timeout-minutes: 15
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - name: Show what we have
+      - name: Verify GHCR_TOKEN can read the package (local test)
         run: |
-          echo "Event: ${{ github.event_name }}"
-          echo "SSH_HOST: ${{ secrets.SSH_HOST }}"
-          echo "SSH_USER: ${{ secrets.SSH_USER }}"
-          echo "SSH_PRIVATE_KEY length: ${#SSH_PRIVATE_KEY}"
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Test SSH connection (debug)
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 1m
-          script: |
-            echo "=== SSH connection OK ==="
-            echo "User: $(whoami)"
-            echo "Host: $(hostname)"
-            echo "Docker: $(docker --version 2>&1 || echo 'not installed')"
-            echo "Docker swarm: $(docker info --format '{{.Swarm.LocalNodeState}}' 2>&1 || echo 'no swarm')"
-            echo "Service check: $(docker service ls --format '{{.Name}}' 2>&1 | head -5)"
+          echo "=== Testing GHCR_TOKEN scopes and package read access ==="
+          if [ -z "${{ secrets.GHCR_TOKEN }}" ]; then
+            echo "FATAL: GHCR_TOKEN is empty!"
+            exit 1
+          fi
+          # Get the token's scopes from the response headers
+          HEADERS=$(curl -sI -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+            "https://ghcr.io/v2/momarzouk1998/elnazlawy.openappo/manifests/latest")
+          echo "$HEADERS"
+          echo "---"
+          # Try the actual manifest pull
+          STATUS=$(curl -s -o /tmp/m.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
+            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/momarzouk1998/elnazlawy.openappo/manifests/latest")
+          echo "Manifest GET status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "First 500 bytes of body:"
+            head -c 500 /tmp/m.json
+            echo ""
+            echo "FATAL: GHCR_TOKEN cannot read the package."
+            echo "Verify the PAT has 'read:packages' scope and is not expired."
+            exit 1
+          fi
+          echo "OK: GHCR_TOKEN has read access."
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -55,7 +59,6 @@ jobs:
             # Image name MUST match what build-and-push.yml pushes.
             # github.repository = "momarzouk1998/Elnazlawy.openappo" (capital E)
             # But GHCR normalizes the package name to lowercase: "elnazlawy.openappo"
-            # 404 on capital, 200/401 on lowercase — so we MUST use lowercase here.
             GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
 
@@ -65,6 +68,8 @@ jobs:
             echo "=== [2/8] Pre-flight checks ==="
             if ! docker manifest inspect "$GHCR_IMAGE" >/dev/null 2>&1; then
               echo "FATAL: Cannot inspect $GHCR_IMAGE after login."
+              echo "Login state:"
+              cat ~/.docker/config.json 2>/dev/null | head -c 200 || echo "no config"
               docker logout ghcr.io >/dev/null 2>&1 || true
               exit 1
             fi
