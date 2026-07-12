@@ -1,6 +1,7 @@
 # ========================================
 # Deploy to Server — SSH-First Approach
 # Waits for Build & Push to GHCR to finish first
+# Uses GITHUB_TOKEN (auto-provisioned) to pull the image.
 # ========================================
 
 name: Deploy to Server
@@ -17,35 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      packages: read
     steps:
-      - name: Verify GHCR_TOKEN can read the package (local test)
-        run: |
-          echo "=== Testing GHCR_TOKEN scopes and package read access ==="
-          if [ -z "${{ secrets.GHCR_TOKEN }}" ]; then
-            echo "FATAL: GHCR_TOKEN is empty!"
-            exit 1
-          fi
-          # Get the token's scopes from the response headers
-          HEADERS=$(curl -sI -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
-            "https://ghcr.io/v2/momarzouk1998/elnazlawy.openappo/manifests/latest")
-          echo "$HEADERS"
-          echo "---"
-          # Try the actual manifest pull
-          STATUS=$(curl -s -o /tmp/m.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.GHCR_TOKEN }}" \
-            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
-            "https://ghcr.io/v2/momarzouk1998/elnazlawy.openappo/manifests/latest")
-          echo "Manifest GET status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "First 500 bytes of body:"
-            head -c 500 /tmp/m.json
-            echo ""
-            echo "FATAL: GHCR_TOKEN cannot read the package."
-            echo "Verify the PAT has 'read:packages' scope and is not expired."
-            exit 1
-          fi
-          echo "OK: GHCR_TOKEN has read access."
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -62,14 +38,19 @@ jobs:
             GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
 
-            echo "=== [1/8] Logging in to GHCR ==="
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            # GITHUB_TOKEN is auto-provisioned by GitHub Actions and is valid
+            # for the lifetime of this job. It has `packages: read` because
+            # of the `permissions:` block above, which lets us pull the image
+            # this repo pushed in the build step.
+            GH_USER="${{ github.actor }}"
+            GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+
+            echo "=== [1/8] Logging in to GHCR (using auto-provisioned GITHUB_TOKEN) ==="
+            echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 
             echo "=== [2/8] Pre-flight checks ==="
             if ! docker manifest inspect "$GHCR_IMAGE" >/dev/null 2>&1; then
               echo "FATAL: Cannot inspect $GHCR_IMAGE after login."
-              echo "Login state:"
-              cat ~/.docker/config.json 2>/dev/null | head -c 200 || echo "no config"
               docker logout ghcr.io >/dev/null 2>&1 || true
               exit 1
             fi
