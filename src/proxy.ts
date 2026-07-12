@@ -5,21 +5,20 @@ import { COOKIE_NAME, verifySession } from '@/lib/db/auth';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public paths — no auth needed
-  const publicPaths = ['/login', '/register'];
+  // Public paths
+  const publicPaths = ['/login'];
   if (publicPaths.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-    // If already logged in, redirect to journal
     const token = request.cookies.get(COOKIE_NAME)?.value;
     if (token) {
       const payload = await verifySession(token);
       if (payload) {
-        return NextResponse.redirect(new URL('/journal', request.url));
+        return NextResponse.redirect(new URL('/dashboard', request.url));
       }
     }
     return NextResponse.next();
   }
 
-  // Allow API auth routes (login, logout, etc.) + static files
+  // Allow API auth + health + static files
   if (
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/health') ||

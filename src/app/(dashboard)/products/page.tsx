@@ -1,0 +1,160 @@
+"use client";
+import { useState, useEffect, useRef } from "react";
+import { useApi, useApiMutation } from "@/hooks/useApi";
+import { formatEGP, formatQty } from "@/lib/format";
+
+interface Product {
+  id: string;
+  name: string;
+  category: string | null;
+  unit: string;
+  units_per_carton: number;
+  last_purchase_price: number | null;
+  default_sale_price: number;
+  reorder_level: number;
+  total_stock: number;
+  inventory_items: { current_stock: number; store: { name: string } }[];
+}
+
+export default function ProductsPage() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const { data, loading, refetch } = useApi<{ items: Product[]; total: number }>(
+    `/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=200`
+  );
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">🏷️ المنتجات</h1>
+          <p className="text-sm text-gray-500 mt-1">{data?.total ?? '...'} منتج</p>
+        </div>
+        <button onClick={() => setShowForm(true)} className="btn-primary">+ إضافة منتج</button>
+      </div>
+
+      <div className="card">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔍 ابحث بالاسم..."
+          className="input-field"
+          autoFocus
+        />
+      </div>
+
+      {loading ? (
+        <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div>
+      ) : (
+        <div className="card overflow-x-auto p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-right">الاسم</th>
+                <th className="p-3 text-right">الفئة</th>
+                <th className="p-3 text-right">الوحدة</th>
+                <th className="p-3 text-right">إجمالي المخزون</th>
+                <th className="p-3 text-right">سعر البيع</th>
+                <th className="p-3 text-right">التوزيع بالمخازن</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data?.items.map((p) => (
+                <tr key={p.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 font-semibold">{p.name}</td>
+                  <td className="p-3 text-gray-600">{p.category || '—'}</td>
+                  <td className="p-3">{p.unit === 'piece' ? 'قطعة' : p.unit === 'box' ? 'علبة' : 'كرتونة'}</td>
+                  <td className="p-3 font-bold text-nazlawy-600">{formatQty(p.total_stock)}</td>
+                  <td className="p-3 font-mono">{formatEGP(p.default_sale_price)}</td>
+                  <td className="p-3 text-xs text-gray-600">
+                    {p.inventory_items.length > 0
+                      ? p.inventory_items.map(i => `${i.store.name}: ${formatQty(i.current_stock)}`).join(' • ')
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+              {data?.items.length === 0 && (
+                <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد منتجات</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showForm && (
+        <ProductFormModal
+          onClose={() => setShowForm(false)}
+          onSaved={() => { setShowForm(false); refetch(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({ name: '', category: '', unit: 'piece', units_per_carton: 1, default_sale_price: 0, reorder_level: 5, last_purchase_price: 0, notes: '' });
+  const { mutate, loading } = useApiMutation();
+
+  async function save() {
+    const { error } = await mutate('POST', '/api/products', form);
+    if (error) { alert('❌ ' + error); return; }
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+        <h2 className="text-xl font-bold mb-2">+ إضافة منتج جديد</h2>
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">اسم المنتج *</label>
+          <input className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الفئة</label>
+            <input className="input-field" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة</label>
+            <select className="input-field" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+              <option value="piece">قطعة</option>
+              <option value="box">علبة</option>
+              <option value="carton">كرتونة</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">قطع/كرتونة</label>
+            <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">سعر البيع</label>
+            <input type="number" step="0.01" className="input-field" value={form.default_sale_price} onChange={(e) => setForm({ ...form, default_sale_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
+            <input type="number" step="0.01" className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى</label>
+            <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium text-gray-700 block mb-1">ملاحظات</label>
+          <textarea className="input-field" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+        </div>
+        <div className="flex gap-2 pt-3">
+          <button onClick={save} disabled={loading || !form.name} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}

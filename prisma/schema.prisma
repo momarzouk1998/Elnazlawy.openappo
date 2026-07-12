@@ -1,322 +1,567 @@
+// ========================================
+// Prisma Schema — ELNAZLAWY (نظام النزلاوي)
+// Migration from AppSheet → Next.js + PostgreSQL
+// Schema: elnazlawy (on shared DO Postgres, same as mazaya)
+// ========================================
+
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["multiSchema"]
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["mazaya"]
+  schemas  = ["elnazlawy"]
 }
 
-model branches {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.Text
-  location   String?   @db.Text
-  phone      String?   @db.Text
-  notes      String?   @db.Text
-  created_at DateTime? @default(now()) @db.Timestamptz()
-  updated_at DateTime? @default(now()) @db.Timestamptz()
-  users      users[]
-  customers  customers[]
-  orders     orders[]
-
-  @@map("branches")
-  @@schema("mazaya")
-}
-
+// =======================================
+// 1. Users (المستخدمين)
+// =======================================
 model users {
-  id              Int                   @id @default(autoincrement())
-  username        String                @unique @db.VarChar(100)
-  full_name       String?               @db.VarChar(200)
-  password_hash   String                @db.Text
-  role            String                @default("branch") @db.VarChar(50)
-  branch_id       String?               @db.Uuid
-  visible_modules String[]              @default([])
-  permissions     Json?                 @default("{}")
-  is_active       Boolean               @default(true)
-  last_login_at   DateTime?             @db.Timestamptz()
-  created_at      DateTime?             @default(now()) @db.Timestamp()
-  updated_at      DateTime?             @default(now()) @db.Timestamp()
-  branch          branches?             @relation(fields: [branch_id], references: [id])
-  audit_logs      audit_log[]
-  created_orders  orders[]              @relation("orders_created_by")
+  id                    Int       @id @default(autoincrement())
+  username              String    @unique @db.VarChar(100)
+  full_name             String    @db.VarChar(200)
+  phone                 String?   @db.VarChar(30)
+  whatsapp              String?   @db.VarChar(30)
+  email                 String?   @db.VarChar(200)
+  password_hash         String    @db.Text
+  role                  String    @default("rep") @db.VarChar(50) // admin | manager | accountant | rep
+  // Cost visibility: only admin & manager can see purchase price
+  can_see_cost          Boolean   @default(false)
+  // POS session
+  pos_active_invoice_id String?   @db.Uuid
+  default_store_id      String?   @db.Uuid
+  is_active             Boolean   @default(true)
+  last_login_at         DateTime? @db.Timestamptz()
+  created_at            DateTime? @default(now()) @db.Timestamptz()
+  updated_at            DateTime? @default(now()) @db.Timestamptz()
+
+  default_store         stores?                 @relation("UserDefaultStore", fields: [default_store_id], references: [id])
+  created_sales         sales_invoices[]        @relation("SalesCreatedBy")
+  created_purchases     purchase_invoices[]     @relation("PurchaseCreatedBy")
+  customer_payments     customer_payments[]
+  supplier_payments     supplier_payments[]
+  created_expenses      expenses[]
+  created_transfers_out stock_transfers[]       @relation("TransferByUser")
+  treasury_transactions treasury_transactions[]
 
   @@map("users")
-  @@schema("mazaya")
+  @@schema("elnazlawy")
 }
 
-model suppliers {
-  id           String                 @id @default(uuid()) @db.Uuid
-  name         String                 @db.Text
-  payment_type String                 @default("نقدي") @db.Text
-  phone        String?                @db.Text
-  notes        String?                @db.Text
-  deleted_at   DateTime?              @db.Timestamptz()
-  created_at   DateTime?              @default(now()) @db.Timestamptz()
-  updated_at   DateTime?              @default(now()) @db.Timestamptz()
-  boards       boards_inventory[]
-  accessories  accessories_inventory[]
+// =======================================
+// 2. Stores (المخازن والفروع)
+// =======================================
+model stores {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String    @db.VarChar(200)
+  type             String    @default("store") @db.VarChar(50) // store | showroom | vehicle
+  description      String?   @db.Text
+  // Vehicle: assigned rep (one-to-many: one user can have many stores/vehicles)
+  assigned_user_id Int?
+  // Vehicle: current treasury
+  treasury_id      String?   @db.Uuid
+  is_active        Boolean   @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamptz()
+  updated_at       DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("suppliers")
-  @@schema("mazaya")
+  // back-relation: list of stores assigned to a user (defined on user.default_store)
+  default_for_users      users[]                  @relation("UserDefaultStore")
+  treasury               treasuries?              @relation(fields: [treasury_id], references: [id])
+  inventory              inventory[]
+  sales_invoices         sales_invoices[]
+  purchase_invoice_items purchase_invoice_items[]
+  transfers_from         stock_transfers[]        @relation("TransferFromStore")
+  transfers_to           stock_transfers[]        @relation("TransferToStore")
+
+  @@map("stores")
+  @@schema("elnazlawy")
 }
 
+// =======================================
+// 3. Products (المنتجات)
+// =======================================
+model products {
+  id                  String    @id @default(uuid()) @db.Uuid
+  // Old AppSheet ID (for migration reference)
+  legacy_id           String?   @unique @db.VarChar(100)
+  name                String    @db.Text
+  description         String?   @db.Text
+  category            String?   @db.VarChar(100)
+  // Unit of measure: piece | box | carton
+  unit                String    @default("piece") @db.VarChar(20)
+  // How many pieces in a carton
+  units_per_carton    Int       @default(1)
+  // Barcode (optional - for future)
+  barcode             String?   @db.VarChar(100)
+  // Last purchase price (updated on each purchase)
+  last_purchase_price Decimal   @default(0) @db.Decimal(15, 2)
+  last_purchase_date  DateTime? @db.Date
+  // Default sale price
+  default_sale_price  Decimal   @default(0) @db.Decimal(15, 2)
+  reorder_level       Int       @default(5)
+  notes               String?   @db.Text
+  is_active           Boolean   @default(true)
+  created_at          DateTime? @default(now()) @db.Timestamptz()
+  updated_at          DateTime? @default(now()) @db.Timestamptz()
+
+  inventory_items inventory[]
+  sales_items     sales_invoice_items[]
+  purchase_items  purchase_invoice_items[]
+  price_history   product_price_history[]
+
+  @@map("products")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 4. Inventory (المخزون)
+// =======================================
+model inventory {
+  id              String    @id @default(uuid()) @db.Uuid
+  product_id      String    @db.Uuid
+  store_id        String    @db.Uuid
+  // Current stock (in pieces)
+  current_stock   Decimal   @default(0) @db.Decimal(15, 2)
+  // Opening balance (from migration)
+  opening_balance Decimal   @default(0) @db.Decimal(15, 2)
+  reorder_level   Int       @default(5)
+  notes           String?   @db.Text
+  created_at      DateTime? @default(now()) @db.Timestamptz()
+  updated_at      DateTime? @default(now()) @db.Timestamptz()
+
+  product products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  store   stores   @relation(fields: [store_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, store_id])
+  @@map("inventory")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 5. Customers (العملاء)
+// =======================================
 model customers {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.Text
-  branch_id  String?   @db.Uuid
-  phone      String?   @db.Text
-  address    String?   @db.Text
-  notes      String?   @db.Text
-  deleted_at DateTime? @db.Timestamptz()
-  created_at DateTime? @default(now()) @db.Timestamptz()
-  updated_at DateTime? @default(now()) @db.Timestamptz()
-  branch     branches? @relation(fields: [branch_id], references: [id])
-  orders     orders[]
+  id               String    @id @default(uuid()) @db.Uuid
+  legacy_id        String?   @unique @db.VarChar(100)
+  name             String    @db.VarChar(200)
+  phone            String?   @db.VarChar(30)
+  whatsapp         String?   @db.VarChar(30)
+  address          String?   @db.Text
+  // GPS location (lat,lng) - optional
+  location         String?   @db.VarChar(100)
+  // Balance: positive = customer owes us, negative = we owe them
+  balance          Decimal   @default(0) @db.Decimal(15, 2)
+  opening_balance  Decimal   @default(0) @db.Decimal(15, 2)
+  // Route days: comma-separated: السبت,الأحد,الاثنين,الثلاثاء,الأربعاء,الخميس
+  route_days       String[]  @default([])
+  // Today's rep (set per day)
+  today_rep_id     Int?
+  today_vehicle_id String?   @db.Uuid
+  notes            String?   @db.Text
+  is_active        Boolean   @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamptz()
+  updated_at       DateTime? @default(now()) @db.Timestamptz()
+
+  sales_invoices sales_invoices[]
+  payments       customer_payments[]
 
   @@map("customers")
-  @@schema("mazaya")
+  @@schema("elnazlawy")
 }
 
-model orders {
-  id                      String                 @id @default(uuid()) @db.Uuid
-  order_name              String                 @db.Text
-  customer_id             String?                @db.Uuid
-  branch_id               String?                @db.Uuid
-  order_type              String                 @default("تصنيع جديد") @db.Text
-  parent_order_id         String?                @db.Uuid
-  start_date              DateTime               @default(now()) @db.Date
-  end_date                DateTime?              @db.Date
-  duration_days           Int?
-  workers_count           Int?                   @default(0)
-  status                  String                 @default("مفتوح") @db.Text
-  boards_cost             Decimal                @default(0)
-  accessories_cost        Decimal                @default(0)
-  installation_cost       Decimal                @default(0)
-  internal_transport_cost Decimal                @default(0)
-  external_transport_cost Decimal                @default(0)
-  factory_commission      Decimal                @default(0)
-  installation_travel_days Int?                  @default(0)
-  order_total             Decimal?
-  notes                   String?                @db.Text
-  deleted_at              DateTime?              @db.Timestamptz()
-  created_by              Int?
-  created_at              DateTime?              @default(now()) @db.Timestamptz()
-  updated_at              DateTime?              @default(now()) @db.Timestamptz()
-  customer                customers?             @relation(fields: [customer_id], references: [id])
-  branch                  branches?              @relation(fields: [branch_id], references: [id])
-  parent_order            orders?                @relation("ParentOrder", fields: [parent_order_id], references: [id])
-  child_orders            orders[]               @relation("ParentOrder")
-  creator                 users?                 @relation("orders_created_by", fields: [created_by], references: [id])
-  materials               order_materials[]
-  external_work           order_external_work[]
-  extra_costs             order_extra_costs[]
-  journal_entries         journal_entries[]
+// =======================================
+// 6. Suppliers (الموردين)
+// =======================================
+model suppliers {
+  id              String    @id @default(uuid()) @db.Uuid
+  legacy_id       String?   @unique @db.VarChar(100)
+  name            String    @db.VarChar(200)
+  phone           String?   @db.VarChar(30)
+  address         String?   @db.Text
+  // Balance: positive = we owe them, negative = they owe us
+  balance         Decimal   @default(0) @db.Decimal(15, 2)
+  opening_balance Decimal   @default(0) @db.Decimal(15, 2)
+  notes           String?   @db.Text
+  is_active       Boolean   @default(true)
+  created_at      DateTime? @default(now()) @db.Timestamptz()
+  updated_at      DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("orders")
-  @@schema("mazaya")
+  purchase_invoices purchase_invoices[]
+  payments          supplier_payments[]
+
+  @@map("suppliers")
+  @@schema("elnazlawy")
 }
 
-model order_materials {
-  id                  String   @id @default(uuid()) @db.Uuid
-  order_id            String   @db.Uuid
-  item_category       String   @db.Text
-  item_id             String   @db.Uuid
-  quantity_used       Decimal  @default(0)
-  unit_price_snapshot Decimal  @default(0)
-  line_total          Decimal?  @default(dbgenerated("(quantity_used * unit_price_snapshot)"))
+// =======================================
+// 7. Sales Invoices (فواتير المبيعات)
+// =======================================
+model sales_invoices {
+  id                  String    @id @default(uuid()) @db.Uuid
+  // Sequential invoice number (auto-increment per type)
+  invoice_number      Int       @unique
+  invoice_date        DateTime  @default(now()) @db.Date
+  // Per-customer sequence
+  customer_seq        Int       @default(0)
+  customer_id         String?   @db.Uuid
+  store_id            String?   @db.Uuid
+  // نوع الفاتورة: عادية | ضريبية | عرض سعر
+  invoice_type        String    @default("عادية") @db.VarChar(20)
+  // الحالة: قيد التنفيذ | مكتملة | ملغاة
+  status              String    @default("مكتملة") @db.VarChar(20)
+  // Subtotal (before discount)
+  subtotal            Decimal   @default(0) @db.Decimal(15, 2)
+  discount            Decimal   @default(0) @db.Decimal(15, 2)
+  // Total = subtotal - discount
+  total               Decimal   @default(0) @db.Decimal(15, 2)
+  // Net profit (cost-based)
+  net_profit          Decimal   @default(0) @db.Decimal(15, 2)
+  // Amount paid (from customer_payments)
+  paid_amount         Decimal   @default(0) @db.Decimal(15, 2)
+  // Void reason (if cancelled via reverse-void)
+  void_reason         String?   @db.Text
+  // Original invoice (for reverse void)
+  original_invoice_id String?   @db.Uuid
+  // Audit
+  created_by          Int?
+  salesperson         String?   @db.VarChar(100)
+  notes               String?   @db.Text
   created_at          DateTime? @default(now()) @db.Timestamptz()
-  order               orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  updated_at          DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("order_materials")
-  @@schema("mazaya")
+  customer customers?            @relation(fields: [customer_id], references: [id])
+  store    stores?               @relation(fields: [store_id], references: [id])
+  creator  users?                @relation("SalesCreatedBy", fields: [created_by], references: [id])
+  items    sales_invoice_items[]
+  payments customer_payments[]
+  original sales_invoices?       @relation("InvoiceVoid", fields: [original_invoice_id], references: [id])
+  voids    sales_invoices[]      @relation("InvoiceVoid")
+
+  @@map("sales_invoices")
+  @@schema("elnazlawy")
 }
 
-model order_external_work {
-  id            String    @id @default(uuid()) @db.Uuid
-  order_id      String    @db.Uuid
-  work_type     String    @default("أخرى") @db.Text
-  contractor_id String?   @db.Uuid
-  amount        Decimal   @default(0)
-  notes         String?   @db.Text
-  created_at    DateTime? @default(now()) @db.Timestamptz()
-  order         orders    @relation(fields: [order_id], references: [id], onDelete: Cascade)
+// =======================================
+// 8. Sales Invoice Items (بنود المبيعات)
+// =======================================
+model sales_invoice_items {
+  id           String    @id @default(uuid()) @db.Uuid
+  invoice_id   String    @db.Uuid
+  product_id   String    @db.Uuid
+  // Snapshot of product name (in case product is renamed/deleted later)
+  product_name String    @db.Text
+  // Row type: بيع | مرتجع
+  row_type     String    @default("بيع") @db.VarChar(20)
+  quantity     Decimal   @db.Decimal(15, 2)
+  unit_price   Decimal   @db.Decimal(15, 2)
+  // Total = quantity * unit_price
+  line_total   Decimal   @db.Decimal(15, 2)
+  // Cost snapshot (from last_purchase_price at sale time)
+  unit_cost    Decimal   @default(0) @db.Decimal(15, 2)
+  // Cost of the line (for profit calc)
+  line_cost    Decimal   @default(0) @db.Decimal(15, 2)
+  store_id     String?   @db.Uuid
+  // Reference to inventory row that was decremented
+  inventory_id String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("order_external_work")
-  @@schema("mazaya")
+  invoice sales_invoices @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  product products       @relation(fields: [product_id], references: [id])
+
+  @@map("sales_invoice_items")
+  @@schema("elnazlawy")
 }
 
-model order_extra_costs {
-  id            String    @id @default(uuid()) @db.Uuid
-  order_id      String    @db.Uuid
-  cost_type     String    @db.Text
-  amount        Decimal   @default(0)
-  notes         String?   @db.Text
-  created_at    DateTime? @default(now()) @db.Timestamptz()
-  order         orders    @relation(fields: [order_id], references: [id], onDelete: Cascade)
-
-  @@map("order_extra_costs")
-  @@schema("mazaya")
-}
-
-model boards_inventory {
-  id                 String              @id @default(uuid()) @db.Uuid
-  item_name          String              @db.Text
-  material_type      String              @default("") @db.Text
-  code               String              @db.Text
-  supplier_id        String?             @db.Uuid
-  unit_price         Decimal             @default(0)
-  unit               String              @default("") @db.Text
-  quantity_in        Decimal             @default(0)
-  total_price        Decimal             @default(0)
-  date_added         DateTime            @default(now()) @db.Date
-  linked_order_id    String?             @db.Uuid
-  quantity_used      Decimal             @default(0)
-  quantity_remaining Decimal             @default(0)
-  used_price         Decimal?
-  notes              String?             @db.Text
-  deleted_at         DateTime?           @db.Timestamptz()
-  created_by         Int?
-  created_at         DateTime?           @default(now()) @db.Timestamptz()
-  updated_at         DateTime?           @default(now()) @db.Timestamptz()
-  supplier           suppliers?          @relation(fields: [supplier_id], references: [id])
-
-  @@unique([supplier_id, code])
-  @@map("boards_inventory")
-  @@schema("mazaya")
-}
-
-model accessories_inventory {
-  id                 String              @id @default(uuid()) @db.Uuid
-  item_name          String              @db.Text
-  material_type      String              @default("") @db.Text
-  code               String              @db.Text
-  supplier_id        String?             @db.Uuid
-  unit_price         Decimal             @default(0)
-  unit               String              @default("") @db.Text
-  quantity_in        Decimal             @default(0)
-  total_price        Decimal             @default(0)
-  date_added         DateTime            @default(now()) @db.Date
-  linked_order_id    String?             @db.Uuid
-  quantity_used      Decimal             @default(0)
-  quantity_remaining Decimal             @default(0)
-  used_price         Decimal?
-  notes              String?             @db.Text
-  deleted_at         DateTime?           @db.Timestamptz()
-  created_by         Int?
-  created_at         DateTime?           @default(now()) @db.Timestamptz()
-  updated_at         DateTime?           @default(now()) @db.Timestamptz()
-  supplier           suppliers?          @relation(fields: [supplier_id], references: [id])
-
-  @@unique([supplier_id, code])
-  @@map("accessories_inventory")
-  @@schema("mazaya")
-}
-
-model contractors {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.Text
-  type       String    @default("أخرى") @db.Text
-  phone      String?   @db.Text
-  notes      String?   @db.Text
-  deleted_at DateTime? @db.Timestamptz()
-  created_at DateTime? @default(now()) @db.Timestamptz()
-  updated_at DateTime? @default(now()) @db.Timestamptz()
-
-  @@map("contractors")
-  @@schema("mazaya")
-}
-
-model workers {
-  id         String              @id @default(uuid()) @db.Uuid
-  name       String              @db.Text
-  phone      String?             @db.Text
-  notes      String?             @db.Text
-  deleted_at DateTime?           @db.Timestamptz()
-  created_at DateTime?           @default(now()) @db.Timestamptz()
-  updated_at DateTime?           @default(now()) @db.Timestamptz()
-  expenses   overhead_expenses[]
-
-  @@map("workers")
-  @@schema("mazaya")
-}
-
-model journal_entries {
-  id             String              @id @default(uuid()) @db.Uuid
-  date           DateTime            @default(now()) @db.Date
-  entry_type     String              @db.Text
-  description    String              @default("") @db.Text
-  amount         Decimal             @default(0)
-  payment_method String              @default("نقدي") @db.Text
-  party_id       String?             @db.Uuid
-  party_type     String?             @db.Text
-  order_id       String?             @db.Uuid
-  is_pass_through Boolean            @default(false)
-  notes          String?             @db.Text
-  created_by     Int?
-  created_at     DateTime?           @default(now()) @db.Timestamptz()
-  updated_at     DateTime?           @default(now()) @db.Timestamptz()
-  order          orders?             @relation(fields: [order_id], references: [id])
-  overhead       overhead_expenses?
-
-  @@map("journal_entries")
-  @@schema("mazaya")
-}
-
-model overhead_expenses {
-  id              String             @id @default(uuid()) @db.Uuid
-  date            DateTime           @default(now()) @db.Date
-  category        String?            @db.Text
-  description     String             @db.Text
-  amount          Decimal            @default(0)
-  payment_method  String?            @db.Text
-  notes           String?            @db.Text
-  journal_entry_id String?           @unique @db.Uuid
-  worker_id       String?            @db.Uuid
+// =======================================
+// 9. Purchase Invoices (فواتير المشتريات)
+// =======================================
+model purchase_invoices {
+  id              String    @id @default(uuid()) @db.Uuid
+  purchase_number Int       @unique
+  purchase_date   DateTime  @default(now()) @db.Date
+  supplier_id     String?   @db.Uuid
+  // الحالة: مكتملة | ملغاة
+  status          String    @default("مكتملة") @db.VarChar(20)
+  // Subtotal
+  total_amount    Decimal   @default(0) @db.Decimal(15, 2)
+  // Paid amount
+  paid_amount     Decimal   @default(0) @db.Decimal(15, 2)
+  notes           String?   @db.Text
   created_by      Int?
-  created_at      DateTime?          @default(now()) @db.Timestamptz()
-  updated_at      DateTime?          @default(now()) @db.Timestamptz()
-  journal_entry   journal_entries?   @relation(fields: [journal_entry_id], references: [id])
-  worker          workers?           @relation(fields: [worker_id], references: [id])
+  created_at      DateTime? @default(now()) @db.Timestamptz()
+  updated_at      DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("overhead_expenses")
-  @@schema("mazaya")
+  supplier suppliers?               @relation(fields: [supplier_id], references: [id])
+  creator  users?                   @relation("PurchaseCreatedBy", fields: [created_by], references: [id])
+  items    purchase_invoice_items[]
+  payments supplier_payments[]
+
+  @@map("purchase_invoices")
+  @@schema("elnazlawy")
 }
 
-model material_types {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @unique @db.Text
-  category   String    @default("board") @db.Text
-  is_active  Boolean   @default(true)
-  sort_order Int?
-  created_at DateTime? @default(now()) @db.Timestamptz()
+// =======================================
+// 10. Purchase Invoice Items (بنود المشتريات)
+// =======================================
+model purchase_invoice_items {
+  id           String    @id @default(uuid()) @db.Uuid
+  purchase_id  String    @db.Uuid
+  product_id   String    @db.Uuid
+  product_name String    @db.Text
+  // Row type: شراء | مرتجع
+  row_type     String    @default("شراء") @db.VarChar(20)
+  quantity     Decimal   @db.Decimal(15, 2)
+  // Total cost for this line (in pieces, normalized)
+  unit_cost    Decimal   @db.Decimal(15, 2)
+  line_total   Decimal   @db.Decimal(15, 2)
+  store_id     String?   @db.Uuid
+  inventory_id String?   @db.Uuid
+  created_at   DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("material_types")
-  @@schema("mazaya")
+  purchase purchase_invoices @relation(fields: [purchase_id], references: [id], onDelete: Cascade)
+  product  products          @relation(fields: [product_id], references: [id])
+  store    stores?           @relation(fields: [store_id], references: [id])
+
+  @@map("purchase_invoice_items")
+  @@schema("elnazlawy")
 }
 
-model accessory_types {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.Text
-  created_at DateTime? @default(now()) @db.Timestamptz()
+// =======================================
+// 11. Stock Transfers (التحويلات المخزنية)
+// =======================================
+model stock_transfers {
+  id            String    @id @default(uuid()) @db.Uuid
+  transfer_date DateTime  @default(now()) @db.Timestamptz()
+  from_store_id String    @db.Uuid
+  to_store_id   String    @db.Uuid
+  product_id    String    @db.Uuid
+  product_name  String    @db.Text
+  quantity      Decimal   @db.Decimal(15, 2)
+  // الحالة: مكتملة | ملغاة
+  status        String    @default("مكتملة") @db.VarChar(20)
+  notes         String?   @db.Text
+  by_user_id    Int?
+  created_at    DateTime? @default(now()) @db.Timestamptz()
 
-  @@map("accessory_types")
-  @@schema("mazaya")
+  from_store stores @relation("TransferFromStore", fields: [from_store_id], references: [id])
+  to_store   stores @relation("TransferToStore", fields: [to_store_id], references: [id])
+  by_user    users? @relation("TransferByUser", fields: [by_user_id], references: [id])
+
+  @@map("stock_transfers")
+  @@schema("elnazlawy")
 }
 
-model audit_log {
+// =======================================
+// 12. Customer Payments (مقبوضات العملاء)
+// =======================================
+model customer_payments {
+  id             String    @id @default(uuid()) @db.Uuid
+  payment_date   DateTime  @default(now()) @db.Date
+  customer_id    String?   @db.Uuid
+  invoice_id     String?   @db.Uuid
+  amount         Decimal   @db.Decimal(15, 2)
+  // طريقة الدفع: نقدي | إنستاباي | فودافون كاش | شيك | تحويل بنكي
+  payment_method String    @default("نقدي") @db.VarChar(50)
+  // الخزينة
+  treasury_id    String?   @db.Uuid
+  // Cheque link (if method=شيك)
+  check_id       String?   @db.Uuid
+  notes          String?   @db.Text
+  created_by     Int?
+  created_at     DateTime? @default(now()) @db.Timestamptz()
+
+  customer customers?      @relation(fields: [customer_id], references: [id])
+  invoice  sales_invoices? @relation(fields: [invoice_id], references: [id])
+  treasury treasuries?     @relation(fields: [treasury_id], references: [id])
+  check    checks?         @relation(fields: [check_id], references: [id])
+  creator  users?          @relation(fields: [created_by], references: [id])
+
+  @@map("customer_payments")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 13. Supplier Payments (مدفوعات الموردين)
+// =======================================
+model supplier_payments {
+  id             String    @id @default(uuid()) @db.Uuid
+  payment_date   DateTime  @default(now()) @db.Date
+  supplier_id    String?   @db.Uuid
+  purchase_id    String?   @db.Uuid
+  amount         Decimal   @db.Decimal(15, 2)
+  payment_method String    @default("نقدي") @db.VarChar(50)
+  treasury_id    String?   @db.Uuid
+  check_id       String?   @db.Uuid
+  notes          String?   @db.Text
+  created_by     Int?
+  created_at     DateTime? @default(now()) @db.Timestamptz()
+
+  supplier suppliers?         @relation(fields: [supplier_id], references: [id])
+  purchase purchase_invoices? @relation(fields: [purchase_id], references: [id])
+  treasury treasuries?        @relation(fields: [treasury_id], references: [id])
+  check    checks?            @relation(fields: [check_id], references: [id])
+  users    users?             @relation(fields: [usersId], references: [id])
+  usersId  Int?
+
+  @@map("supplier_payments")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 14. Checks (الشيكات) - 🆕 New in Next.js
+// =======================================
+model checks {
+  id           String    @id @default(uuid()) @db.Uuid
+  // direction: incoming (from customer) | outgoing (to supplier)
+  direction    String    @db.VarChar(20)
+  // Bank info
+  bank_name    String?   @db.VarChar(200)
+  check_number String?   @db.VarChar(100)
+  // Amount
+  amount       Decimal   @db.Decimal(15, 2)
+  // Issue date & due date
+  issue_date   DateTime  @db.Date
+  due_date     DateTime  @db.Date
+  // الحالة: تحت التحصيل | تم الصرف | مرفوض | مُلغى
+  status       String    @default("تحت التحصيل") @db.VarChar(30)
+  // Party (customer or supplier)
+  customer_id  String?   @db.Uuid
+  supplier_id  String?   @db.Uuid
+  // Related invoice/purchase
+  invoice_id   String?   @db.Uuid
+  purchase_id  String?   @db.Uuid
+  // Cash out when cleared
+  treasury_id  String?   @db.Uuid
+  // Notes
+  notes        String?   @db.Text
+  created_by   Int?
+  created_at   DateTime? @default(now()) @db.Timestamptz()
+  updated_at   DateTime? @default(now()) @db.Timestamptz()
+
+  customer_payments customer_payments[]
+  supplier_payments supplier_payments[]
+  treasuries        treasuries?         @relation(fields: [treasuriesId], references: [id])
+  treasuriesId      String?             @db.Uuid
+
+  @@map("checks")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 15. Expenses (المصروفات)
+// =======================================
+model expenses {
+  id             String    @id @default(uuid()) @db.Uuid
+  expense_date   DateTime  @default(now()) @db.Date
+  category       String    @db.VarChar(100) // إيجار | كهرباء | مرتبات | عمولة مندوب | سلف | أخرى
+  description    String    @db.Text
+  amount         Decimal   @db.Decimal(15, 2)
+  payment_method String    @default("نقدي") @db.VarChar(50)
+  treasury_id    String?   @db.Uuid
+  notes          String?   @db.Text
+  created_by     Int?
+  created_at     DateTime? @default(now()) @db.Timestamptz()
+
+  creator  users?      @relation(fields: [created_by], references: [id])
+  treasury treasuries? @relation(fields: [treasury_id], references: [id])
+
+  @@map("expenses")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 16. Treasuries (الخزائن)
+// =======================================
+model treasuries {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String    @db.VarChar(200)
+  // Type: رئيسية | عهدة عربية | إدارة
+  type             String    @default("رئيسية") @db.VarChar(50)
+  // Assigned user (for vehicle custody)
+  assigned_user_id Int?
+  // Opening balance
+  opening_balance  Decimal   @default(0) @db.Decimal(15, 2)
+  // Current balance (computed from transactions)
+  current_balance  Decimal   @default(0) @db.Decimal(15, 2)
+  notes            String?   @db.Text
+  is_active        Boolean   @default(true)
+  created_at       DateTime? @default(now()) @db.Timestamptz()
+  updated_at       DateTime? @default(now()) @db.Timestamptz()
+
+  customer_payments customer_payments[]
+  supplier_payments supplier_payments[]
+  expenses          expenses[]
+  transactions      treasury_transactions[]
+  stores            stores[]
+  outgoing_checks   checks[]
+
+  @@map("treasuries")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 17. Treasury Transactions (حركات الخزائن)
+// =======================================
+model treasury_transactions {
+  id               String    @id @default(uuid()) @db.Uuid
+  transaction_date DateTime  @default(now()) @db.Timestamptz()
+  treasury_id      String    @db.Uuid
+  // Direction: in (deposit) | out (withdraw) | transfer_out | transfer_in
+  direction        String    @db.VarChar(20)
+  amount           Decimal   @db.Decimal(15, 2)
+  // For transfers
+  from_treasury_id String?   @db.Uuid
+  to_treasury_id   String?   @db.Uuid
+  // Reference (customer_payment, supplier_payment, expense, etc.)
+  reference_type   String?   @db.VarChar(50)
+  reference_id     String?   @db.Uuid
+  // Status: pending | accepted | rejected
+  status           String    @default("accepted") @db.VarChar(20)
+  notes            String?   @db.Text
+  by_user_id       Int?
+  created_at       DateTime? @default(now()) @db.Timestamptz()
+
+  treasury treasuries @relation(fields: [treasury_id], references: [id])
+  by_user  users?     @relation(fields: [by_user_id], references: [id])
+
+  @@map("treasury_transactions")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 18. Product Price History (تاريخ الأسعار)
+// =======================================
+model product_price_history {
   id          String   @id @default(uuid()) @db.Uuid
+  product_id  String   @db.Uuid
+  old_price   Decimal  @db.Decimal(15, 2)
+  new_price   Decimal  @db.Decimal(15, 2)
+  supplier_id String?  @db.Uuid
+  purchase_id String?  @db.Uuid
+  change_date DateTime @default(now()) @db.Timestamptz()
+
+  product products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("product_price_history")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 19. Audit Log (سجل التدقيق)
+// =======================================
+model audit_log {
+  id          String    @id @default(uuid()) @db.Uuid
   user_id     Int?
-  action      String   @db.VarChar(10)
-  table_name  String   @db.VarChar(100)
-  row_id      String   @db.Uuid
+  action      String    @db.VarChar(20) // INSERT | UPDATE | DELETE
+  table_name  String    @db.VarChar(100)
+  row_id      String    @db.VarChar(100)
   before_json Json?
   after_json  Json?
   created_at  DateTime? @default(now()) @db.Timestamptz()
-  user        users?   @relation(fields: [user_id], references: [id])
 
   @@map("audit_log")
-  @@schema("mazaya")
+  @@schema("elnazlawy")
 }

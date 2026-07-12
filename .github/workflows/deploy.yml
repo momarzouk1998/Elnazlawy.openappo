@@ -1,10 +1,6 @@
 # ========================================
 # Deploy to Server — SSH-First Approach
-# ========================================
-# Strategy: SSH direct from GitHub (works every time)
-# - No self-hosted runner needed
-# - No external dependencies
-# - Reliable deployment
+# Mirrors mazaya pattern on the SAME server, different service name
 # ========================================
 
 name: Deploy to Server
@@ -31,26 +27,26 @@ jobs:
             set -e
 
             echo "=== [1/6] Pulling latest image from GHCR ==="
-            docker pull ghcr.io/momarzouk1998/mazaya.openappo:latest
+            docker pull ghcr.io/momarzouk1998/elnazlawy.openappo:latest
 
             echo "=== [2/6] Tagging local image ==="
-            docker tag ghcr.io/momarzouk1998/mazaya.openappo:latest furniture-xhl2yk:latest
+            docker tag ghcr.io/momarzouk1998/elnazlawy.openappo:latest elnazlawy-x9y8z7:latest
 
             echo "=== [3/6] Updating swarm service ==="
-            docker service update --image furniture-xhl2yk:latest --force furniture-xhl2yk
+            docker service update --image elnazlawy-x9y8z7:latest --force elnazlawy-x9y8z7
 
-            echo "=== [4/6] Waiting 15s for service to settle ==="
-            sleep 15
+            echo "=== [4/6] Waiting 20s for service to settle ==="
+            sleep 20
 
             echo "=== [5/6] Service status ==="
-            docker service ps furniture-xhl2yk --no-trunc
+            docker service ps elnazlawy-x9y8z7 --no-trunc
 
             echo ""
             echo "=== Internal health check ==="
-            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3001/ || echo "Internal check failed"
+            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" http://127.0.0.1:3002/ || echo "Internal check failed"
 
             echo "=== External health check ==="
-            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" https://mazaya.openappo.com/ || echo "External check failed"
+            curl -s -o /dev/null -w "HTTP: %{http_code} | Time: %{time_total}s\n" https://elnazlawy.openappo.com/ || echo "External check failed"
 
             echo "=== [6/6] Cleaning up old images ==="
             docker image prune -f

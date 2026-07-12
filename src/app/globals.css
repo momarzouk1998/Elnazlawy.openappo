@@ -1,23 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-black: #1A1A1A;
-  --color-brand-orange: #F2994A;
-  --color-brand-orange-dark: #D87C2E;
-  --color-brand-orange-light: #FFF3E6;
-  --color-brand-cream: #FAFAF7;
-  --font-family-sans: "Cairo", system-ui, sans-serif;
+  /* 🟧 Brand Primary — Orange #f56226 */
+  --color-nazlawy-50:  #fef3ee;
+  --color-nazlawy-100: #fde2d4;
+  --color-nazlawy-200: #fac1a8;
+  --color-nazlawy-300: #f59a73;
+  --color-nazlawy-400: #f07546;
+  --color-nazlawy-500: #f56226;
+  --color-nazlawy-600: #d9531e;
+  --color-nazlawy-700: #b53f17;
+  --color-nazlawy-800: #8a3013;
+  --color-nazlawy-900: #5c1f0c;
+  --color-slate-650:  #677077;
+
+  --font-family-sans: "Cairo", "Segoe UI", Tahoma, sans-serif;
 }
 
 :root {
-  --font-cairo: "Cairo", system-ui, sans-serif;
+  --font-cairo: "Cairo", "Segoe UI", Tahoma, sans-serif;
+  --color-bg-body: #f0f2f5;
+  --color-bg-card: #ffffff;
 }
 
 html { direction: rtl; }
 body {
   font-family: var(--font-cairo);
-  background-color: #FAFAF7;
-  color: #1A1A1A;
+  background-color: var(--color-bg-body);
+  color: #1a1a1a;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -30,16 +40,16 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-brand-orange hover:bg-brand-orange-dark text-white font-semibold px-5 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-nazlawy-500 hover:bg-nazlawy-600 text-white font-semibold px-5 py-2.5 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-brand-black border border-gray-300 font-medium px-5 py-2.5 rounded-lg transition-all;
+    @apply bg-white hover:bg-gray-50 text-gray-800 border border-gray-300 font-medium px-5 py-2.5 rounded-lg transition-all;
   }
   .btn-danger {
     @apply bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-all;
   }
   .input-field {
-    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-orange/40 focus:border-brand-orange transition-all;
+    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nazlawy-500/40 focus:border-nazlawy-500 transition-all;
   }
   .card {
     @apply bg-white rounded-xl p-5 border border-gray-100;
@@ -59,9 +69,15 @@ body {
 .shadow-elevated {
   box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
 }
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+
+/* === Print styles for thermal (80mm) and A4 invoices === */
+@media print {
+  body { background: white; padding: 0; }
+  .no-print { display: none !important; }
+  .print-page { box-shadow: none !important; border: none !important; }
+}
+
+@media print and (max-width: 80mm) {
+  body { font-size: 12px; color: #000; }
+  .print-page { width: 80mm !important; box-shadow: none !important; border: none !important; }
 }

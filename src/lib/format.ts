@@ -1,83 +1,66 @@
-// أدوات مساعدة مشتركة
-export function formatCurrency(value: number | null | undefined): string {
-  if (value == null || isNaN(value)) return "0";
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0, maximumFractionDigits: 2,
-  }).format(value);
-}
-export function formatNumber(value: number | null | undefined): string {
-  if (value == null || isNaN(value)) return "0";
-  return new Intl.NumberFormat("en-US").format(value);
-}
-export function formatDate(date: string | null | undefined): string {
-  if (!date) return "-";
-  try {
-    return new Date(date).toLocaleDateString("ar-EG", {
-      year: "numeric", month: "long", day: "numeric",
-    });
-  } catch { return date; }
-}
-export function formatDateShort(date: string | null | undefined): string {
-  if (!date) return "-";
-  try {
-    return new Date(date).toLocaleDateString("ar-EG");
-  } catch { return date; }
-}
-export function daysBetween(start: string, end: string): number | null {
-  if (!start || !end) return null;
-  const s = new Date(start); const e = new Date(end);
-  return Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+// Common formatters & helpers
+
+export function formatEGP(n: number | string | null | undefined): string {
+  if (n === null || n === undefined) return '0.00';
+  const num = typeof n === 'string' ? parseFloat(n) : n;
+  if (isNaN(num)) return '0.00';
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// ============================================================
-// خرائط العرض (للدروبداونات) — مفاتيح عربية فقط
-// ============================================================
-export const STATUS_LABELS: Record<string, string> = {
-  "مفتوح": "مفتوح",
-  "قيد التنفيذ": "قيد التنفيذ",
-  "مكتمل": "مكتمل",
-  "تم التسليم": "تم التسليم",
-};
-export const ORDER_TYPE_LABELS: Record<string, string> = {
-  "تصنيع جديد": "تصنيع جديد",
-  "صيانة": "صيانة",
-};
-export const ENTRY_TYPE_LABELS: Record<string, string> = {
-  "مشتريات": "مشتريات",
-  "دفعة واردة من معرض": "دفعة واردة من معرض",
-  "دفعة صادرة لمورد": "دفعة صادرة لمورد",
-  "تحويل تمريري": "تحويل تمريري",
-  "نثريات": "نثريات",
-};
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  "نقدي": "نقدي",
-  "تحويل": "تحويل",
-  "كلاهما": "كلاهما",
-};
+export function formatQty(n: number | string | null | undefined): string {
+  if (n === null || n === undefined) return '0';
+  const num = typeof n === 'string' ? parseFloat(n) : n;
+  if (isNaN(num)) return '0';
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
 
-// ============================================================
-// خرائط الألوان (للـ badges) — فيها المفاتيح العربية + الإنجليزية
-// عشان بتتوافق مع البيانات القديمة في الداتابيز
-// ============================================================
-export const STATUS_COLORS: Record<string, string> = {
-  "مفتوح": "bg-yellow-100 text-yellow-800 border-yellow-300",
-  "قيد التنفيذ": "bg-blue-100 text-blue-800 border-blue-300",
-  "مكتمل": "bg-green-100 text-green-800 border-green-300",
-  "تم التسليم": "bg-gray-100 text-gray-800 border-gray-300",
-  open: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  in_progress: "bg-blue-100 text-blue-800 border-blue-300",
-  completed: "bg-green-100 text-green-800 border-green-300",
-  delivered: "bg-gray-100 text-gray-800 border-gray-300",
-};
-export const ENTRY_TYPE_COLORS: Record<string, string> = {
-  "مشتريات": "bg-red-100 text-red-700 border-red-300",
-  "دفعة واردة من معرض": "bg-green-100 text-green-700 border-green-300",
-  "دفعة صادرة لمورد": "bg-red-100 text-red-700 border-red-300",
-  "تحويل تمريري": "bg-orange-100 text-orange-700 border-orange-300",
-  "نثريات": "bg-purple-100 text-purple-700 border-purple-300",
-  purchase: "bg-red-100 text-red-700 border-red-300",
-  income: "bg-green-100 text-green-700 border-green-300",
-  expense: "bg-red-100 text-red-700 border-red-300",
-  transfer: "bg-orange-100 text-orange-700 border-orange-300",
-  overhead: "bg-purple-100 text-purple-700 border-purple-300",
-};
+export function formatDate(d: Date | string | null | undefined): string {
+  if (!d) return '—';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return date.toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+export function formatDateTime(d: Date | string | null | undefined): string {
+  if (!d) return '—';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return date.toLocaleString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+export function daysAgo(d: Date | string): number {
+  const date = typeof d === 'string' ? new Date(d) : d;
+  const diff = Date.now() - date.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+export function statusColor(status: string): string {
+  switch (status) {
+    case 'مكتملة': return 'bg-green-100 text-green-800 border-green-200';
+    case 'قيد التنفيذ': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'ملغاة': return 'bg-red-100 text-red-800 border-red-200';
+    case 'لم يتم السداد': return 'bg-red-100 text-red-800 border-red-200';
+    case 'مدفوعات زائدة': return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'حساب خالص': return 'bg-green-100 text-green-800 border-green-200';
+    case 'تحت التحصيل': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'تم الصرف': return 'bg-green-100 text-green-800 border-green-200';
+    case 'مرفوض': return 'bg-red-100 text-red-800 border-red-200';
+    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+}
+
+export function getDayName(date: Date = new Date()): string {
+  const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  return days[date.getDay()];
+}
+
+export const PAYMENT_METHODS = [
+  { value: 'نقدي', label: 'نقدي', icon: '💵' },
+  { value: 'إنستاباي', label: 'إنستاباي', icon: '📱' },
+  { value: 'فودافون كاش', label: 'فودافون كاش', icon: '📞' },
+  { value: 'شيك', label: 'شيك', icon: '🧾' },
+  { value: 'تحويل بنكي', label: 'تحويل بنكي', icon: '🏦' },
+];
+
+export const EXPENSE_CATEGORIES = [
+  'إيجار', 'كهرباء', 'مياه', 'مرتبات', 'عمولة مندوب',
+  'سلف', 'صيانة', 'مواصلات', 'تسويق', 'متنوعة', 'أخرى',
+];

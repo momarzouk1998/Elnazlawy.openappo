@@ -1,5 +1,5 @@
 {
-  "name": "mazaya-furniture",
+  "name": "elnazlawy-system",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:inventory": "node --experimental-strip-types --no-warnings=ExperimentalWarning tests/inventory-flow.test.ts"
+    "db:push": "prisma db push",
+    "db:seed": "node --experimental-strip-types --no-warnings=ExperimentalWarning prisma/seed.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

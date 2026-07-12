@@ -12,19 +12,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Look up the user by username OR full_name, but ONLY consider active
-    // accounts. Without `is_active: true`, a soft-deleted user that kept
-    // its `full_name` (see DELETE handler) would match and block the real
-    // active user from signing in.
+    // Lookup by username OR phone OR full_name
     const user = await prisma.users.findFirst({
       where: {
         is_active: true,
         OR: [
           { username },
+          { phone: username },
           { full_name: username },
         ],
       },
-      select: { id: true, username: true, full_name: true, role: true, branch_id: true, password_hash: true, is_active: true },
+      select: {
+        id: true, username: true, full_name: true, role: true,
+        can_see_cost: true, password_hash: true, is_active: true,
+      },
     });
 
     if (!user) {
@@ -42,19 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update last_login_at
     await prisma.users.update({ where: { id: user.id }, data: { last_login_at: new Date() } });
 
-    // Sign JWT
-    const token = await signSession({
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      branch_id: user.branch_id,
-    });
+    const token = await signSession({ id: user.id, username: user.username, role: user.role });
 
     const proto = request.headers.get('x-forwarded-proto') || '';
     const isSecure = request.url.startsWith('https:') || proto === 'https';
+
     const response = NextResponse.json({
       ok: true,
       data: {
@@ -62,7 +57,7 @@ export async function POST(request: NextRequest) {
         username: user.username,
         full_name: user.full_name,
         role: user.role,
-        branch_id: user.branch_id,
+        can_see_cost: user.can_see_cost,
       },
     });
 

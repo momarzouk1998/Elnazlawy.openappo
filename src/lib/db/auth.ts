@@ -4,7 +4,7 @@ import { SignJWT, jwtVerify } from 'jose';
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'dev-secret-change-in-production'
 );
-export const COOKIE_NAME = 'mazaya_session';
+export const COOKIE_NAME = 'elnazlawy_session';
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -18,13 +18,11 @@ export async function signSession(user: {
   id: number;
   username: string;
   role: string;
-  branch_id: string | null;
 }): Promise<string> {
   return new SignJWT({
     sub: String(user.id),
     username: user.username,
     role: user.role,
-    branch_id: user.branch_id,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
@@ -33,14 +31,13 @@ export async function signSession(user: {
 
 export async function verifySession(
   token: string
-): Promise<{ sub: number; username: string; role: string;   branch_id: string | null } | null> {
+): Promise<{ sub: number; username: string; role: string } | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET);
     return {
       sub: Number(payload.sub) || 0,
       username: (payload.username as string) || '',
       role: (payload.role as string) || '',
-      branch_id: (payload.branch_id as string) || null,
     };
   } catch {
     return null;

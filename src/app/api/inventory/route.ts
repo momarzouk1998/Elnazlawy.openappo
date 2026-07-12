@@ -1,0 +1,43 @@
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/db/prisma';
+import { getCurrentUser } from '@/lib/auth-server';
+
+export async function GET(request: NextRequest) {
+  const profile = await getCurrentUser();
+  if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const storeId = searchParams.get('store_id') || '';
+  const lowStock = searchParams.get('low_stock') === '1';
+  const search = searchParams.get('search')?.trim() || '';
+
+  const where: any = {};
+  if (storeId) where.store_id = storeId;
+  if (lowStock) where.current_stock = { lte: prisma.inventory.fields.reorder_level as any };
+
+  if (search) {
+    where.product = { name: { contains: search, mode: 'insensitive' } };
+  }
+
+  const items = await prisma.inventory.findMany({
+    where,
+    include: {
+      product: { select: { id: true, name: true, category: true, unit: true, reorder_level: true, last_purchase_price: true } },
+      store: { select: { id: true, name: true, type: true } },
+    },
+    orderBy: { product: { name: 'asc' } },
+    take: 500,
+  });
+
+  // Augment: hide cost for non-privileged
+  const augmented = items.map(i => ({
+    ...i,
+    product: {
+      ...i.product,
+      last_purchase_price: profile.can_see_cost ? i.product.last_purchase_price : null,
+    },
+    value: profile.can_see_cost ? Number(i.current_stock) * Number(i.product.last_purchase_price) : null,
+  }));
+
+  return NextResponse.json({ ok: true, data: augmented });
+}
