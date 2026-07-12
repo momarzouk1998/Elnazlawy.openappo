@@ -1,7 +1,12 @@
 # ==============================================
-# Mazaya System - .gitignore
+# Elnazlawy System - .gitignore
 # الحماية من رفع ملفات حساسة لـ GitHub
 # ==============================================
+
+# === Internal docs (NOT to be uploaded to GitHub) ===
+DEPLOY.md
+SERVER_ACCESS.md
+*.local.md
 
 # === Dependencies & Build Artifacts ===
 /node_modules
