@@ -1,20 +1,22 @@
 # ========================================
 # Deploy to Server — SSH-First Approach
-# Mirrors mazaya pattern on the SAME server, different service name
+# Waits for Build & Push to GHCR to finish first
 # ========================================
 
 name: Deploy to Server
 
 on:
+  workflow_run:
+    workflows: ["Build & Push to GHCR"]
+    types: [completed]
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   deploy:
     name: Deploy via SSH
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -26,19 +28,19 @@ jobs:
           script: |
             set -e
 
-            # IMPORTANT: image name MUST match ${{ github.repository }} from build-and-push.yml
-            # github.repository = "momarzouk1998/elnazlawy-system"  =>  ghcr.io/momarzouk1998/elnazlawy-system:latest
-            GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy-system:latest"
+            # Image name MUST match ${{ github.repository }} from build-and-push.yml
+            # github.repository = "momarzouk1998/Elnazlawy.openappo"
+            # build-and-push.yml uses ghcr.io/${{ github.repository }} = ghcr.io/momarzouk1998/Elnazlawy.openappo:latest
+            GHCR_IMAGE="ghcr.io/momarzouk1998/Elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
 
             echo "=== [1/8] Logging in to GHCR ==="
-            # GHCR_TOKEN must be a PAT with read:packages scope (stored in GitHub Secrets).
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
             echo "=== [2/8] Pre-flight checks ==="
             if ! docker manifest inspect "$GHCR_IMAGE" >/dev/null 2>&1; then
               echo "FATAL: Cannot inspect $GHCR_IMAGE after login."
-              echo "  -> build-and-push.yml may not have run yet (push to main first)."
+              echo "  -> Build & Push may not have run successfully (check its logs)."
               echo "  -> GHCR_TOKEN may be wrong / expired / missing read:packages scope."
               docker logout ghcr.io >/dev/null 2>&1 || true
               exit 1
