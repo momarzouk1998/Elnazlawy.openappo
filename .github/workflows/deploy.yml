@@ -35,8 +35,14 @@ jobs:
             # Image name MUST match what build-and-push.yml pushes.
             # github.repository = "momarzouk1998/Elnazlawy.openappo" (capital E)
             # But GHCR normalizes the package name to lowercase: "elnazlawy.openappo"
+            # NOTE on port 3005:
+            #   elnazlawy.openappo.com previously pointed at the mazaya container on 3002.
+            #   We moved elnazlawy to host:3005 -> container:3000 to avoid the conflict.
+            #   You still need to update the Caddy/Nginx upstream for elnazlawy.openappo.com
+            #   to point at 127.0.0.1:3005 (we do NOT touch your reverse proxy here).
             GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
+            HOST_PORT=3005
 
             # GITHUB_TOKEN is auto-provisioned by GitHub Actions and is valid
             # for the lifetime of this job. It has `packages: read` because
@@ -71,7 +77,7 @@ jobs:
               docker service create \
                 --name elnazlawy-x9y8z7 \
                 --replicas 1 \
-                --publish published=3002,target=3000 \
+                --publish published=${HOST_PORT},target=3000 \
                 "${ENV_FLAGS[@]}" \
                 --restart-condition on-failure \
                 --restart-max-attempts 5 \
@@ -82,7 +88,29 @@ jobs:
             fi
 
             echo "=== [6/8] Updating swarm service to the new image ==="
-            docker service update --image "$LOCAL_IMAGE" --force elnazlawy-x9y8z7
+            # If the service was previously created with a different published port
+            # (e.g. 3002), Docker will not let us re-port it via `service update`.
+            # We detect that case and recreate the service with the new port.
+            CURRENT_PUB=$(docker service inspect elnazlawy-x9y8z7 --format '{{.Endpoint.PublishedPort}}' 2>/dev/null || echo "")
+            if [ "$CURRENT_PUB" != "$HOST_PORT" ]; then
+              echo "  Service is published on '$CURRENT_PUB', expected '$HOST_PORT' — removing and recreating."
+              docker service rm elnazlawy-x9y8z7 >/dev/null
+              # Rebuild env flags for recreate (we lost them in the inspect branch)
+              ENV_FLAGS=(--env NODE_ENV=production --env PORT=3000)
+              [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
+              [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
+              [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
+              docker service create \
+                --name elnazlawy-x9y8z7 \
+                --replicas 1 \
+                --publish published=${HOST_PORT},target=3000 \
+                "${ENV_FLAGS[@]}" \
+                --restart-condition on-failure \
+                --restart-max-attempts 5 \
+                "$LOCAL_IMAGE"
+            else
+              docker service update --image "$LOCAL_IMAGE" --force elnazlawy-x9y8z7
+            fi
 
             echo "=== [7/8] Waiting 25s for service to settle ==="
             sleep 25
@@ -91,11 +119,11 @@ jobs:
             docker service ps elnazlawy-x9y8z7 --no-trunc
 
             echo ""
-            echo "=== Internal health check (127.0.0.1:3002) ==="
-            INT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:3002/ || echo "000")
+            echo "=== Internal health check (127.0.0.1:${HOST_PORT}) ==="
+            INT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:${HOST_PORT}/" || echo "000")
             echo "HTTP: $INT_CODE"
             if [ "$INT_CODE" = "000" ]; then
-              echo "  -> 3002 not listening, trying 3000..."
+              echo "  -> ${HOST_PORT} not listening, trying 3000..."
               INT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:3000/ || echo "000")
               echo "HTTP (3000): $INT_CODE"
             fi
