@@ -84,7 +84,7 @@ export default function POSPage() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Products panel */}
       <div className="lg:col-span-2 space-y-3">
-        <h1 className="text-2xl font-extrabold text-slate-650">🛒 فاتورة جديدة (POS)</h1>
+        <h1 className="text-2xl font-extrabold text-slate-650">🛒 إنشاء فاتورة مبيعات</h1>
         <div className="card">
           <input
             autoFocus

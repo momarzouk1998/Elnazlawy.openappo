@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatQty, formatDate } from "@/lib/format";
 
@@ -70,14 +70,13 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
   const [stores, setStores] = useState<{id:string;name:string}[]>([]);
   const [search, setSearch] = useState("");
 
-  useState(() => {
+  useEffect(() => {
     fetch('/api/stores').then(r => r.json()).then(j => setStores(j.data?.items || [])).catch(() => {});
-  });
+  }, []);
 
-  // بحث المنتجات
-  useState(() => {
+  useEffect(() => {
     fetch(`/api/products?search=${encodeURIComponent(search)}&limit=50`).then(r => r.json()).then(j => setProducts(j.data?.items || [])).catch(() => {});
-  });
+  }, [search]);
 
   async function save() {
     if (!f.product_id || !f.from_store_id || !f.to_store_id || f.quantity <= 0) {

@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
 
   const where: any = {};
   if (storeId) where.store_id = storeId;
-  if (lowStock) where.current_stock = { lte: prisma.inventory.fields.reorder_level as any };
 
   if (search) {
     where.product = { name: { contains: search, mode: 'insensitive' } };
@@ -29,8 +28,12 @@ export async function GET(request: NextRequest) {
     take: 500,
   });
 
+  const filtered = lowStock
+    ? items.filter((item) => Number(item.current_stock) <= Number(item.product.reorder_level))
+    : items;
+
   // Augment: hide cost for non-privileged
-  const augmented = items.map(i => ({
+  const augmented = filtered.map(i => ({
     ...i,
     product: {
       ...i.product,

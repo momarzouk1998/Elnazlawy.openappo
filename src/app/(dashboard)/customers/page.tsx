@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP } from "@/lib/format";
 
@@ -7,8 +8,16 @@ interface Customer { id: string; name: string; phone: string | null; balance: nu
 
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [show, setShow] = useState(false);
+  const router = useRouter();
   const { data, loading, refetch } = useApi<{ items: Customer[]; total: number }>(`/api/customers?search=${encodeURIComponent(search)}&limit=200`);
+
+  const visibleCustomers = (data?.items ?? []).filter((c) => {
+    const status = c.balance > 0.01 ? 'unpaid' : c.balance < -0.01 ? 'overpaid' : 'cleared';
+    if (statusFilter === 'all') return true;
+    return status === statusFilter;
+  });
 
   return (
     <div className="space-y-4">
@@ -20,8 +29,14 @@ export default function CustomersPage() {
         <button onClick={() => setShow(true)} className="btn-primary">+ إضافة عميل</button>
       </div>
 
-      <div className="card">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 ابحث..." className="input-field" autoFocus />
+      <div className="card flex flex-col gap-3 md:flex-row">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 ابحث..." className="input-field md:flex-1" autoFocus />
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input-field md:w-56">
+          <option value="all">كل الحالات</option>
+          <option value="unpaid">لم يتم السداد</option>
+          <option value="overpaid">مدفوعات زائدة</option>
+          <option value="cleared">حساب خالص</option>
+        </select>
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
@@ -37,12 +52,16 @@ export default function CustomersPage() {
               </tr>
             </thead>
             <tbody>
-              {data?.items.map(c => {
+              {visibleCustomers.map(c => {
                 const status = c.balance > 0.01 ? 'لم يتم السداد' : c.balance < -0.01 ? 'مدفوعات زائدة' : 'حساب خالص';
                 const statusClass = c.balance > 0.01 ? 'bg-red-100 text-red-800' : c.balance < -0.01 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
                 return (
                   <tr key={c.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3 font-semibold">{c.name}</td>
+                    <td className="p-3 font-semibold">
+                      <button type="button" onClick={() => router.push(`/customers/${c.id}`)} className="text-right hover:text-nazlawy-600 transition-colors">
+                        {c.name}
+                      </button>
+                    </td>
                     <td className="p-3 text-sm font-mono">{c.phone || '—'}</td>
                     <td className="p-3 font-mono text-xs">{formatEGP(c.opening_balance)}</td>
                     <td className="p-3 font-mono font-bold">{formatEGP(c.balance)}</td>
@@ -50,7 +69,7 @@ export default function CustomersPage() {
                   </tr>
                 );
               })}
-              {data?.items.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-gray-400">لا يوجد عملاء</td></tr>}
+              {visibleCustomers.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-gray-400">لا يوجد عملاء</td></tr>}
             </tbody>
           </table>
         </div>

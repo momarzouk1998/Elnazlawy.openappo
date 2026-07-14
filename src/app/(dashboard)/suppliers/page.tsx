@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP } from "@/lib/format";
 
@@ -8,6 +9,7 @@ interface Supplier { id: string; name: string; phone: string | null; balance: nu
 export default function SuppliersPage() {
   const [search, setSearch] = useState("");
   const [show, setShow] = useState(false);
+  const router = useRouter();
   const { data, loading, refetch } = useApi<{ items: Supplier[]; total: number }>(`/api/suppliers?search=${encodeURIComponent(search)}&limit=200`);
 
   return (
@@ -38,7 +40,11 @@ export default function SuppliersPage() {
             <tbody>
               {data?.items.map(s => (
                 <tr key={s.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-semibold">{s.name}</td>
+                  <td className="p-3 font-semibold">
+                    <button type="button" onClick={() => router.push(`/suppliers/${s.id}`)} className="text-right hover:text-nazlawy-600 transition-colors">
+                      {s.name}
+                    </button>
+                  </td>
                   <td className="p-3 text-sm font-mono">{s.phone || '—'}</td>
                   <td className="p-3 font-mono text-xs">{formatEGP(s.opening_balance)}</td>
                   <td className="p-3 font-mono font-bold">{formatEGP(s.balance)}</td>

@@ -24,7 +24,7 @@ export interface AllModule {
 export const ALL_MODULES: AllModule[] = [
   // 🟢 للمدير (Admin / Manager)
   { key: 'dashboard',    label: 'الرئيسية',                icon: '📊', path: '/dashboard' },
-  { key: 'pos',          label: 'فاتورة جديدة (POS)',      icon: '🛒', path: '/sales/new' },
+  { key: 'pos',          label: 'إنشاء فاتورة مبيعات',      icon: '🛒', path: '/sales/new' },
   { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
   { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
   { key: 'inventory',    label: 'بضاعة المخازن',           icon: '📦', path: '/inventory' },

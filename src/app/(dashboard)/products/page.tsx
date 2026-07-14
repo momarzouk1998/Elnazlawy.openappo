@@ -19,10 +19,13 @@ interface Product {
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [category, setCategory] = useState("");
   const [showForm, setShowForm] = useState(false);
   const { data, loading, refetch } = useApi<{ items: Product[]; total: number }>(
-    `/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=200`
+    `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=200`
   );
+
+  const categoryOptions = Array.from(new Set((data?.items ?? []).map((p) => p.category).filter(Boolean))) as string[];
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -39,15 +42,25 @@ export default function ProductsPage() {
         <button onClick={() => setShowForm(true)} className="btn-primary">+ إضافة منتج</button>
       </div>
 
-      <div className="card">
+      <div className="card flex flex-col gap-3 md:flex-row">
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="🔍 ابحث بالاسم..."
-          className="input-field"
+          className="input-field md:flex-1"
           autoFocus
         />
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="input-field md:w-56"
+        >
+          <option value="">كل الفئات</option>
+          {categoryOptions.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
