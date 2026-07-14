@@ -43,6 +43,7 @@ jobs:
             GHCR_IMAGE="ghcr.io/momarzouk1998/elnazlawy.openappo:latest"
             LOCAL_IMAGE="elnazlawy-x9y8z7:latest"
             HOST_PORT=3005
+            APP_PORT=3005
 
             # GITHUB_TOKEN is auto-provisioned by GitHub Actions and is valid
             # for the lifetime of this job. It has `packages: read` because
@@ -70,14 +71,14 @@ jobs:
               # Build env flags from whatever env secrets the user has set.
               # Add more --env entries as needed; missing secrets produce
               # no flag, which Docker handles safely.
-              ENV_FLAGS=(--env NODE_ENV=production --env PORT=3000)
+              ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
               [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
               [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
               [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
               docker service create \
                 --name elnazlawy-x9y8z7 \
                 --replicas 1 \
-                --publish published=${HOST_PORT},target=3000 \
+                --network host \
                 "${ENV_FLAGS[@]}" \
                 --restart-condition on-failure \
                 --restart-max-attempts 5 \
@@ -96,14 +97,14 @@ jobs:
               echo "  Service is published on '$CURRENT_PUB', expected '$HOST_PORT' — removing and recreating."
               docker service rm elnazlawy-x9y8z7 >/dev/null
               # Rebuild env flags for recreate (we lost them in the inspect branch)
-              ENV_FLAGS=(--env NODE_ENV=production --env PORT=3000)
+              ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
               [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
               [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
               [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
               docker service create \
                 --name elnazlawy-x9y8z7 \
                 --replicas 1 \
-                --publish published=${HOST_PORT},target=3000 \
+                --network host \
                 "${ENV_FLAGS[@]}" \
                 --restart-condition on-failure \
                 --restart-max-attempts 5 \
