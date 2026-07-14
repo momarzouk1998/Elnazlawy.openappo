@@ -61,6 +61,15 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
 }
 
 function SidebarContent({ visible, pathname, onNavigate }: { visible: any[]; pathname: string; onNavigate: () => void }) {
+  const activeModule = visible.reduce<any | null>((best, module) => {
+    if (!module.path) return best;
+    if (pathname === module.path) return module;
+    if (pathname.startsWith(`${module.path}/`)) {
+      if (!best || module.path.length > best.path.length) return module;
+    }
+    return best;
+  }, null);
+
   return (
     <>
       <div className="p-4 border-b-4 border-nazlawy-500 flex items-center gap-3">
@@ -74,7 +83,7 @@ function SidebarContent({ visible, pathname, onNavigate }: { visible: any[]; pat
       </div>
       <nav className="flex-1 overflow-y-auto py-2">
         {visible.map((m) => {
-          const active = pathname === m.path || pathname.startsWith(m.path + '/');
+          const active = activeModule?.key === m.key;
           return (
             <Link
               key={m.key}
