@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApi } from "@/hooks/useApi";
 import { formatEGP } from "@/lib/format";
 
@@ -22,39 +22,67 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const qs = from && to ? `?from=${from}&to=${to}` : "";
-      const [cust, sup, cp, sp, ex, sales] = await Promise.all([
-        fetch("/api/customers?limit=9999").then(r => r.json()),
-        fetch("/api/suppliers?limit=9999").then(r => r.json()),
-        fetch(`/api/payments/customers${qs}&limit=9999`).then(r => r.json()),
-        fetch(`/api/payments/suppliers${qs}&limit=9999`).then(r => r.json()),
-        fetch(`/api/expenses${qs}&limit=9999`).then(r => r.json()),
-        fetch(`/api/sales/invoices?status=مكتملة&limit=9999`).then(r => r.json()),
+      const responses = await Promise.all([
+        fetch("/api/customers?limit=9999").then(async r => {
+          if (!r.ok) throw new Error(`Customers API: ${r.status}`);
+          return r.json();
+        }),
+        fetch("/api/suppliers?limit=9999").then(async r => {
+          if (!r.ok) throw new Error(`Suppliers API: ${r.status}`);
+          return r.json();
+        }),
+        fetch(`/api/payments/customers${qs}&limit=9999`).then(async r => {
+          if (!r.ok) throw new Error(`Customer Payments API: ${r.status}`);
+          return r.json();
+        }),
+        fetch(`/api/payments/suppliers${qs}&limit=9999`).then(async r => {
+          if (!r.ok) throw new Error(`Supplier Payments API: ${r.status}`);
+          return r.json();
+        }),
+        fetch(`/api/expenses${qs}&limit=9999`).then(async r => {
+          if (!r.ok) throw new Error(`Expenses API: ${r.status}`);
+          return r.json();
+        }),
+        fetch(`/api/sales/invoices?status=مكتملة&limit=9999`).then(async r => {
+          if (!r.ok) throw new Error(`Sales API: ${r.status}`);
+          return r.json();
+        }),
       ]);
 
-      const customerDebt = (cust.data?.items || []).reduce((s: number, c: Customer) => s + Number(c.balance), 0);
-      const supplierDebt = (sup.data?.items || []).reduce((s: number, c: Supplier) => s + Number(c.balance), 0);
-      const totalCollections = (cp.data?.items || []).reduce((s: number, p: CustomerPayment) => s + Number(p.amount), 0);
-      const totalPayments = (sp.data?.items || []).reduce((s: number, p: SupplierPayment) => s + Number(p.amount), 0);
-      const totalExpenses = (ex.data?.items || []).reduce((s: number, e: Expense) => s + Number(e.amount), 0);
-      const totalSales = (sales.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.total), 0);
-      const totalProfit = (sales.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.net_profit), 0);
+      const [cust, sup, cp, sp, ex, sales] = responses;
+
+      const customerDebt = (cust?.data?.items || []).reduce((s: number, c: Customer) => s + Number(c.balance), 0);
+      const supplierDebt = (sup?.data?.items || []).reduce((s: number, c: Supplier) => s + Number(c.balance), 0);
+      const totalCollections = (cp?.data?.items || []).reduce((s: number, p: CustomerPayment) => s + Number(p.amount), 0);
+      const totalPayments = (sp?.data?.items || []).reduce((s: number, p: SupplierPayment) => s + Number(p.amount), 0);
+      const totalExpenses = (ex?.data?.items || []).reduce((s: number, e: Expense) => s + Number(e.amount), 0);
+      const totalSales = (sales?.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.total), 0);
+      const totalProfit = (sales?.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.net_profit), 0);
 
       setStats({
-        customerDebt, supplierDebt, totalSales, totalProfit,
-        totalCollections, totalPayments, totalExpenses,
+        customerDebt,
+        supplierDebt,
+        totalSales,
+        totalProfit,
+        totalCollections,
+        totalPayments,
+        totalExpenses,
         netCash: totalCollections - totalPayments - totalExpenses,
       });
     } catch (e: any) {
-      setError(e?.message || "حدث خطأ");
+      setError(e?.message || "حدث خطأ في تحميل البيانات");
     } finally {
       setLoading(false);
     }
   }
 
-  useState(() => { load(); });
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
     <div className="space-y-4">

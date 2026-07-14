@@ -25,7 +25,9 @@ export default function ProductsPage() {
     `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=200`
   );
 
-  const categoryOptions = Array.from(new Set((data?.items ?? []).map((p) => p.category).filter(Boolean))) as string[];
+  const categoryOptions = Array.from(
+    new Set((data?.items ?? []).map((p) => p.category).filter(Boolean))
+  ) as string[];
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
