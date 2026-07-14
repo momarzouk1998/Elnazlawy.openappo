@@ -403,8 +403,7 @@ model supplier_payments {
   purchase purchase_invoices? @relation(fields: [purchase_id], references: [id])
   treasury treasuries?        @relation(fields: [treasury_id], references: [id])
   check    checks?            @relation(fields: [check_id], references: [id])
-  users    users?             @relation(fields: [usersId], references: [id])
-  usersId  Int?
+  creator  users?             @relation(fields: [created_by], references: [id])
 
   @@map("supplier_payments")
   @@schema("elnazlawy")
@@ -443,8 +442,7 @@ model checks {
 
   customer_payments customer_payments[]
   supplier_payments supplier_payments[]
-  treasuries        treasuries?         @relation(fields: [treasuriesId], references: [id])
-  treasuriesId      String?             @db.Uuid
+  treasury          treasuries?         @relation(fields: [treasury_id], references: [id])
 
   @@map("checks")
   @@schema("elnazlawy")

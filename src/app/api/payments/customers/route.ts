@@ -98,13 +98,27 @@ export async function POST(request: NextRequest) {
         data: { balance: { decrement: amt } },
       });
 
-      // 5. إضافة للخزينة
+      // 5. تحديث المبلغ المدفوع على الفاتورة إن وجدت
+      if (invoice_id) {
+        const invoice = await tx.sales_invoices.findUnique({ where: { id: invoice_id } });
+        if (invoice) {
+          const total = Number(invoice.total || 0);
+          const paidSoFar = Number(invoice.paid_amount || 0);
+          const nextPaid = Math.min(total, paidSoFar + amt);
+          await tx.sales_invoices.update({
+            where: { id: invoice_id },
+            data: { paid_amount: nextPaid },
+          });
+        }
+      }
+
+      // 6. إضافة للخزينة
       await tx.treasuries.update({
         where: { id: treasury_id },
         data: { current_balance: { increment: amt } },
       });
 
-      // 6. سجل حركة الخزينة
+      // 7. سجل حركة الخزينة
       await tx.treasury_transactions.create({
         data: {
           treasury_id,

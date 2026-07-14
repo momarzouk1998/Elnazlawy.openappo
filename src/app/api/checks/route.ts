@@ -28,12 +28,91 @@ export async function POST(request: NextRequest) {
         status: 'تحت التحصيل',
         customer_id: body.customer_id || null,
         supplier_id: body.supplier_id || null,
+        treasury_id: body.treasury_id || null,
         notes: body.notes || null,
         created_by: profile.id,
       },
     });
     return NextResponse.json({ ok: true, data: check });
   } catch (e: any) {
+    return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const profile = await getCurrentUser();
+  if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
+
+  try {
+    const body = await request.json();
+    const { id, status, treasury_id } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'الرقم ومعرف الحالة مطلوبان' } }, { status: 400 });
+    }
+
+    const validStatuses = ['تحت التحصيل', 'تم الصرف', 'مرفوض', 'مُلغى'];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ ok: false, error: { code: 'INVALID_STATUS' } }, { status: 400 });
+    }
+
+    const existing = await prisma.checks.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
+    }
+
+    if (existing.created_by !== profile.id && profile.role !== 'admin') {
+      return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
+    }
+
+    const effectiveTreasuryId = existing.treasury_id || treasury_id || null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (status === 'تم الصرف' && existing.status !== 'تم الصرف') {
+        if (!effectiveTreasuryId) {
+          throw new Error('NO_TREASURY');
+        }
+
+        const treasury = await tx.treasuries.findUnique({ where: { id: effectiveTreasuryId } });
+        if (!treasury) throw new Error('TREASURY_NOT_FOUND');
+
+        const amount = Number(existing.amount);
+        const direction = existing.direction === 'incoming' ? 'in' : 'out';
+        const operation = direction === 'in' ? 'increment' : 'decrement';
+
+        await tx.treasuries.update({
+          where: { id: effectiveTreasuryId },
+          data: { current_balance: { [operation]: amount } },
+        });
+
+        await tx.treasury_transactions.create({
+          data: {
+            treasury_id: effectiveTreasuryId,
+            direction,
+            amount,
+            reference_type: 'check',
+            reference_id: existing.id,
+            status: 'accepted',
+            by_user_id: profile.id,
+          },
+        });
+      }
+
+      return tx.checks.update({
+        where: { id },
+        data: {
+          status,
+          treasury_id: effectiveTreasuryId,
+          updated_at: new Date(),
+        },
+      });
+    });
+
+    return NextResponse.json({ ok: true, data: updated });
+  } catch (e: any) {
+    if (e?.message === 'NO_TREASURY' || e?.message === 'TREASURY_NOT_FOUND') {
+      return NextResponse.json({ ok: false, error: { code: e.message } }, { status: 400 });
+    }
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }
 }

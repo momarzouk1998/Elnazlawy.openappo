@@ -19,16 +19,23 @@
 
 :root {
   --font-cairo: "Cairo", "Segoe UI", Tahoma, sans-serif;
-  --color-bg-body: #f0f2f5;
+  --color-bg-body: #f4f4f5;
   --color-bg-card: #ffffff;
+  --color-surface-2: #f8f8f8;
+  --color-sidebar: linear-gradient(180deg, #111315 0%, #1d1f22 100%);
+  --color-sidebar-accent: #f56226;
 }
 
 html { direction: rtl; }
 body {
   font-family: var(--font-cairo);
-  background-color: var(--color-bg-body);
-  color: #1a1a1a;
+  background: linear-gradient(135deg, #f5f5f5 0%, #ececec 100%);
+  color: #1c1c1c;
   -webkit-font-smoothing: antialiased;
+}
+
+.bg-header-gradient {
+  background: var(--color-sidebar);
 }
 
 * { box-sizing: border-box; }
@@ -49,11 +56,11 @@ body {
     @apply bg-red-500 hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg transition-all;
   }
   .input-field {
-    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nazlawy-500/40 focus:border-nazlawy-500 transition-all;
+    @apply w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nazlawy-500/40 focus:border-nazlawy-500 transition-all bg-white text-gray-900;
   }
   .card {
-    @apply bg-white rounded-xl p-5 border border-gray-100;
-    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px 0 rgba(0,0,0,0.04);
+    @apply bg-white rounded-xl p-5 border border-gray-200;
+    box-shadow: 0 10px 30px -12px rgba(17, 19, 21, 0.12);
   }
   .table-header {
     @apply bg-gray-50 text-gray-700 text-sm font-semibold uppercase tracking-wide;
