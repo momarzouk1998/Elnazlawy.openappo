@@ -65,53 +65,31 @@ jobs:
             echo "=== [4/8] Logging out of GHCR (rotate credentials) ==="
             docker logout ghcr.io >/dev/null
 
-            echo "=== [5/8] Ensure swarm service exists ==="
-            if ! docker service inspect elnazlawy-x9y8z7 >/dev/null 2>&1; then
-              echo "  Swarm service 'elnazlawy-x9y8z7' not found — creating it now."
-              # Build env flags from whatever env secrets the user has set.
-              # Add more --env entries as needed; missing secrets produce
-              # no flag, which Docker handles safely.
-              ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
-              [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
-              [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
-              [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
-              docker service create \
-                --name elnazlawy-x9y8z7 \
-                --replicas 1 \
-                --network host \
-                "${ENV_FLAGS[@]}" \
-                --restart-condition on-failure \
-                --restart-max-attempts 5 \
-                "$LOCAL_IMAGE"
-              echo "  Service created."
+            echo "=== [5/8] Ensure env file exists on the host ==="
+            ENV_FILE=/tmp/elnazlawy.env
+            if [ -f /opt/elnazlawy/.env ]; then
+              cp /opt/elnazlawy/.env "$ENV_FILE"
+              echo "  Loaded environment file from /opt/elnazlawy/.env"
             else
-              echo "  Swarm service exists."
+              echo "  /opt/elnazlawy/.env not found — creating an empty env file"
+              : > "$ENV_FILE"
             fi
 
-            echo "=== [6/8] Updating swarm service to the new image ==="
-            # If the service was previously created with a different published port
-            # (e.g. 3002), Docker will not let us re-port it via `service update`.
-            # We detect that case and recreate the service with the new port.
-            CURRENT_PUB=$(docker service inspect elnazlawy-x9y8z7 --format '{{.Endpoint.PublishedPort}}' 2>/dev/null || echo "")
-            if [ "$CURRENT_PUB" != "$HOST_PORT" ]; then
-              echo "  Service is published on '$CURRENT_PUB', expected '$HOST_PORT' — removing and recreating."
-              docker service rm elnazlawy-x9y8z7 >/dev/null
-              # Rebuild env flags for recreate (we lost them in the inspect branch)
-              ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
-              [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
-              [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
-              [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
-              docker service create \
-                --name elnazlawy-x9y8z7 \
-                --replicas 1 \
-                --network host \
-                "${ENV_FLAGS[@]}" \
-                --restart-condition on-failure \
-                --restart-max-attempts 5 \
-                "$LOCAL_IMAGE"
-            else
-              docker service update --image "$LOCAL_IMAGE" --force elnazlawy-x9y8z7
-            fi
+            echo "=== [6/8] Recreate swarm service with the latest image ==="
+            docker service rm elnazlawy-x9y8z7 >/dev/null 2>&1 || true
+            ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
+            [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
+            [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
+            [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
+            docker service create \
+              --name elnazlawy-x9y8z7 \
+              --replicas 1 \
+              --network host \
+              --env-file "$ENV_FILE" \
+              "${ENV_FLAGS[@]}" \
+              --restart-condition on-failure \
+              --restart-max-attempts 5 \
+              "$LOCAL_IMAGE"
 
             echo "=== [7/8] Waiting 25s for service to settle ==="
             sleep 25
