@@ -82,7 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               quantity: it.quantity,
               unit_cost: it.unit_cost,
               line_total,
-              store_id: it.store_id || existing.store_id, // assuming there might be store_id on existing or default
+              store_id: it.store_id, // items should have store_id
             },
           });
         }
