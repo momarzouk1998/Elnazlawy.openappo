@@ -1,100 +1,161 @@
-"use client";
-import { useState } from "react";
-import { useApi } from "@/hooks/useApi";
+import { getCurrentUser } from "@/lib/auth-server";
+import { redirect } from "next/navigation";
+import prisma from "@/lib/db/prisma";
 import { formatEGP, formatDate } from "@/lib/format";
+import { StatementsClient } from "./StatementsClient";
 
-interface Customer { id: string; name: string; balance: number; }
-interface Supplier { id: string; name: string; balance: number; }
-interface CustomerPayment { id: string; payment_date: string; amount: number; payment_method: string; notes: string | null; }
-interface SupplierPayment { id: string; payment_date: string; amount: number; payment_method: string; notes: string | null; }
+export const dynamic = 'force-dynamic';
 
-export default function StatementsPage() {
-  const [type, setType] = useState<"customer" | "supplier">("customer");
-  const [partyId, setPartyId] = useState("");
+interface SearchParams {
+  type?: 'customer' | 'supplier';
+  id?: string;
+}
 
-  const partiesApi = useApi<{ items: (Customer | Supplier)[] }>(type === "customer" ? "/api/customers?limit=9999" : "/api/suppliers?limit=9999");
+export default async function StatementsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const profile = await getCurrentUser();
+  if (!profile) redirect('/login');
 
-  const parties = partiesApi.data?.items || [];
-  const selected = parties.find(p => p.id === partyId) as (Customer | Supplier) | undefined;
+  const params = await searchParams;
+  const type = (params.type === 'supplier' ? 'supplier' : 'customer') as 'customer' | 'supplier';
+  const selectedId = params.id || '';
 
-  // payments للطرف المحدد
-  const paymentsApi = useApi<{ items: (CustomerPayment | SupplierPayment)[] }>(
-    partyId ? (type === "customer" ? `/api/payments/customers?customer_id=${partyId}&limit=9999` : `/api/payments/suppliers?supplier_id=${partyId}&limit=9999`) : null
-  );
+  // جلب قائمة العملاء/الموردين
+  const parties = (type === 'customer'
+    ? await prisma.customers.findMany({
+        where: { is_active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, phone: true, balance: true, opening_balance: true },
+      })
+    : await prisma.suppliers.findMany({
+        where: { is_active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, phone: true, balance: true, opening_balance: true },
+      })
+  ).map(p => ({
+    ...p,
+    balance: Number(p.balance),
+    opening_balance: Number(p.opening_balance),
+  }));
 
-  const payments = paymentsApi.data?.items || [];
-  const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
+  // جلب تفاصيل الطرف المختار
+  const selected = selectedId
+    ? (type === 'customer'
+        ? await prisma.customers.findUnique({
+            where: { id: selectedId },
+            select: { id: true, name: true, phone: true, balance: true, opening_balance: true, address: true },
+          })
+        : await prisma.suppliers.findUnique({
+            where: { id: selectedId },
+            select: { id: true, name: true, phone: true, balance: true, opening_balance: true, address: true },
+          }))
+    : null;
+  const selectedNormalized = selected ? {
+    ...selected,
+    balance: Number(selected.balance),
+    opening_balance: Number(selected.opening_balance),
+  } : null;
+
+  // جلب الحركات (فواتير + مدفوعات) للطرف المختار
+  let transactions: any[] = [];
+  if (selectedNormalized) {
+    const selected = selectedNormalized; // alias for cleaner code below
+    const [salesInvoices, purchaseInvoices, customerPayments, supplierPayments] = await Promise.all([
+      type === 'customer'
+        ? prisma.sales_invoices.findMany({
+            where: { customer_id: selected.id, invoice_type: { not: 'عرض سعر' } },
+            orderBy: { invoice_date: 'asc' },
+            select: { id: true, invoice_number: true, invoice_date: true, total: true, paid_amount: true, status: true, invoice_type: true, notes: true, void_reason: true },
+          })
+        : Promise.resolve([]),
+      type === 'supplier'
+        ? prisma.purchase_invoices.findMany({
+            where: { supplier_id: selected.id },
+            orderBy: { purchase_date: 'asc' },
+            select: { id: true, purchase_number: true, purchase_date: true, total_amount: true, paid_amount: true, status: true, notes: true },
+          })
+        : Promise.resolve([]),
+      type === 'customer'
+        ? prisma.customer_payments.findMany({
+            where: { customer_id: selected.id },
+            orderBy: { payment_date: 'asc' },
+            select: { id: true, payment_date: true, amount: true, payment_method: true, notes: true },
+          })
+        : Promise.resolve([]),
+      type === 'supplier'
+        ? prisma.supplier_payments.findMany({
+            where: { supplier_id: selected.id },
+            orderBy: { payment_date: 'asc' },
+            select: { id: true, payment_date: true, amount: true, payment_method: true, notes: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    if (type === 'customer') {
+      // العميل: الفاتورة تزيد الدين (مدين)، التحصيل ينقص الدين (دائن)
+      for (const inv of salesInvoices as any[]) {
+        if (inv.status === 'ملغاة') continue;
+        transactions.push({
+          id: `inv-${inv.id}`,
+          date: new Date(inv.invoice_date),
+          dateStr: formatDate(inv.invoice_date),
+          type: 'فاتورة مبيعات',
+          docNumber: `#${inv.invoice_number}`,
+          debit: Number(inv.total || 0),    // عليه (مدين)
+          credit: Number(inv.paid_amount || 0), // مسدد منها
+          notes: inv.invoice_type || '',
+        });
+      }
+      for (const pay of customerPayments as any[]) {
+        transactions.push({
+          id: `pay-${pay.id}`,
+          date: new Date(pay.payment_date),
+          dateStr: formatDate(pay.payment_date),
+          type: 'تحصيل',
+          docNumber: pay.payment_method,
+          debit: 0,
+          credit: Number(pay.amount || 0),
+          notes: pay.notes || '',
+        });
+      }
+    } else {
+      // المورد: الفاتورة تزيد ما لنا عليه (دائن)، السداد ينقص (مدين)
+      for (const inv of purchaseInvoices as any[]) {
+        if (inv.status === 'ملغاة') continue;
+        transactions.push({
+          id: `inv-${inv.id}`,
+          date: new Date(inv.purchase_date),
+          dateStr: formatDate(inv.purchase_date),
+          type: 'فاتورة مشتريات',
+          docNumber: `#${inv.purchase_number}`,
+          debit: Number(inv.paid_amount || 0),
+          credit: Number(inv.total_amount || 0),
+          notes: inv.notes || '',
+        });
+      }
+      for (const pay of supplierPayments as any[]) {
+        transactions.push({
+          id: `pay-${pay.id}`,
+          date: new Date(pay.payment_date),
+          dateStr: formatDate(pay.payment_date),
+          type: 'سداد للمورد',
+          docNumber: pay.payment_method,
+          debit: Number(pay.amount || 0),
+          credit: 0,
+          notes: pay.notes || '',
+        });
+      }
+    }
+
+    // ترتيب زمني
+    transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">📋 كشوف الحسابات</h1>
-        <p className="text-sm text-gray-500">كشف حساب عميل أو مورد</p>
-      </div>
-
-      <div className="card p-4 space-y-3">
-        <div className="flex gap-2">
-          <button onClick={() => { setType("customer"); setPartyId(""); }} className={`flex-1 py-2 rounded-lg font-semibold ${type === "customer" ? "bg-nazlawy-500 text-white" : "bg-gray-100"}`}>👥 عميل</button>
-          <button onClick={() => { setType("supplier"); setPartyId(""); }} className={`flex-1 py-2 rounded-lg font-semibold ${type === "supplier" ? "bg-nazlawy-500 text-white" : "bg-gray-100"}`}>🏭 مورد</button>
-        </div>
-        <select className="input-field" value={partyId} onChange={(e) => setPartyId(e.target.value)}>
-          <option value="">اختر {type === "customer" ? "عميل" : "مورد"}...</option>
-          {parties.map(p => <option key={p.id} value={p.id}>{p.name} — رصيد: {formatEGP(p.balance)}</option>)}
-        </select>
-      </div>
-
-      {selected && (
-        <>
-          {/* KPI */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card p-4">
-              <div className="text-sm text-gray-500">{type === "customer" ? "رصيد مدين (له علينا)" : "مستحقات (لنا عليه)"}</div>
-              <div className={`text-2xl font-bold ${Number(selected.balance) > 0 ? "text-red-700" : "text-green-700"}`}>{formatEGP(selected.balance)}</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-sm text-gray-500">إجمالي المدفوعات</div>
-              <div className="text-2xl font-bold text-blue-700">{formatEGP(totalPaid)}</div>
-            </div>
-            <div className="card p-4">
-              <div className="text-sm text-gray-500">عدد الحركات</div>
-              <div className="text-2xl font-bold text-slate-650">{payments.length}</div>
-            </div>
-          </div>
-
-          {/* Statement table */}
-          <div className="card overflow-x-auto p-0">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-3 text-right">التاريخ</th>
-                  <th className="p-3 text-right">البيان</th>
-                  <th className="p-3 text-right">طريقة الدفع</th>
-                  <th className="p-3 text-right">المبلغ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map(p => (
-                  <tr key={p.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3 text-xs">{formatDate(p.payment_date)}</td>
-                    <td className="p-3">{p.notes || (type === "customer" ? "تحصيل من عميل" : "سداد لمورد")}</td>
-                    <td className="p-3 text-xs">{p.payment_method}</td>
-                    <td className="p-3 font-mono font-bold text-green-700">{formatEGP(p.amount)}</td>
-                  </tr>
-                ))}
-                {payments.length === 0 && <tr><td colSpan={4} className="p-12 text-center text-gray-400">لا توجد حركات</td></tr>}
-              </tbody>
-              {payments.length > 0 && (
-                <tfoot>
-                  <tr className="bg-gray-100 font-bold">
-                    <td colSpan={3} className="p-3 text-left">الإجمالي:</td>
-                    <td className="p-3 font-mono">{formatEGP(totalPaid)}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </>
-      )}
-    </div>
+    <StatementsClient
+      type={type as 'customer' | 'supplier'}
+      parties={parties}
+      selected={selectedNormalized}
+      transactions={transactions}
+    />
   );
 }

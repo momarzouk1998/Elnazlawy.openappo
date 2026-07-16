@@ -42,5 +42,8 @@ export async function GET(request: NextRequest) {
     value: profile.can_see_cost ? Number(i.current_stock) * Number(i.product.last_purchase_price) : null,
   }));
 
-  return NextResponse.json({ ok: true, data: augmented });
+  return NextResponse.json(
+    { ok: true, data: augmented },
+    { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } }
+  );
 }

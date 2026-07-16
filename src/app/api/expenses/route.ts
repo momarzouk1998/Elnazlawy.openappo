@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth-server";
 import { Prisma } from "@prisma/client";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { FinancialNotifications } from "@/lib/financial-notifications";
 
 // GET /api/expenses — قائمة المصروفات مع فلترة
 export async function GET(request: NextRequest) {
@@ -51,6 +53,14 @@ export async function POST(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
 
+  // Rate limiting للمصروفات - 15 طلب كحد أقصى خلال 10 دقائق
+  if (!checkRateLimit(request, `expense_create_${profile.id}`, 15, 600000)) {
+    return NextResponse.json(
+      { ok: false, error: { code: "RATE_LIMIT_EXCEEDED", message: "تم تجاوز الحد المسموح من المصروفات. حاول مرة أخرى لاحقاً" } },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { category, description, amount, payment_method, treasury_id, expense_date, notes } = body;
@@ -93,6 +103,12 @@ export async function POST(request: NextRequest) {
         data: { current_balance: { decrement: amt } },
       });
 
+      // تحقق من الرصيد السالب وإشعار
+      const updatedTreasury = await tx.treasuries.findUnique({ where: { id: treasury_id } });
+      if (updatedTreasury && Number(updatedTreasury.current_balance) < 0) {
+        FinancialNotifications.negativeBalance(treasury.name, Number(updatedTreasury.current_balance));
+      }
+
       // 4. سجل حركة الخزينة
       await tx.treasury_transactions.create({
         data: {
@@ -105,6 +121,11 @@ export async function POST(request: NextRequest) {
           by_user_id: profile.id,
         },
       });
+
+      // إشعار للمصروفات الكبيرة (أكثر من 1000 ج)
+      if (amt > 1000) {
+        FinancialNotifications.largeExpense(amt, description, profile.id);
+      }
 
       return e;
     });

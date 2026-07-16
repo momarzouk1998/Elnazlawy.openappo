@@ -19,7 +19,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
-  const [storeId, setStoreId] = useState("");
+  // لم نعد نحتاج لاختيار "المخزن الأساسي" — يحدد أوتوماتيكياً من أول صنف مضاف
   const [invoiceType, setInvoiceType] = useState("عادية");
   const [status, setStatus] = useState("قيد التنفيذ");
   const [discount, setDiscount] = useState(0);
@@ -31,50 +31,65 @@ export default function POSPage() {
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
 
-  useEffect(() => {
-    if (stores?.items && stores.items.length > 0 && !storeId) setStoreId(stores.items[0].id);
-  }, [stores, storeId]);
-
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - discount);
 
   // المخزون المتاح للصنف في المخزن المختار
-  function stockFor(p: Product, sId: string = storeId): number {
+  function stockFor(p: Product, sId: string): number {
     if (!sId) return 0;
     const perStore = p.inventory_items?.find(i => i.store_id === sId);
-    return perStore ? Number(perStore.current_stock) : Number(p.total_stock);
+    return perStore ? Number(perStore.current_stock) : 0;
+  }
+
+  // الكسر المخزني للصنف: قائمة المخازن + الكمية المتاحة، مرتبة بالمتاح الأكبر
+  function storeBreakdown(p: Product) {
+    const all = (stores?.items || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      available: stockFor(p, s.id),
+    })).filter(s => s.available > 0)
+      .sort((a, b) => b.available - a.available);
+    return all;
   }
 
   function addToCart(p: Product) {
-    if (!storeId) { alert('اختر مخزن أولاً'); return; }
-    const available = stockFor(p);
-    const existing = cart.find(c => c.product_id === p.id && c.store_id === storeId);
+    const breakdown = storeBreakdown(p);
+    if (breakdown.length === 0) {
+      // لا يوجد مخزون في أي مخزن
+      if (p.total_stock <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر في أي مخزن`); return; }
+      // صفر في كل المخازن بالرغم من أن الإجمالي > 0 (حالة نادرة) — أضف من أول مخزن
+      if (!stores?.items?.length) { alert('❌ لا يوجد مخازن معرفة'); return; }
+    }
+    
+    const targetStore = breakdown[0] || (stores?.items?.[0] ? { id: stores.items[0].id, name: stores.items[0].name, available: 0 } : null);
+    if (!targetStore) { alert('❌ لا يوجد مخازن'); return; }
+    const available = targetStore.available;
+    const existing = cart.find(c => c.product_id === p.id && c.store_id === targetStore.id);
     const currentQty = existing ? existing.quantity : 0;
     
-    if (available <= 0 && p.total_stock > 0) {
-      setSmartSplitItem({ product: p, requestedQty: 1, currentStoreId: storeId });
+    if (available <= 0) {
+      alert(`❌ الصنف "${p.name}" غير متوفر في المخزن "${targetStore.name}"`);
       return;
     }
-    if (available <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر في أي مخزن`); return; }
     
     if (currentQty + 1 > available) {
+      // هل الإجمالي الكلي يكفي؟
       if (p.total_stock >= currentQty + 1) {
-        setSmartSplitItem({ product: p, requestedQty: currentQty + 1, currentStoreId: storeId });
+        setSmartSplitItem({ product: p, requestedQty: currentQty + 1, currentStoreId: targetStore.id });
       } else {
-        alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح في جميع المخازن (${p.total_stock})`);
+        alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح (${p.total_stock})`);
       }
       return;
     }
     
     if (existing) {
-      setCart(cart.map(c => c.product_id === p.id && c.store_id === storeId ? { ...c, quantity: c.quantity + 1 } : c));
+      setCart(cart.map(c => c.product_id === p.id && c.store_id === targetStore.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
-      const store = stores?.items.find(s => s.id === storeId);
       setCart([...cart, {
         product_id: p.id,
         product_name: p.name,
-        store_id: storeId,
-        store_name: store?.name || '',
+        store_id: targetStore.id,
+        store_name: targetStore.name,
         quantity: 1,
         unit_price: Number(p.default_sale_price),
         available,
@@ -175,10 +190,12 @@ export default function POSPage() {
     }
     
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
+    // المخزن الأساسي للفاتورة: أول مخزن من الأصناف (تلقائي)
+    const primaryStoreId = validItems[0]?.store_id || null;
 
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
-      store_id: storeId, // المخزن الافتراضي للفاتورة، بس كل سطر ليه مخزنه الخاص
+      store_id: primaryStoreId,
       invoice_type: invoiceType,
       status: finalStatus,
       items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
@@ -221,21 +238,45 @@ export default function POSPage() {
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[600px] overflow-y-auto">
-          {productsData?.items.map(p => (
-            <button
-              key={p.id}
-              onClick={() => addToCart(p)}
-              className="card text-right hover:border-nazlawy-500 hover:shadow-lg transition-all p-3"
-            >
-              <div className="font-semibold text-sm line-clamp-2">{p.name}</div>
-              <div className="flex items-center justify-between mt-2 text-xs">
-                <span className="text-nazlawy-600 font-bold">{formatEGP(p.default_sale_price)} ج</span>
-                <span className={`font-mono ${p.total_stock <= 0 ? 'text-red-500' : 'text-gray-600'}`}>
-                  متاح: {formatQty(p.total_stock)}
-                </span>
-              </div>
-            </button>
-          ))}
+          {productsData?.items.map(p => {
+            // إخفاء الصنف تماماً لو سعره صفر (سعر البيع غير مهيأ)
+            if (Number(p.default_sale_price) <= 0) return null;
+            const breakdown = storeBreakdown(p);
+            const topStore = breakdown[0];
+            return (
+              <button
+                key={p.id}
+                onClick={() => addToCart(p)}
+                disabled={breakdown.length === 0}
+                className={`card text-right transition-all p-3 ${breakdown.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-nazlawy-500 hover:shadow-lg'}`}
+              >
+                <div className="font-semibold text-sm line-clamp-2">{p.name}</div>
+                <div className="mt-2 space-y-0.5">
+                  <div className="text-xs">
+                    <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price)} ج</span>
+                  </div>
+                  {breakdown.length === 0 ? (
+                    <div className="text-xs text-red-500 font-mono">غير متوفر</div>
+                  ) : breakdown.length === 1 ? (
+                    <div className="text-xs font-mono text-gray-600">
+                      {topStore.name}: {formatQty(topStore.available)}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-gray-600 space-y-0.5">
+                      {breakdown.slice(0, 2).map(s => (
+                        <div key={s.id} className="font-mono truncate">
+                          {s.name}: {formatQty(s.available)}
+                        </div>
+                      ))}
+                      {breakdown.length > 2 && (
+                        <div className="text-gray-400">+ {breakdown.length - 2} مخازن</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           {search.trim() !== "" && productsData?.items.length === 0 && (
             <div className="col-span-full card p-4 text-center">
               <p className="text-gray-500 mb-2">لا توجد نتائج لـ "{search}"</p>
@@ -266,21 +307,13 @@ export default function POSPage() {
               emptyLabel="— بدون عميل —"
             />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-600 block mb-1">المخزن الأساسي للفاتورة</label>
-              <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-                {stores?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 block mb-1">النوع</label>
-              <select className="input-field text-sm" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)}>
-                <option value="عادية">عادية</option>
-                <option value="ضريبية">ضريبية</option>
-                <option value="عرض سعر">عرض سعر</option>
-              </select>
-            </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">النوع</label>
+            <select className="input-field text-sm" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)}>
+              <option value="عادية">عادية</option>
+              <option value="ضريبية">ضريبية</option>
+              <option value="عرض سعر">عرض سعر</option>
+            </select>
           </div>
           {invoiceType !== 'عرض سعر' && (
             <div>
@@ -329,7 +362,35 @@ export default function POSPage() {
                       <div className="text-xs font-bold text-nazlawy-600 text-center p-1 bg-white rounded border">{formatEGP(c.quantity * c.unit_price)}</div>
                     </div>
                   </div>
-                  <div className="text-[10px] text-gray-500 mt-1">{c.store_name} • متاح: {formatQty(c.available)} {c.quantity >= c.available && c.available > 0 && <span className="text-red-600 font-bold">• وصلت للحد الأقصى</span>}</div>
+                  <div className="grid grid-cols-2 gap-2 mt-1 items-center">
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-0.5">المخزن</label>
+                      <select
+                        className="input-field text-[11px] p-1"
+                        value={c.store_id}
+                        onChange={(e) => {
+                          const newStoreId = e.target.value;
+                          const newStore = stores?.items.find(s => s.id === newStoreId);
+                          setCart(cart.map((row, idx) => idx === i ? { ...row, store_id: newStoreId, store_name: newStore?.name || '', available: stockFor(c.product_ref, newStoreId) } : row));
+                        }}
+                      >
+                        {(stores?.items || []).map(s => {
+                          const available = stockFor(c.product_ref, s.id);
+                          return (
+                            <option key={s.id} value={s.id}>
+                              {s.name}{available > 0 ? ` (${formatQty(available)})` : ' (فارغ)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      متاح هنا: {formatQty(c.available)}
+                      {c.quantity > c.available && c.available > 0 && (
+                        <span className="text-red-600 font-bold block">⚠️ الكمية أكبر من المتاح</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

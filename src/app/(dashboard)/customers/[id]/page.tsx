@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate, statusColor } from "@/lib/format";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface CustomerDetail {
   id: string;
@@ -138,9 +139,43 @@ async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeo
    قسم كشف الحساب
 ============================================ */
 function StatementSection({ customerId, balance, onCollect }: { customerId: string; balance: number; onCollect: () => void }) {
-  const { data, loading } = useApi<{ items: Payment[]; total_amount: number }>(`/api/payments/customers?customer_id=${customerId}&limit=9999`);
+  const { data, loading, refetch } = useApi<{ items: Payment[]; total_amount: number }>(`/api/payments/customers?customer_id=${customerId}&limit=9999`);
   const payments = data?.items || [];
   const totalPaid = data?.total_amount || 0;
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
+
+  // تعديل مدفوعة
+  async function editPayment(payment: Payment) {
+    setEditingPayment(payment);
+  }
+
+  // حذف مدفوعة - مع مربع تأكيد محسن
+  async function deletePayment(payment: Payment) {
+    setDeletingPayment(payment);
+  }
+
+  async function confirmDeletePayment() {
+    if (!deletingPayment) return;
+
+    try {
+      const res = await fetch(`/api/payments/customers/${deletingPayment.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      
+      if (!res.ok) {
+        alert('❌ ' + (json?.error?.message || json?.error?.code || 'فشل في الحذف'));
+        return;
+      }
+      
+      alert('✅ تم حذف المدفوعة وإرجاع المبلغ لرصيد العميل');
+      refetch(); // تحديث قائمة المدفوعات
+      window.location.reload(); // تحديث رصيد العميل
+    } catch (e) {
+      alert('❌ حدث خطأ أثناء الحذف');
+    } finally {
+      setDeletingPayment(null);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -174,6 +209,7 @@ function StatementSection({ customerId, balance, onCollect }: { customerId: stri
                 <th className="p-3 text-right">طريقة الدفع</th>
                 <th className="p-3 text-right">البيان</th>
                 <th className="p-3 text-right">المبلغ</th>
+                <th className="p-3 text-center">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -184,14 +220,32 @@ function StatementSection({ customerId, balance, onCollect }: { customerId: stri
                   <td className="p-3 text-xs">{p.payment_method}</td>
                   <td className="p-3">{p.notes || 'تحصيل من عميل'}</td>
                   <td className="p-3 font-mono font-bold text-green-700">{formatEGP(p.amount)}</td>
+                  <td className="p-3">
+                    <div className="flex gap-1 justify-center">
+                      <button
+                        onClick={() => editPayment(p)}
+                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                        title="تعديل"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => deletePayment(p)}
+                        className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        title="حذف"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
-              {payments.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-gray-400">لا توجد حركات</td></tr>}
+              {payments.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">لا توجد حركات</td></tr>}
             </tbody>
             {payments.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-100 font-bold">
-                  <td colSpan={4} className="p-3 text-left">الإجمالي:</td>
+                  <td colSpan={5} className="p-3 text-left">الإجمالي:</td>
                   <td className="p-3 font-mono">{formatEGP(totalPaid)}</td>
                 </tr>
               </tfoot>
@@ -199,6 +253,39 @@ function StatementSection({ customerId, balance, onCollect }: { customerId: stri
           </table>
         </div>
       )}
+      
+      {editingPayment && (
+        <EditPaymentForm
+          payment={editingPayment}
+          customerId={customerId}
+          onClose={() => setEditingPayment(null)}
+          onSaved={() => {
+            setEditingPayment(null);
+            refetch();
+            window.location.reload(); // تحديث رصيد العميل
+          }}
+        />
+      )}
+      
+      <ConfirmDialog
+        isOpen={!!deletingPayment}
+        type="danger"
+        title="حذف مدفوعة"
+        message={deletingPayment ? 
+          `هل أنت متأكد من حذف مدفوعة بمبلغ ${formatEGP(deletingPayment.amount)} ؟
+
+سيتم:
+• إرجاع المبلغ لرصيد العميل
+• خصم المبلغ من الخزينة
+• حذف سجل المدفوعة نهائياً
+
+هذا الإجراء لا يمكن التراجع عنه!` : ''
+        }
+        confirmText="نعم، احذف"
+        cancelText="إلغاء"
+        onConfirm={confirmDeletePayment}
+        onCancel={() => setDeletingPayment(null)}
+      />
     </div>
   );
 }
@@ -283,7 +370,10 @@ function EditForm({ customer, onClose, onSaved }: { customer: CustomerDetail; on
         <div>
           <label className="text-sm font-medium block mb-1">الرصيد الافتتاحي</label>
           <input type="number" step="0.01" className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} />
-          <p className="text-xs text-orange-600 mt-1">⚠️ تعديل الرصيد الافتتاحي يغيّر الرصيد الحالي مباشرة</p>
+          <div className="text-xs text-gray-600 mt-2 bg-orange-50 border border-orange-200 rounded p-2">
+            <span className="font-bold text-orange-800">⚠️ تنبيه:</span> تعديل الرصيد الافتتاحي يغيّر الرصيد الحالي تلقائياً بنفس القيمة (يُضاف الفرق للعميل أو يُخصم منه).<br/>
+            <span className="text-red-700">موجب</span> = العميل مدين لك • <span className="text-green-700">سالب</span> = أنت مدين للعميل.
+          </div>
         </div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><textarea className="input-field" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
@@ -334,6 +424,69 @@ function CollectForm({ customerId, onClose, onSaved }: { customerId: string; onC
         <div><label className="text-sm font-medium block mb-1">التاريخ</label><input type="date" className="input-field" value={f.payment_date} onChange={(e) => setF({ ...f, payment_date: e.target.value })} /></div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
+      </div>
+    </div>
+  );
+}
+/* ============================================
+   نموذج تعديل مدفوعة عميل
+============================================ */
+function EditPaymentForm({ payment, customerId, onClose, onSaved }: { 
+  payment: Payment; 
+  customerId: string; 
+  onClose: () => void; 
+  onSaved: () => void 
+}) {
+  const [f, setF] = useState({
+    amount: payment.amount,
+    payment_method: payment.payment_method,
+    treasury_id: payment.treasury?.id || '',
+    payment_date: payment.payment_date.split('T')[0], // تحويل للتنسيق المطلوب للـ input
+    notes: payment.notes || '',
+  });
+  const { mutate, loading } = useApiMutation();
+  const [treasuries, setTreasuries] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/treasury').then(r => r.json()).then(j => setTreasuries(j.data?.items || [])).catch(() => {});
+  }, []);
+
+  async function save() {
+    if (!f.treasury_id || f.amount <= 0) { alert('❌ أكمل البيانات'); return; }
+    const { error } = await mutate('PATCH', `/api/payments/customers/${payment.id}`, f);
+    if (error) { alert('❌ ' + error); return; }
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
+        <h2 className="text-xl font-bold">✏️ تعديل المدفوعة</h2>
+        <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} autoFocus /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">طريقة الدفع</label>
+            <select className="input-field" value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })}>
+              {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">الخزينة *</label>
+            <select className="input-field" value={f.treasury_id} onChange={(e) => setF({ ...f, treasury_id: e.target.value })}>
+              <option value="">اختر...</option>
+              {treasuries.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div><label className="text-sm font-medium block mb-1">التاريخ</label><input type="date" className="input-field" value={f.payment_date} onChange={(e) => setF({ ...f, payment_date: e.target.value })} /></div>
+        <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
+        <div className="text-xs bg-yellow-50 border border-yellow-200 rounded p-2">
+          <span className="font-bold text-yellow-800">⚠️ تنبيه:</span> تعديل المدفوعة سيؤثر على رصيد العميل والخزينة تلقائياً.
+        </div>
+        <div className="flex gap-2 pt-3">
+          <button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
+        </div>
       </div>
     </div>
   );

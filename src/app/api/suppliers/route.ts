@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     prisma.suppliers.findMany({ where, orderBy: { name: 'asc' }, take: limit, skip: offset }),
     prisma.suppliers.count({ where }),
   ]);
-  return NextResponse.json({ ok: true, data: { items, total, limit, offset } });
+  return NextResponse.json(
+    { ok: true, data: { items, total, limit, offset } },
+    { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' } }
+  );
 }
 
 export async function POST(request: NextRequest) {

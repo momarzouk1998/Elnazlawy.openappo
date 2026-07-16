@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
   const customerId = searchParams.get('customer_id') || '';
   const type = searchParams.get('type') || ''; // عرض سعر | عادية | ضريبية
   const status = searchParams.get('status') || '';
+  const from = searchParams.get('from') || '';
+  const to = searchParams.get('to') || '';
   const limit = parseInt(searchParams.get('limit') || '50');
   const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -18,6 +20,11 @@ export async function GET(request: NextRequest) {
   if (customerId) where.customer_id = customerId;
   if (type) where.invoice_type = type;
   if (status) where.status = status;
+  if (from || to) {
+    where.invoice_date = {};
+    if (from) where.invoice_date.gte = new Date(from);
+    if (to) where.invoice_date.lte = new Date(to);
+  }
 
   const [items, total] = await Promise.all([
     prisma.sales_invoices.findMany({
@@ -35,7 +42,10 @@ export async function GET(request: NextRequest) {
     prisma.sales_invoices.count({ where }),
   ]);
 
-  return NextResponse.json({ ok: true, data: { items, total, limit, offset } });
+  return NextResponse.json(
+    { ok: true, data: { items, total, limit, offset } },
+    { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=60' } }
+  );
 }
 
 export async function POST(request: NextRequest) {

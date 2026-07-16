@@ -1,9 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
+import { Cairo } from "next/font/google";
 import { COOKIE_NAME, verifySession } from "@/lib/db/auth";
 import prisma from "@/lib/db/prisma";
 import type { CurrentProfile, UserRole } from "@/lib/auth";
 import "./globals.css";
+
+// خط Cairo محمّل ذاتياً بواسطة Next (يستخدم display: swap فلا يحجب الرسم)
+const cairo = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
+  variable: "--font-cairo",
+  preload: true,
+  fallback: ["Segoe UI", "Tahoma", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   title: "معرض النزلاوي - نظام الإدارة",
@@ -63,18 +74,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className={cairo.variable} suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico?v=2" type="image/x-icon" />
         <link rel="shortcut icon" href="/favicon.ico?v=2" type="image/x-icon" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
       </head>
-      <body className="min-h-screen">
+      <body className="min-h-screen font-[var(--font-cairo)]">
         {children}
       </body>
     </html>

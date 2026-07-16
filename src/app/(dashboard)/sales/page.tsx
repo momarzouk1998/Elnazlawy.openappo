@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate, statusColor } from "@/lib/format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
+import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 
 interface Invoice {
   id: string;
@@ -27,7 +28,11 @@ export default function SalesListPage() {
   const [status, setStatus] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [openInvoice, setOpenInvoice] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+  useEffect(() => {
+    getCurrentUserClient().then(p => { if (p && p.role === 'admin') setIsAdmin(true); });
+  }, []);
   const params = new URLSearchParams();
   if (type) params.set('type', type);
   if (status) params.set('status', status);
@@ -77,52 +82,87 @@ export default function SalesListPage() {
       {loading ? (
         <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div>
       ) : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-right">رقم</th>
-                <th className="p-3 text-right">التاريخ</th>
-                <th className="p-3 text-right">النوع</th>
-                <th className="p-3 text-right">العميل</th>
-                <th className="p-3 text-right">المخزن</th>
-                <th className="p-3 text-right">الأصناف</th>
-                <th className="p-3 text-right">الإجمالي</th>
-                <th className="p-3 text-right">الحالة</th>
-                <th className="p-3 text-right">إجراء</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.items.map(inv => (
-                <tr
-                  key={inv.id}
-                  onClick={() => setOpenInvoice(inv.id)}
-                  className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors"
-                >
-                  <td className="p-3 font-mono font-bold">#{inv.invoice_number}</td>
-                  <td className="p-3 text-xs">{formatDate(inv.invoice_date)}</td>
-                  <td className="p-3 text-xs">{inv.invoice_type}</td>
-                  <td className="p-3">{inv.customer?.name || '—'}</td>
-                  <td className="p-3 text-xs">{inv.store?.name || '—'}</td>
-                  <td className="p-3 text-center">{inv._count.items}</td>
-                  <td className="p-3 font-bold text-nazlawy-600">{formatEGP(inv.total)}</td>
-                  <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
-                  <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                    <Link href={`/print/invoice/${inv.id}`} className="text-nazlawy-600 underline text-xs">🖨️ طباعة</Link>
-                  </td>
+        <>
+          {/* ===== Mobile: كاردات (تجنب جدول عريض) ===== */}
+          <div className="space-y-2 md:hidden">
+            {data?.items.map(inv => (
+              <div
+                key={inv.id}
+                onClick={() => setOpenInvoice(inv.id)}
+                className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start justify-between mb-1.5">
+                  <div className="font-mono font-bold text-nazlawy-600 text-lg">#{inv.invoice_number}</div>
+                  <span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                  <span>{formatDate(inv.invoice_date)}</span>
+                  <span>{inv.invoice_type}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-sm truncate flex-1">{inv.customer?.name || '—'}</div>
+                  <div className="font-bold text-nazlawy-600 text-base shrink-0 ml-2">{formatEGP(inv.total)} ج</div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1">
+                  <span>📦 {inv._count.items} صنف{inv._count.items !== 1 ? 'ات' : ''}</span>
+                  {inv.store?.name && <span>🏢 {inv.store.name}</span>}
+                </div>
+              </div>
+            ))}
+            {data?.items.length === 0 && (
+              <div className="card text-center py-12 text-gray-400">لا توجد فواتير</div>
+            )}
+          </div>
+
+          {/* ===== Desktop: جدول ===== */}
+          <div className="card overflow-x-auto p-0 hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-3 text-right">رقم</th>
+                  <th className="p-3 text-right">التاريخ</th>
+                  <th className="p-3 text-right">النوع</th>
+                  <th className="p-3 text-right">العميل</th>
+                  <th className="p-3 text-right">المخزن</th>
+                  <th className="p-3 text-right">الأصناف</th>
+                  <th className="p-3 text-right">الإجمالي</th>
+                  <th className="p-3 text-right">الحالة</th>
+                  <th className="p-3 text-right">إجراء</th>
                 </tr>
-              ))}
-              {data?.items.length === 0 && (
-                <tr><td colSpan={9} className="p-12 text-center text-gray-400">لا توجد فواتير</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data?.items.map(inv => (
+                  <tr
+                    key={inv.id}
+                    onClick={() => setOpenInvoice(inv.id)}
+                    className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors"
+                  >
+                    <td className="p-3 font-mono font-bold">#{inv.invoice_number}</td>
+                    <td className="p-3 text-xs">{formatDate(inv.invoice_date)}</td>
+                    <td className="p-3 text-xs">{inv.invoice_type}</td>
+                    <td className="p-3">{inv.customer?.name || '—'}</td>
+                    <td className="p-3 text-xs">{inv.store?.name || '—'}</td>
+                    <td className="p-3 text-center">{inv._count.items}</td>
+                    <td className="p-3 font-bold text-nazlawy-600">{formatEGP(inv.total)}</td>
+                    <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <Link href={`/print/invoice/${inv.id}`} className="text-nazlawy-600 underline text-xs">🖨️ طباعة</Link>
+                    </td>
+                  </tr>
+                ))}
+                {data?.items.length === 0 && (
+                  <tr><td colSpan={9} className="p-12 text-center text-gray-400">لا توجد فواتير</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {openInvoice && (
         <InvoiceDetailsModal
           invoiceId={openInvoice}
+          isAdmin={isAdmin}
           onClose={() => setOpenInvoice(null)}
         />
       )}
@@ -133,7 +173,7 @@ export default function SalesListPage() {
 /* ============================================
    Modal تفاصيل/تعديل الفاتورة
 ============================================ */
-function InvoiceDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
+function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: string; isAdmin: boolean; onClose: () => void }) {
   const router = useRouter();
   const { data: inv, loading, refetch } = useApi<any>(`/api/sales/invoices/${invoiceId}`);
   const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>('/api/stores');
@@ -238,7 +278,10 @@ function InvoiceDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClos
   }
 
   async function cancelInvoice() {
-    if (!confirm('هل تريد إلغاء هذه الفاتورة؟ سيتم إرجاع المخزون وخصم المبلغ من رصيد العميل.')) return;
+    const confirmText = isAdmin
+      ? '⚠️ كمدير عام: سيتم إلغاء الفاتورة وإرجاع المخزون وخصم المبلغ من رصيد العميل.\n\nهل أنت متأكد؟'
+      : 'هل تريد إلغاء هذه الفاتورة؟ سيتم إرجاع المخزون وخصم المبلغ من رصيد العميل.';
+    if (!confirm(confirmText)) return;
     const { error } = await mutate('DELETE', `/api/sales/invoices/${invoiceId}`);
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم إلغاء الفاتورة وإرجاع المخزون');

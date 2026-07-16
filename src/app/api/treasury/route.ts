@@ -9,7 +9,10 @@ export async function GET() {
     where: { is_active: true },
     orderBy: { name: 'asc' },
   });
-  return NextResponse.json({ ok: true, data: { items: treasuries, total: treasuries.length } });
+  return NextResponse.json(
+    { ok: true, data: { items: treasuries, total: treasuries.length } },
+    { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=60' } }
+  );
 }
 
 export async function POST(request: NextRequest) {

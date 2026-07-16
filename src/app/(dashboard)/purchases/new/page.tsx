@@ -15,7 +15,7 @@ export default function NewPurchasePage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [supplierId, setSupplierId] = useState("");
-  const [storeId, setStoreId] = useState("");
+  // المخزن لكل سطر يحدد منفصلاً (يمكن استلام البضاعة في أكثر من مخزن)
   const [status, setStatus] = useState("قيد التنفيذ");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
@@ -25,24 +25,21 @@ export default function NewPurchasePage() {
   const { data: storesData } = useApi<{ items: Store[] }>('/api/stores');
 
   const stores = storesData?.items;
-
-  useEffect(() => {
-    if (stores && stores.length > 0 && !storeId) setStoreId(stores[0].id);
-  }, [stores, storeId]);
+  const defaultStoreId = stores && stores.length > 0 ? stores[0].id : '';
 
   const total = cart.reduce((s, i) => s + i.quantity * i.unit_cost, 0);
 
   function addToCart(p: Product) {
-    if (!storeId) { alert('اختر مخزن للاستلام أولاً'); return; }
-    const existing = cart.find(c => c.product_id === p.id && c.store_id === storeId);
+    if (!defaultStoreId) { alert('لا يوجد مخازن معرفة في النظام'); return; }
+    const existing = cart.find(c => c.product_id === p.id && c.store_id === defaultStoreId);
     if (existing) {
       setCart(cart.map(c => c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
-      const store = stores?.find(s => s.id === storeId);
+      const store = stores?.find(s => s.id === defaultStoreId);
       setCart([...cart, {
         product_id: p.id,
         product_name: p.name,
-        store_id: storeId,
+        store_id: defaultStoreId,
         store_name: store?.name || '',
         quantity: 1,
         unit_cost: Number(p.last_purchase_price) || 0,
@@ -79,8 +76,7 @@ export default function NewPurchasePage() {
 
   async function save() {
     if (cart.length === 0) { alert('السلة فارغة'); return; }
-    if (!storeId) { alert('اختر مخزن للاستلام'); return; }
-    const validItems = cart.filter(c => c.quantity > 0 && c.unit_cost >= 0);
+    const validItems = cart.filter(c => c.quantity > 0 && c.unit_cost >= 0 && c.store_id);
     const invalid = cart.length - validItems.length;
     if (invalid > 0) {
       if (!confirm(`يوجد ${invalid} صنف بكمية أو سعر صفر وسيتم استبعاده. متابعة؟`)) return;
@@ -171,12 +167,6 @@ export default function NewPurchasePage() {
             />
           </div>
           <div>
-            <label className="text-xs text-gray-600 block mb-1">مخزن الاستلام</label>
-            <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-              {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
             <label className="text-xs text-gray-600 block mb-1">الحالة</label>
             <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="قيد التنفيذ">قيد التنفيذ (مسودة - لا تخصم المخزون)</option>
@@ -221,7 +211,20 @@ export default function NewPurchasePage() {
                       <div className="text-xs font-bold text-nazlawy-600 text-center p-1 bg-white rounded border">{formatEGP(c.quantity * c.unit_cost)}</div>
                     </div>
                   </div>
-                  <div className="text-[10px] text-gray-500 mt-1">{c.store_name}</div>
+                  <div className="mt-1">
+                    <label className="text-[10px] text-gray-500 block mb-0.5">مخزن الاستلام</label>
+                    <select
+                      className="input-field text-[11px] p-1"
+                      value={c.store_id}
+                      onChange={(e) => {
+                        const newStoreId = e.target.value;
+                        const newStore = stores?.find(s => s.id === newStoreId);
+                        setCart(cart.map((row, idx) => idx === i ? { ...row, store_id: newStoreId, store_name: newStore?.name || '' } : row));
+                      }}
+                    >
+                      {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>

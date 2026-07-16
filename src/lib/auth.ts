@@ -32,6 +32,8 @@ export const ALL_MODULES: AllModule[] = [
   { key: 'suppliers',    label: 'الموردين',                icon: '🏭', path: '/suppliers' },
   { key: 'treasury',     label: 'الخزائن',                 icon: '🏦', path: '/treasury' },
   { key: 'expenses',     label: 'المصروفات',               icon: '📉', path: '/expenses' },
+  { key: 'checks',       label: 'الشيكات',                 icon: '🧾', path: '/checks' },
+  { key: 'collections',  label: 'التحصيلات',               icon: '💰', path: '/collections' },
   // 🔵 للمحاسب
   { key: 'reports',      label: 'التقارير',                icon: '📈', path: '/reports' },
   // 🟣 Admin only

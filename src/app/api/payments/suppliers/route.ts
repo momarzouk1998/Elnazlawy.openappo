@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth-server";
 import { Prisma } from "@prisma/client";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 // GET /api/payments/suppliers — قائمة مدفوعات الموردين
 export async function GET(request: NextRequest) {
@@ -53,6 +54,14 @@ export async function POST(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
 
+  // Rate limiting للمدفوعات - 10 طلبات كحد أقصى خلال 5 دقائق
+  if (!checkRateLimit(request, `supplier_payment_create_${profile.id}`, 10, 300000)) {
+    return NextResponse.json(
+      { ok: false, error: { code: "RATE_LIMIT_EXCEEDED", message: "تم تجاوز الحد المسموح من مدفوعات الموردين. حاول مرة أخرى لاحقاً" } },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { supplier_id, amount, payment_method, treasury_id, purchase_id, payment_date, notes } = body;
@@ -88,6 +97,7 @@ export async function POST(request: NextRequest) {
           purchase_id: purchase_id || null,
           payment_date: payment_date ? new Date(payment_date) : new Date(),
           notes: notes || null,
+          created_by: profile.id,
         },
       });
 

@@ -19,7 +19,11 @@ export async function GET(request: NextRequest) {
     prisma.customers.findMany({ where, orderBy: { name: 'asc' }, take: limit, skip: offset }),
     prisma.customers.count({ where }),
   ]);
-  return NextResponse.json({ ok: true, data: { items, total, limit, offset } });
+  // Cache 30s + stale-while-revalidate 5min — يسرّع تحميل قوائم العملاء جداً
+  return NextResponse.json(
+    { ok: true, data: { items, total, limit, offset } },
+    { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=300' } }
+  );
 }
 
 export async function POST(request: NextRequest) {

@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate, statusColor } from "@/lib/format";
 import Link from "next/link";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
+import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 
 interface PurchaseInvoice {
   id: string; purchase_number: number; purchase_date: string; total_amount: number;
@@ -17,6 +18,10 @@ interface ApiResponse { items: PurchaseInvoice[]; total: number; }
 export default function PurchasesPage() {
   const [openInvoice, setOpenInvoice] = useState<string | null>(null);
   const [supplierId, setSupplierId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    getCurrentUserClient().then(p => { if (p && p.role === 'admin') setIsAdmin(true); });
+  }, []);
   const { data: suppliers } = useApi<{ items: { id: string; name: string; phone: string | null; balance: number }[]; total: number }>('/api/suppliers?limit=200');
   const qs = supplierId ? `?supplier_id=${supplierId}` : '';
   const { data, loading, refetch } = useApi<ApiResponse>(`/api/purchases/invoices${qs}`);
@@ -52,42 +57,71 @@ export default function PurchasesPage() {
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-right">رقم</th>
-                <th className="p-3 text-right">التاريخ</th>
-                <th className="p-3 text-right">المورد</th>
-                <th className="p-3 text-right">الأصناف</th>
-                <th className="p-3 text-right">الإجمالي</th>
-                <th className="p-3 text-right">الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.items.map(inv => (
-                <tr
-                  key={inv.id}
-                  onClick={() => setOpenInvoice(inv.id)}
-                  className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors"
-                >
-                  <td className="p-3 font-mono font-bold">#{inv.purchase_number}</td>
-                  <td className="p-3 text-xs">{formatDate(inv.purchase_date)}</td>
-                  <td className="p-3 font-semibold">{inv.supplier?.name || '—'}</td>
-                  <td className="p-3 text-center">{inv._count?.items ?? 0}</td>
-                  <td className="p-3 font-mono font-bold">{formatEGP(inv.total_amount)}</td>
-                  <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
+        <>
+          {/* ===== Mobile: كاردات ===== */}
+          <div className="space-y-2 md:hidden">
+            {data?.items.map(inv => (
+              <div
+                key={inv.id}
+                onClick={() => setOpenInvoice(inv.id)}
+                className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start justify-between mb-1.5">
+                  <div className="font-mono font-bold text-purple-700 text-lg">#{inv.purchase_number}</div>
+                  <span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span>
+                </div>
+                <div className="text-xs text-gray-500 mb-1.5">{formatDate(inv.purchase_date)}</div>
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-sm truncate flex-1">{inv.supplier?.name || '—'}</div>
+                  <div className="font-bold text-nazlawy-600 text-base shrink-0 ml-2">{formatEGP(inv.total_amount)} ج</div>
+                </div>
+                <div className="text-[10px] text-gray-500 mt-1">📦 {inv._count?.items ?? 0} صنف{(inv._count?.items ?? 0) !== 1 ? 'ات' : ''}</div>
+              </div>
+            ))}
+            {data?.items.length === 0 && (
+              <div className="card text-center py-12 text-gray-400">لا توجد فواتير مشتريات</div>
+            )}
+          </div>
+
+          {/* ===== Desktop: جدول ===== */}
+          <div className="card overflow-x-auto p-0 hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-3 text-right">رقم</th>
+                  <th className="p-3 text-right">التاريخ</th>
+                  <th className="p-3 text-right">المورد</th>
+                  <th className="p-3 text-right">الأصناف</th>
+                  <th className="p-3 text-right">الإجمالي</th>
+                  <th className="p-3 text-right">الحالة</th>
                 </tr>
-              ))}
-              {data?.items.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد فواتير مشتريات</td></tr>}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data?.items.map(inv => (
+                  <tr
+                    key={inv.id}
+                    onClick={() => setOpenInvoice(inv.id)}
+                    className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors"
+                  >
+                    <td className="p-3 font-mono font-bold">#{inv.purchase_number}</td>
+                    <td className="p-3 text-xs">{formatDate(inv.purchase_date)}</td>
+                    <td className="p-3 font-semibold">{inv.supplier?.name || '—'}</td>
+                    <td className="p-3 text-center">{inv._count?.items ?? 0}</td>
+                    <td className="p-3 font-mono font-bold">{formatEGP(inv.total_amount)}</td>
+                    <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
+                  </tr>
+                ))}
+                {data?.items.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد فواتير مشتريات</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {openInvoice && (
         <PurchaseDetailsModal
           invoiceId={openInvoice}
+          isAdmin={isAdmin}
           onClose={() => setOpenInvoice(null)}
         />
       )}
@@ -95,7 +129,7 @@ export default function PurchasesPage() {
   );
 }
 
-function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
+function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: string; isAdmin: boolean; onClose: () => void }) {
   const { data: inv, loading, refetch } = useApi<any>(`/api/purchases/invoices/${invoiceId}`);
   const { mutate } = useApiMutation();
   const [editing, setEditing] = useState(false);
@@ -120,7 +154,10 @@ function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClo
   }
 
   async function cancelInvoice() {
-    if (!confirm('هل تريد إلغاء هذه الفاتورة؟ سيتم خصم المخزون المضاف وإرجاع المبلغ لخصمه من رصيد المورد.')) return;
+    const confirmText = isAdmin
+      ? '⚠️ كمدير عام: سيتم إلغاء الفاتورة وخصم المخزون المضاف وإرجاع الرصيد للمورد.\n\nهل أنت متأكد؟'
+      : 'هل تريد إلغاء هذه الفاتورة؟ سيتم خصم المخزون المضاف وإرجاع المبلغ لخصمه من رصيد المورد.';
+    if (!confirm(confirmText)) return;
     const { error } = await mutate('DELETE', `/api/purchases/invoices/${invoiceId}`);
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم إلغاء الفاتورة');
@@ -230,7 +267,9 @@ function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClo
                   <button onClick={() => setEditing(true)} className="btn-secondary text-sm">✏️ تعديل</button>
                 )}
                 {!isCancelled && (
-                  <button onClick={cancelInvoice} className="btn-secondary text-sm !bg-red-50 !text-red-600 hover:!bg-red-100 !border-red-200">🗑️ إلغاء الفاتورة</button>
+                  <button onClick={cancelInvoice} className={`text-sm px-4 py-2 rounded-lg font-semibold border transition ${isAdmin ? 'bg-red-600 text-white hover:bg-red-700 border-red-700' : 'bg-red-50 text-red-700 hover:bg-red-100 border-red-200'}`}>
+                    {isAdmin ? '⚠️ إلغاء (صلاحية مدير)' : '🗑️ إلغاء الفاتورة'}
+                  </button>
                 )}
               </>
             )}

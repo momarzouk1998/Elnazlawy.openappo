@@ -14,7 +14,11 @@ export async function GET() {
       _count: { select: { inventory: true } },
     },
   });
-  return NextResponse.json({ ok: true, data: { items: stores, total: stores.length } });
+  // المخازن نادراً ما تتغير — cache طويلة
+  return NextResponse.json(
+    { ok: true, data: { items: stores, total: stores.length } },
+    { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=600' } }
+  );
 }
 
 export async function POST(request: NextRequest) {

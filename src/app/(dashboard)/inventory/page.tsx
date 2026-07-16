@@ -114,8 +114,8 @@ function StockTab({ profile }: { profile: any }) {
 
           {/* Store Cards */}
           {stores.map((s: any) => (
-            <div key={s.store_id} className="card border-l-4 border-l-nazlawy-500 hover:shadow-lg transition-shadow bg-white">
-              <h3 className="text-md font-bold text-gray-800 mb-2">🏢 {s.store_name}</h3>
+            <div key={s.id} className="card border-l-4 border-l-nazlawy-500 hover:shadow-lg transition-shadow bg-white">
+              <h3 className="text-md font-bold text-gray-800 mb-2">🏢 {s.name}</h3>
               <div className="space-y-1 text-sm text-gray-600">
                 <div className="flex justify-between">
                   <span>عدد الأصناف:</span>
@@ -152,34 +152,67 @@ function StockTab({ profile }: { profile: any }) {
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-right">الصنف</th>
-                <th className="p-3 text-right">المخزن</th>
-                <th className="p-3 text-right">الكمية</th>
-                <th className="p-3 text-right">الحد الأدنى</th>
-                {showCost && <th className="p-3 text-right">القيمة</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {data?.map(i => {
-                const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
-                return (
-                  <tr key={i.id} className={`border-t hover:bg-gray-50 ${lowStock ? 'bg-red-50' : ''}`}>
-                    <td className="p-3 font-semibold">{i.product.name}</td>
-                    <td className="p-3 text-xs">{i.store.name}</td>
-                    <td className={`p-3 font-mono font-bold ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>{formatQty(i.current_stock)}</td>
-                    <td className="p-3 font-mono text-xs text-gray-500">{i.reorder_level}</td>
-                    {showCost && <td className="p-3 font-mono text-xs">{formatEGP(i.value)}</td>}
-                  </tr>
-                );
-              })}
-              {data?.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Mobile: كاردات */}
+          <div className="space-y-2 md:hidden">
+            {data?.map(i => {
+              const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
+              return (
+                <div key={i.id} className={`card p-3 ${lowStock ? 'ring-2 ring-red-300' : ''}`}>
+                  <div className="flex items-start justify-between mb-1.5">
+                    <div className="font-bold text-sm truncate flex-1">{i.product.name}</div>
+                    <div className={`font-mono font-bold text-lg shrink-0 mr-2 ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>
+                      {formatQty(i.current_stock)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>🏢 {i.store.name}</span>
+                    <span>الحد الأدنى: <span className="font-mono">{i.reorder_level}</span></span>
+                  </div>
+                  {showCost && i.value !== null && (
+                    <div className="text-xs text-green-700 mt-1 font-mono">💰 {formatEGP(i.value)} ج</div>
+                  )}
+                  {lowStock && (
+                    <div className="text-xs text-red-600 font-bold mt-1">⚠️ تحت الحد الأدنى</div>
+                  )}
+                </div>
+              );
+            })}
+            {data?.length === 0 && (
+              <div className="card text-center py-12 text-gray-400">لا توجد بيانات</div>
+            )}
+          </div>
+
+          {/* Desktop: جدول */}
+          <div className="card overflow-x-auto p-0 hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-3 text-right">الصنف</th>
+                  <th className="p-3 text-right">المخزن</th>
+                  <th className="p-3 text-right">الكمية</th>
+                  <th className="p-3 text-right">الحد الأدنى</th>
+                  {showCost && <th className="p-3 text-right">القيمة</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {data?.map(i => {
+                  const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
+                  return (
+                    <tr key={i.id} className={`border-t hover:bg-gray-50 ${lowStock ? 'bg-red-50' : ''}`}>
+                      <td className="p-3 font-semibold">{i.product.name}</td>
+                      <td className="p-3 text-xs">{i.store.name}</td>
+                      <td className={`p-3 font-mono font-bold ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>{formatQty(i.current_stock)}</td>
+                      <td className="p-3 font-mono text-xs text-gray-500">{i.reorder_level}</td>
+                      {showCost && <td className="p-3 font-mono text-xs">{formatEGP(i.value)}</td>}
+                    </tr>
+                  );
+                })}
+                {data?.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

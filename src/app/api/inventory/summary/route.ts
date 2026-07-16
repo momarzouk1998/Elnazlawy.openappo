@@ -21,8 +21,8 @@ export async function GET() {
     const summaryMap = new Map();
     for (const store of stores) {
       summaryMap.set(store.id, {
-        store_id: store.id,
-        store_name: store.name,
+        id: store.id,
+        name: store.name,
         total_items: 0,
         total_qty: 0,
         total_value: 0
@@ -51,7 +51,10 @@ export async function GET() {
       return acc;
     }, { total_items: 0, total_qty: 0, total_value: 0 });
 
-    return NextResponse.json({ ok: true, data: { stores: summary, overall } });
+    return NextResponse.json(
+      { ok: true, data: { stores: summary, overall } },
+      { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=120' } }
+    );
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }

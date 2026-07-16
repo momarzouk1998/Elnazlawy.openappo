@@ -96,29 +96,55 @@ function SuppliersTab() {
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-right">الاسم</th>
-                <th className="p-3 text-right">الهاتف</th>
-                <th className="p-3 text-right">رصيد سابق</th>
-                <th className="p-3 text-right">الرصيد الحالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.items.map(s => (
-                <tr key={s.id} onClick={() => router.push(`/suppliers/${s.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
-                  <td className="p-3 font-semibold">{s.name}</td>
-                  <td className="p-3 text-sm font-mono">{s.phone || '—'}</td>
-                  <td className="p-3 font-mono text-xs">{formatEGP(s.opening_balance)}</td>
-                  <td className="p-3 font-mono font-bold">{formatEGP(s.balance)}</td>
+        <>
+          {/* Mobile: كاردات */}
+          <div className="space-y-2 md:hidden">
+            {data?.items.map(s => (
+              <div
+                key={s.id}
+                onClick={() => router.push(`/reports/statements?type=supplier&id=${s.id}`)}
+                className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
+              >
+                <div className="font-bold text-sm truncate mb-1">{s.name}</div>
+                <div className="text-xs text-gray-500 font-mono mb-1.5">{s.phone || '—'}</div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">الرصيد:</span>
+                  <span className={`font-bold font-mono ${s.balance > 0.01 ? 'text-red-700' : s.balance < -0.01 ? 'text-blue-700' : 'text-green-700'}`}>
+                    {formatEGP(s.balance)} ج
+                  </span>
+                </div>
+              </div>
+            ))}
+            {data?.items.length === 0 && (
+              <div className="card text-center py-12 text-gray-400">لا يوجد موردين</div>
+            )}
+          </div>
+
+          {/* Desktop: جدول */}
+          <div className="card overflow-x-auto p-0 hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-3 text-right">الاسم</th>
+                  <th className="p-3 text-right">الهاتف</th>
+                  <th className="p-3 text-right">رصيد سابق</th>
+                  <th className="p-3 text-right">الرصيد الحالي</th>
                 </tr>
-              ))}
-              {data?.items.length === 0 && <tr><td colSpan={4} className="p-12 text-center text-gray-400">لا يوجد موردين</td></tr>}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data?.items.map(s => (
+                  <tr key={s.id} onClick={() => router.push(`/reports/statements?type=supplier&id=${s.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
+                    <td className="p-3 font-semibold">{s.name}</td>
+                    <td className="p-3 text-sm font-mono">{s.phone || '—'}</td>
+                    <td className="p-3 font-mono text-xs">{formatEGP(s.opening_balance)}</td>
+                    <td className="p-3 font-mono font-bold">{formatEGP(s.balance)}</td>
+                  </tr>
+                ))}
+                {data?.items.length === 0 && <tr><td colSpan={4} className="p-12 text-center text-gray-400">لا يوجد موردين</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {show && <SupplierForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}

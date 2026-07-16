@@ -26,14 +26,17 @@ export default async function DashboardPage() {
     totalCustomersDebt,
     totalSuppliersDebt,
     totalInventoryValue,
+    unpaidSalesAgg,
+    unpaidPurchasesAgg,
   ] = await Promise.all([
     prisma.products.count({ where: { is_active: true } }),
     prisma.customers.count({ where: { is_active: true } }),
     prisma.suppliers.count({ where: { is_active: true } }),
     prisma.stores.count({ where: { is_active: true } }),
+    // تحت الحد الأدنى: يستثني المخزون الصفري (يعتبر مباع/مستهلك)
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(*)::bigint as count FROM elnazlawy.inventory
-      WHERE current_stock <= reorder_level
+      WHERE current_stock <= reorder_level AND current_stock > 0
     `,
     prisma.sales_invoices.aggregate({
       where: { invoice_date: { gte: today }, status: 'مكتملة' },
@@ -47,20 +50,40 @@ export default async function DashboardPage() {
     }),
     prisma.sales_invoices.count({ where: { status: 'قيد التنفيذ' } }),
     prisma.checks.count({ where: { status: 'تحت التحصيل' } }),
-    prisma.customers.aggregate({ where: { is_active: true }, _sum: { balance: true } }),
-    prisma.suppliers.aggregate({ where: { is_active: true }, _sum: { balance: true } }),
+    // ديون العملاء = الرصيد الموجب فقط (اللي عليهم فلوس)
+    prisma.customers.aggregate({
+      where: { is_active: true, balance: { gt: 0 } },
+      _sum: { balance: true },
+    }),
+    // ديون الموردين = الرصيد الموجب فقط (اللي لنا عليهم فلوس نخصمها من مستحقاتنا)
+    prisma.suppliers.aggregate({
+      where: { is_active: true, balance: { gt: 0 } },
+      _sum: { balance: true },
+    }),
     canSeeCost(profile)
       ? prisma.$queryRaw<{ total: number }[]>`
           SELECT COALESCE(SUM(p.last_purchase_price * i.current_stock), 0)::numeric as total
           FROM elnazlawy.inventory i
           JOIN elnazlawy.products p ON p.id = i.product_id
-          WHERE p.is_active = true
+          WHERE p.is_active = true AND i.current_stock > 0
         `.then(r => Number(r[0]?.total || 0))
       : Promise.resolve(0),
+    // فواتير بيع مكتملة لم تُحصّل بالكامل
+    prisma.sales_invoices.aggregate({
+      where: { status: 'مكتملة', invoice_type: { not: 'عرض سعر' } },
+      _sum: { total: true, paid_amount: true },
+    }),
+    // فواتير شراء مكتملة لم تُسدّد بالكامل
+    prisma.purchase_invoices.aggregate({
+      where: { status: 'مكتملة' },
+      _sum: { total_amount: true, paid_amount: true },
+    }),
   ]);
 
   const showCost = canSeeCost(profile);
   const lowStock = Number(lowStockCount[0]?.count || 0);
+  const pendingSalesAmount = Number(unpaidSalesAgg._sum.total || 0) - Number(unpaidSalesAgg._sum.paid_amount || 0);
+  const pendingPurchasesAmount = Number(unpaidPurchasesAgg._sum.total_amount || 0) - Number(unpaidPurchasesAgg._sum.paid_amount || 0);
 
   return (
     <div className="space-y-6">
@@ -112,14 +135,14 @@ export default async function DashboardPage() {
           icon="💳"
           label="ديون العملاء"
           value={formatEGP(Number(totalCustomersDebt._sum.balance || 0))}
-          subValue="إجمالي مستحق"
+          subValue="ليستحقة لك"
           color="red"
         />
         <KpiCard
           icon="🏦"
           label="ديون الموردين"
           value={formatEGP(Number(totalSuppliersDebt._sum.balance || 0))}
-          subValue="إجمالي علينا"
+          subValue="عليك لموردين"
           color="yellow"
         />
         <KpiCard
@@ -138,6 +161,38 @@ export default async function DashboardPage() {
             color="green"
           />
         )}
+      </div>
+
+      {/* KPIs — المعلقات (اللي مفيش في الحسابات أعلاه) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiCard
+          icon="⏳"
+          label="فواتير لم تُحصّل"
+          value={formatEGP(pendingSalesAmount)}
+          subValue="مكتملة ورصيد متبقي"
+          color="red"
+        />
+        <KpiCard
+          icon="📋"
+          label="مشتريات لم تُسدّد"
+          value={formatEGP(pendingPurchasesAmount)}
+          subValue="مكتملة ورصيد متبقي"
+          color="yellow"
+        />
+        <KpiCard
+          icon="📊"
+          label="إجمالي المنتجات"
+          value={String(totalProducts)}
+          subValue={`في ${totalStores} مخزن`}
+          color="blue"
+        />
+        <KpiCard
+          icon="👥"
+          label="إجمالي العملاء"
+          value={String(totalCustomers)}
+          subValue={`+ ${totalSuppliers} مورد`}
+          color="green"
+        />
       </div>
 
       {/* System stats */}
@@ -163,7 +218,7 @@ function KpiCard({ icon, label, value, subValue, color }: { icon: string; label:
   const colorClasses: Record<string, string> = {
     green: 'from-green-500/10 to-green-500/5 border-green-500/30',
     blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/30',
-    orange: 'from-nazlawy-500/15 to-nazlawy-500/5 border-nazlawy-500/30',
+    orange: 'from-orange-500/15 to-orange-500/5 border-orange-500/40',
     red: 'from-red-500/10 to-red-500/5 border-red-500/30',
     purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/30',
     yellow: 'from-yellow-500/10 to-yellow-500/5 border-yellow-500/30',

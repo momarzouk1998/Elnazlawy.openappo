@@ -16,6 +16,8 @@ const STATUS_STYLES: Record<string, string> = {
   "مُلغى": "bg-gray-100 text-gray-800",
 };
 
+const MAX_BATCH = 15;
+
 export default function ChecksPage() {
   const [show, setShow] = useState(false);
   const { data, loading, refetch } = useApi<ApiResponse>("/api/checks");
@@ -30,7 +32,7 @@ export default function ChecksPage() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">🧾 الشيكات</h1>
           <p className="text-sm text-gray-500">{data?.items?.length ?? '...'} شيك</p>
         </div>
-        <button onClick={() => setShow(true)} className="btn-primary">+ إضافة شيك</button>
+        <button onClick={() => setShow(true)} className="btn-primary">+ إضافة شيك / دفعة شيكات</button>
       </div>
 
       {/* KPI cards */}
@@ -77,47 +79,215 @@ export default function ChecksPage() {
         </div>
       )}
 
-      {show && <Form onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
+      {show && <BatchCheckForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
     </div>
   );
 }
 
-function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ direction: 'incoming', bank_name: '', check_number: '', amount: 0, issue_date: '', due_date: '', notes: '' });
+/* ===========================================================
+   نموذج إضافة عدة شيكات دفعة واحدة (بحد أقصى 15)
+=========================================================== */
+function BatchCheckForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  // عدد الشيكات (افتراضي 1) — المستخدم يحدد
+  const [count, setCount] = useState(1);
+  // اتجاه موحّد لكل الشيكات في الدفعة
+  const [direction, setDirection] = useState<'incoming' | 'outgoing'>('incoming');
+  // صف الشيكات: مصفوفة من الكائنات (التاريخ، البنك، الرقم، المبلغ)
+  const [rows, setRows] = useState<CheckRow[]>(() => defaultRow(1));
+  const [notes, setNotes] = useState('');
+  const [progress, setProgress] = useState<string>('');
   const { mutate, loading } = useApiMutation();
 
+  function defaultRow(_: number): CheckRow[] {
+    return [emptyRow()];
+  }
+
+  function emptyRow(): CheckRow {
+    return {
+      bank_name: '',
+      check_number: '',
+      amount: 0,
+      issue_date: new Date().toISOString().slice(0, 10),
+      due_date: '',
+      notes: '',
+    };
+  }
+
+  function applyCount(n: number) {
+    n = Math.max(1, Math.min(MAX_BATCH, Math.floor(n) || 1));
+    setCount(n);
+    setRows(prev => {
+      if (n === prev.length) return prev;
+      if (n > prev.length) {
+        // وسّع المصفوفة
+        return [...prev, ...Array.from({ length: n - prev.length }, () => emptyRow())];
+      } else {
+        // قلّص (احتفظ بالأولى)
+        return prev.slice(0, n);
+      }
+    });
+  }
+
+  function updateRow(i: number, field: keyof CheckRow, value: any) {
+    setRows(rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+  }
+
+  function removeRow(i: number) {
+    if (rows.length <= 1) return;
+    const next = rows.filter((_, idx) => idx !== i);
+    setRows(next);
+    setCount(next.length);
+  }
+
+  const validRows = rows.filter(r => Number(r.amount) > 0 && r.issue_date && r.due_date);
+  const totalAmount = validRows.reduce((s, r) => s + Number(r.amount), 0);
+
   async function save() {
-    if (!f.amount || f.amount <= 0 || !f.issue_date || !f.due_date) { alert('❌ أكمل البيانات'); return; }
-    const { error } = await mutate('POST', '/api/checks', f);
-    if (error) { alert('❌ ' + error); return; }
+    if (validRows.length === 0) {
+      alert('❌ لا يوجد صفوف صالحة للحفظ. أكمل المبلغ وتاريخ الإصدار والاستحقاق لشيك واحد على الأقل.');
+      return;
+    }
+    setProgress(`جاري حفظ 0 / ${validRows.length}...`);
+    let saved = 0;
+    let firstError: string | null = null;
+    for (const row of validRows) {
+      const payload = {
+        direction,
+        bank_name: row.bank_name || null,
+        check_number: row.check_number || null,
+        amount: Number(row.amount),
+        issue_date: row.issue_date,
+        due_date: row.due_date,
+        notes: [notes, row.notes].filter(Boolean).join(' • ') || null,
+      };
+      const { error } = await mutate('POST', '/api/checks', payload);
+      if (error) {
+        firstError = error;
+        break;
+      }
+      saved++;
+      setProgress(`جاري حفظ ${saved} / ${validRows.length}...`);
+    }
+    if (firstError) {
+      alert(`❌ تم حفظ ${saved} شيك. فشل: ${firstError}`);
+      setProgress('');
+      return;
+    }
+    setProgress('');
     onSaved();
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
-        <h2 className="text-xl font-bold">+ إضافة شيك</h2>
-        <div className="grid grid-cols-2 gap-3">
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-nazlawy-500 text-white p-4 flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium block mb-1">الاتجاه *</label>
-            <select className="input-field" value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value })}>
-              <option value="incoming">📥 وارد (من عميل)</option>
-              <option value="outgoing">📤 صادر (لمورد)</option>
-            </select>
+            <h2 className="text-lg font-bold">+ إضافة دفعة شيكات</h2>
+            <p className="text-xs opacity-90">أضف حتى {MAX_BATCH} شيك في المرة الواحدة. عدّل الجدول قبل الحفظ.</p>
           </div>
-          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} /></div>
+          <button onClick={onClose} className="text-2xl hover:text-gray-200">✕</button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">البنك</label><input className="input-field" value={f.bank_name} onChange={(e) => setF({ ...f, bank_name: e.target.value })} /></div>
-          <div><label className="text-sm font-medium block mb-1">رقم الشيك</label><input className="input-field" value={f.check_number} onChange={(e) => setF({ ...f, check_number: e.target.value })} /></div>
+
+        <div className="overflow-y-auto flex-1 p-4 space-y-4">
+          {/* إعدادات الدفعة */}
+          <div className="card bg-nazlawy-50/30 border-nazlawy-200 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm font-medium block mb-1">الاتجاه *</label>
+              <select className="input-field" value={direction} onChange={(e) => setDirection(e.target.value as any)}>
+                <option value="incoming">📥 وارد (من عميل)</option>
+                <option value="outgoing">📤 صادر (لمورد)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">عدد الشيكات (حد أقصى {MAX_BATCH})</label>
+              <input
+                type="number"
+                min={1}
+                max={MAX_BATCH}
+                className="input-field"
+                value={count}
+                onChange={(e) => applyCount(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">ملاحظة عامة (اختياري)</label>
+              <input className="input-field" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="تطبق على كل الشيكات في الدفعة" />
+            </div>
+          </div>
+
+          {/* جدول الشيكات */}
+          <div className="border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-xs">
+                  <tr>
+                    <th className="p-2 text-center w-10">#</th>
+                    <th className="p-2 text-right">البنك</th>
+                    <th className="p-2 text-right">رقم الشيك</th>
+                    <th className="p-2 text-right">المبلغ (ج) *</th>
+                    <th className="p-2 text-right">تاريخ الإصدار *</th>
+                    <th className="p-2 text-right">تاريخ الاستحقاق *</th>
+                    <th className="p-2 text-right">ملاحظة خاصة</th>
+                    <th className="p-2 text-center w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const valid = Number(r.amount) > 0 && r.issue_date && r.due_date;
+                    return (
+                      <tr key={i} className={`border-t ${valid ? 'bg-white' : 'bg-yellow-50'}`}>
+                        <td className="p-2 text-center font-mono text-gray-500">{i + 1}</td>
+                        <td className="p-1"><input className="input-field text-xs p-1.5" value={r.bank_name} onChange={(e) => updateRow(i, 'bank_name', e.target.value)} placeholder="البنك" /></td>
+                        <td className="p-1"><input className="input-field text-xs p-1.5 font-mono" value={r.check_number} onChange={(e) => updateRow(i, 'check_number', e.target.value)} placeholder="رقم الشيك" /></td>
+                        <td className="p-1"><input type="number" min={0} step="0.01" className="input-field text-xs p-1.5 font-mono font-bold" value={r.amount || ''} onChange={(e) => updateRow(i, 'amount', parseFloat(e.target.value) || 0)} placeholder="0.00" /></td>
+                        <td className="p-1"><input type="date" className="input-field text-xs p-1.5" value={r.issue_date} onChange={(e) => updateRow(i, 'issue_date', e.target.value)} /></td>
+                        <td className="p-1"><input type="date" className="input-field text-xs p-1.5" value={r.due_date} onChange={(e) => updateRow(i, 'due_date', e.target.value)} /></td>
+                        <td className="p-1"><input className="input-field text-xs p-1.5" value={r.notes} onChange={(e) => updateRow(i, 'notes', e.target.value)} placeholder="—" /></td>
+                        <td className="p-2 text-center">
+                          {rows.length > 1 && (
+                            <button type="button" onClick={() => removeRow(i)} className="text-red-500 hover:text-red-700 text-lg" title="حذف هذا الصف">✕</button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot className="bg-gray-50 font-bold">
+                  <tr>
+                    <td colSpan={3} className="p-2 text-left">إجمالي ({validRows.length} من {rows.length} صالح للحفظ):</td>
+                    <td className="p-2 font-mono text-nazlawy-600">{formatEGP(totalAmount)} ج</td>
+                    <td colSpan={4}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <div className="text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded p-2">
+            💡 <strong>ملاحظة:</strong> سيتم حفظ كل صف على حدة في قاعدة البيانات بنفس الاتجاه. الصفوف التي لا تحتوي على مبلغ أو تاريخ لن تُحفظ.
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">تاريخ الإصدار *</label><input type="date" className="input-field" value={f.issue_date} onChange={(e) => setF({ ...f, issue_date: e.target.value })} /></div>
-          <div><label className="text-sm font-medium block mb-1">تاريخ الاستحقاق *</label><input type="date" className="input-field" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} /></div>
+
+        {/* أزرار */}
+        <div className="border-t p-3 flex gap-2 bg-gray-50">
+          <button onClick={save} disabled={loading || validRows.length === 0} className="btn-primary flex-1">
+            {loading
+              ? (progress || `جاري حفظ ${validRows.length} شيك...`)
+              : `💾 حفظ ${validRows.length} شيك (${formatEGP(totalAmount)} ج)`}
+          </button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
         </div>
-        <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
-        <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
       </div>
     </div>
   );
+}
+
+interface CheckRow {
+  bank_name: string;
+  check_number: string;
+  amount: number;
+  issue_date: string;
+  due_date: string;
+  notes: string;
 }

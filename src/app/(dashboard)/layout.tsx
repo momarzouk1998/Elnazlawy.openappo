@@ -9,7 +9,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar profile={profile} />
-      <main className="flex-1 min-w-0 p-3 md:p-6 max-w-full overflow-x-hidden">
+      {/*
+        على الموبايل: pt-14 لتفادي الـ top bar الثابت.
+        على الديسكتوب: pt-0 (الـ sidebar جنبي).
+        max-w-full + overflow-x-hidden لمنع الانزلاق الأفقي في الجوال.
+      */}
+      <main className="flex-1 min-w-0 max-w-full p-3 pt-16 md:p-6 md:pt-6 overflow-x-hidden">
         {children}
       </main>
     </div>

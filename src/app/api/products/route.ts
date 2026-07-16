@@ -35,11 +35,15 @@ export async function GET(request: NextRequest) {
   const augmented = items.map(p => ({
     ...p,
     total_stock: p.inventory_items.reduce((sum, i) => sum + Number(i.current_stock), 0),
-    // Hide cost for non-privileged
+    // Hide cost for non-privileged - تحسين الحماية
     last_purchase_price: profile.can_see_cost ? p.last_purchase_price : null,
+    last_purchase_date: profile.can_see_cost ? p.last_purchase_date : null,
   }));
 
-  return NextResponse.json({ ok: true, data: { items: augmented, total, limit, offset } });
+  return NextResponse.json(
+    { ok: true, data: { items: augmented, total, limit, offset } },
+    { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } }
+  );
 }
 
 export async function POST(request: NextRequest) {
