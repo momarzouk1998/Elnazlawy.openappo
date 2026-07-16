@@ -80,6 +80,11 @@ export async function PATCH(request: NextRequest) {
         const direction = existing.direction === 'incoming' ? 'in' : 'out';
         const operation = direction === 'in' ? 'increment' : 'decrement';
 
+        // للشيكات الصادرة للموردين: تأكد من رصيد الخزينة قبل الخصم
+        if (direction === 'out' && Number(treasury.current_balance) < amount) {
+          throw new Error('INSUFFICIENT_FUNDS');
+        }
+
         await tx.treasuries.update({
           where: { id: effectiveTreasuryId },
           data: { current_balance: { [operation]: amount } },
@@ -96,6 +101,24 @@ export async function PATCH(request: NextRequest) {
             by_user_id: profile.id,
           },
         });
+
+        // تسديد شيك صادر لمورد: ينشئ سداد مورد ويخصم من رصيد المورد
+        if (direction === 'out' && existing.supplier_id) {
+          await tx.supplier_payments.create({
+            data: {
+              supplier_id: existing.supplier_id,
+              amount,
+              payment_method: 'شيك',
+              treasury_id: effectiveTreasuryId,
+              payment_date: new Date(),
+              notes: `تسديد شيك رقم ${existing.check_number || '—'} بنك ${existing.bank_name || '—'}`,
+            },
+          });
+          await tx.suppliers.update({
+            where: { id: existing.supplier_id },
+            data: { balance: { decrement: amount } },
+          });
+        }
       }
 
       return tx.checks.update({
@@ -110,8 +133,13 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ ok: true, data: updated });
   } catch (e: any) {
-    if (e?.message === 'NO_TREASURY' || e?.message === 'TREASURY_NOT_FOUND') {
-      return NextResponse.json({ ok: false, error: { code: e.message } }, { status: 400 });
+    if (e?.message === 'NO_TREASURY' || e?.message === 'TREASURY_NOT_FOUND' || e?.message === 'INSUFFICIENT_FUNDS') {
+      const messages: Record<string, string> = {
+        NO_TREASURY: 'يجب اختيار خزينة لصرف الشيك',
+        TREASURY_NOT_FOUND: 'الخزينة غير موجودة',
+        INSUFFICIENT_FUNDS: 'رصيد الخزينة غير كافي لصرف الشيك',
+      };
+      return NextResponse.json({ ok: false, error: { code: e.message, message: messages[e.message] } }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }
