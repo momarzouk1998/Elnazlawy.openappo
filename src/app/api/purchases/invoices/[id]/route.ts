@@ -208,7 +208,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
         where: { id },
         data: {
           status: 'ملغاة',
-          void_reason: 'إلغاء يدوي',
           updated_at: new Date(),
         },
       });
