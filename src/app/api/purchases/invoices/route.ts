@@ -2,20 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { getCurrentUser } from '@/lib/auth-server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
 
+  const { searchParams } = new URL(request.url);
+  const supplierId = searchParams.get('supplier_id') || '';
+  const where = supplierId ? { supplier_id: supplierId } : {};
+
   const [items, total] = await Promise.all([
     prisma.purchase_invoices.findMany({
+      where,
       orderBy: { purchase_number: 'desc' },
-      take: 50,
+      take: 200,
       include: {
         supplier: { select: { name: true } },
         _count: { select: { items: true } },
       },
     }),
-    prisma.purchase_invoices.count(),
+    prisma.purchase_invoices.count({ where }),
   ]);
   return NextResponse.json({ ok: true, data: { items, total } });
 }
@@ -26,6 +31,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { items, ...purchaseData } = body;
+
+    // === فاليديشن أساسي ===
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'الفاتورة يجب أن تحتوي على صنف واحد على الأقل' } }, { status: 400 });
+    }
+    for (const it of items) {
+      const qty = Number(it.quantity);
+      const cost = Number(it.unit_cost);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'كل صنف يجب أن تكون كميته موجبة' } }, { status: 400 });
+      }
+      if (!Number.isFinite(cost) || cost < 0) {
+        return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر الشراء غير صالح' } }, { status: 400 });
+      }
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const maxN = await tx.purchase_invoices.aggregate({ _max: { purchase_number: true } });
       const purchase_number = (maxN._max.purchase_number || 0) + 1;

@@ -48,18 +48,34 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    // === فاليديشن ===
+    if (!body.name || !String(body.name).trim()) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الصنف مطلوب' } }, { status: 400 });
+    }
+    const salePrice = Number(body.default_sale_price);
+    const purchasePrice = Number(body.last_purchase_price);
+    if (!Number.isFinite(salePrice) || salePrice < 0) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر البيع غير صالح' } }, { status: 400 });
+    }
+    if (!Number.isFinite(purchasePrice) || purchasePrice < 0) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر الشراء غير صالح' } }, { status: 400 });
+    }
+    const unitsPerCarton = Number(body.units_per_carton) || 1;
+    if (unitsPerCarton < 1) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'قطع/كرتونة يجب أن تكون 1 على الأقل' } }, { status: 400 });
+    }
     const product = await prisma.products.create({
       data: {
-        name: body.name,
+        name: String(body.name).trim(),
         description: body.description || null,
         category: body.category || null,
         unit: body.unit || 'piece',
-        units_per_carton: body.units_per_carton || 1,
+        units_per_carton: unitsPerCarton,
         barcode: body.barcode || null,
-        default_sale_price: body.default_sale_price || 0,
-        reorder_level: body.reorder_level || 5,
+        default_sale_price: salePrice,
+        reorder_level: Number(body.reorder_level) || 5,
         notes: body.notes || null,
-        last_purchase_price: body.last_purchase_price || 0,
+        last_purchase_price: purchasePrice,
       },
     });
     return NextResponse.json({ ok: true, data: product });

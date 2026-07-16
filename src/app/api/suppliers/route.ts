@@ -27,13 +27,21 @@ export async function POST(request: NextRequest) {
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
   try {
     const body = await request.json();
+    // === فاليديشن ===
+    if (!body.name || !String(body.name).trim()) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم المورد مطلوب' } }, { status: 400 });
+    }
+    const opening = Number(body.opening_balance) || 0;
+    if (!Number.isFinite(opening)) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'الرصيد الافتتاحي غير صالح' } }, { status: 400 });
+    }
     const supplier = await prisma.suppliers.create({
       data: {
-        name: body.name,
+        name: String(body.name).trim(),
         phone: body.phone || null,
         address: body.address || null,
-        opening_balance: body.opening_balance || 0,
-        balance: body.opening_balance || 0,
+        opening_balance: opening,
+        balance: opening,
         notes: body.notes || null,
       },
     });

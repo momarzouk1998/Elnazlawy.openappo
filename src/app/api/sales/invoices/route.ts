@@ -46,6 +46,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { items: invoiceItems, ...invoiceData } = body;
 
+    // === فاليديشن أساسي ===
+    if (!Array.isArray(invoiceItems) || invoiceItems.length === 0) {
+      return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'الفاتورة يجب أن تحتوي على صنف واحد على الأقل' } }, { status: 400 });
+    }
+    for (const item of invoiceItems) {
+      const qty = Number(item.quantity);
+      const price = Number(item.unit_price);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'كل صنف يجب أن تكون كميته موجبة' } }, { status: 400 });
+      }
+      if (!Number.isFinite(price) || price < 0) {
+        return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر الوحدة غير صالح' } }, { status: 400 });
+      }
+    }
+
     // === Validate inventory availability ===
     for (const item of invoiceItems) {
       if (invoiceData.invoice_type === 'عرض سعر' || invoiceData.invoice_type === 'Quotation') continue;
