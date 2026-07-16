@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate } from "@/lib/format";
+import Link from "next/link";
 
 interface PurchaseInvoice {
   id: string; purchase_number: number; purchase_date: string; total_amount: number;
@@ -23,7 +24,7 @@ export default function PurchasesPage() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">📥 فواتير المشتريات</h1>
           <p className="text-sm text-gray-500">{data?.total ?? '...'} فاتورة • إجمالي: {formatEGP(totalAmount)} جنيه</p>
         </div>
-        <button onClick={() => alert("لإنشاء فاتورة شراء جديدة، استخدم نموذج الشراء الكامل قريباً")} className="btn-primary">+ فاتورة شراء</button>
+        <Link href="/purchases/new" className="btn-primary">+ فاتورة شراء</Link>
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
