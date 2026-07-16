@@ -1,12 +1,63 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
-import { formatEGP } from "@/lib/format";
+import { formatEGP, formatDate } from "@/lib/format";
 
-interface Customer { id: string; name: string; phone: string | null; balance: number; opening_balance: number; }
+/* ============================================
+   أنواع مشتركة
+============================================ */
+interface Customer {
+  id: string; name: string; phone: string | null; balance: number; opening_balance: number;
+  whatsapp?: string | null; address?: string | null; route_days?: string[];
+}
+interface Payment {
+  id: string; payment_date: string; amount: number; payment_method: string; notes: string | null;
+  customer?: { id: string; name: string; phone: string | null } | null;
+  treasury?: { id: string; name: string } | null;
+}
+
+const TABS = [
+  { key: 'customers', label: 'العملاء', icon: '👥' },
+  { key: 'route', label: 'خط السير', icon: '🗺️' },
+  { key: 'collections', label: 'التحصيلات', icon: '💰' },
+] as const;
+type TabKey = typeof TABS[number]['key'];
+
+const DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+const METHODS = ["نقدي", "إنستاباي", "فودافون كاش", "تحويل بنكي", "شيك"];
 
 export default function CustomersPage() {
+  const [tab, setTab] = useState<TabKey>('customers');
+
+  return (
+    <div className="space-y-4">
+      {/* شريط التبويبات */}
+      <div className="flex gap-2 border-b">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-bold transition-all border-b-2 -mb-px ${
+              tab === t.key ? 'border-nazlawy-500 text-nazlawy-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'customers' && <CustomersTab />}
+      {tab === 'route' && <RouteTab />}
+      {tab === 'collections' && <CollectionsTab />}
+    </div>
+  );
+}
+
+/* ============================================
+   تبويب العملاء
+============================================ */
+function CustomersTab() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [show, setShow] = useState(false);
@@ -22,10 +73,7 @@ export default function CustomersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">👥 العملاء</h1>
-          <p className="text-sm text-gray-500">{data?.total ?? '...'} عميل</p>
-        </div>
+        <p className="text-sm text-gray-500">{data?.total ?? '...'} عميل</p>
         <button onClick={() => setShow(true)} className="btn-primary">+ إضافة عميل</button>
       </div>
 
@@ -37,6 +85,26 @@ export default function CustomersPage() {
           <option value="overpaid">مدفوعات زائدة</option>
           <option value="cleared">حساب خالص</option>
         </select>
+      </div>
+
+      {/* كاردات إجماليات تتحرك مع البحث/الفلتر */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="card p-4">
+          <div className="text-xs text-gray-500">عدد العملاء</div>
+          <div className="text-2xl font-extrabold text-slate-650">{visibleCustomers.length}</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-xs text-gray-500">إجمالي الديون</div>
+          <div className="text-2xl font-extrabold text-red-700">{formatEGP(visibleCustomers.reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0))} ج</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-xs text-gray-500">عملاء تحت السداد</div>
+          <div className="text-2xl font-extrabold text-orange-700">{visibleCustomers.filter(c => Number(c.balance) > 0.01).length}</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-xs text-gray-500">رصيد دائن (لنا)</div>
+          <div className="text-2xl font-extrabold text-green-700">{formatEGP(visibleCustomers.reduce((s, c) => s + (Number(c.balance) < 0 ? Math.abs(Number(c.balance)) : 0), 0))} ج</div>
+        </div>
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
@@ -56,12 +124,8 @@ export default function CustomersPage() {
                 const status = c.balance > 0.01 ? 'لم يتم السداد' : c.balance < -0.01 ? 'مدفوعات زائدة' : 'حساب خالص';
                 const statusClass = c.balance > 0.01 ? 'bg-red-100 text-red-800' : c.balance < -0.01 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
                 return (
-                  <tr key={c.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3 font-semibold">
-                      <button type="button" onClick={() => router.push(`/customers/${c.id}`)} className="text-right hover:text-nazlawy-600 transition-colors">
-                        {c.name}
-                      </button>
-                    </td>
+                  <tr key={c.id} onClick={() => router.push(`/customers/${c.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
+                    <td className="p-3 font-semibold">{c.name}</td>
                     <td className="p-3 text-sm font-mono">{c.phone || '—'}</td>
                     <td className="p-3 font-mono text-xs">{formatEGP(c.opening_balance)}</td>
                     <td className="p-3 font-mono font-bold">{formatEGP(c.balance)}</td>
@@ -75,16 +139,17 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {show && <Form onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
+      {show && <CustomerForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
     </div>
   );
 }
 
-function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({ name: '', phone: '', whatsapp: '', address: '', opening_balance: 0, notes: '' });
   const { mutate, loading } = useApiMutation();
 
   async function save() {
+    if (!f.name.trim()) { alert('❌ اسم العميل مطلوب'); return; }
     const { error } = await mutate('POST', '/api/customers', f);
     if (error) { alert('❌ ' + error); return; }
     onSaved();
@@ -102,6 +167,206 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
         <div><label className="text-sm font-medium block mb-1">العنوان</label><input className="input-field" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
         <div><label className="text-sm font-medium block mb-1">رصيد سابق (افتتاحي)</label><input type="number" step="0.01" className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading || !f.name} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================
+   تبويب خط السير
+============================================ */
+function RouteTab() {
+  const [selectedDay, setSelectedDay] = useState("");
+  const { data, loading } = useApi<{ items: Customer[]; total: number }>("/api/customers?limit=9999");
+
+  const customers = (data?.items || []).filter(c => c.route_days && c.route_days.length > 0);
+  const filtered = selectedDay ? customers.filter(c => c.route_days!.includes(selectedDay)) : customers;
+
+  const byDay = DAYS.map(day => ({
+    day,
+    customers: customers.filter(c => c.route_days!.includes(day)),
+  }));
+
+  const totalDebt = filtered.reduce((s, c) => s + Number(c.balance), 0);
+  const withoutRoute = (data?.items || []).filter(c => !c.route_days || c.route_days.length === 0).length;
+
+  return (
+    <div className="space-y-4">
+      {/* كروت الأيام */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        {byDay.map(({ day, customers: dayCustomers }) => {
+          const dayDebt = dayCustomers.reduce((s, c) => s + Number(c.balance), 0);
+          return (
+            <button
+              key={day}
+              onClick={() => setSelectedDay(selectedDay === day ? "" : day)}
+              className={`card p-3 text-center transition-all ${selectedDay === day ? "ring-2 ring-nazlawy-500 bg-nazlawy-50" : "hover:shadow-md"}`}
+            >
+              <div className="text-sm font-bold text-slate-650">{day}</div>
+              <div className="text-xs text-gray-500">{dayCustomers.length} عميل</div>
+              <div className="text-xs font-mono mt-1 text-orange-700">{formatEGP(dayDebt)}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* عملاء بدون مسار */}
+      {withoutRoute > 0 && (
+        <div className="card p-4 bg-yellow-50 border border-yellow-200">
+          <div className="text-sm text-yellow-800">⚠️ {withoutRoute} عميل بدون أيام زيارة محددة</div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold">{selectedDay ? `عملاء ${selectedDay}` : "كل العملاء بخط سير"}</h2>
+          <p className="text-sm text-gray-500">{filtered.length} عميل • إجمالي ديون: {formatEGP(totalDebt)} جنيه</p>
+        </div>
+        {selectedDay && <button onClick={() => setSelectedDay("")} className="btn-secondary">إظهار الكل</button>}
+      </div>
+
+      {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
+        <div className="card overflow-x-auto p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-right">الاسم</th>
+                <th className="p-3 text-right">الهاتف</th>
+                <th className="p-3 text-right">العنوان</th>
+                <th className="p-3 text-right">أيام الزيارة</th>
+                <th className="p-3 text-right">الرصيد</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => (
+                <tr key={c.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 font-semibold">{c.name}</td>
+                  <td className="p-3 text-xs font-mono">
+                    {c.phone && <a href={`tel:${c.phone}`} className="text-nazlawy-600 hover:underline">{c.phone}</a>}
+                    {!c.phone && "—"}
+                  </td>
+                  <td className="p-3 text-xs text-gray-600">{c.address || '—'}</td>
+                  <td className="p-3">
+                    <div className="flex gap-1 flex-wrap">
+                      {c.route_days!.map(d => (
+                        <span key={d} className={`badge text-xs ${d === selectedDay ? "bg-nazlawy-100 text-nazlawy-800" : "bg-gray-100"}`}>{d}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3 font-mono font-bold text-red-700">{formatEGP(c.balance)}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <tr><td colSpan={5} className="p-12 text-center text-gray-400">لا يوجد عملاء</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================
+   تبويب التحصيلات
+============================================ */
+function CollectionsTab() {
+  const [show, setShow] = useState(false);
+  const { data, loading, refetch } = useApi<{ items: Payment[]; total: number; total_amount: number }>("/api/payments/customers?limit=200");
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <p className="text-sm text-gray-500">{data?.total ?? '...'} تحصيل • إجمالي: {data ? formatEGP(data.total_amount) : '...'} جنيه</p>
+        <button onClick={() => setShow(true)} className="btn-primary">+ تحصيل جديد</button>
+      </div>
+
+      {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
+        <div className="card overflow-x-auto p-0">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-right">التاريخ</th>
+                <th className="p-3 text-right">العميل</th>
+                <th className="p-3 text-right">الخزينة</th>
+                <th className="p-3 text-right">طريقة الدفع</th>
+                <th className="p-3 text-right">المبلغ</th>
+                <th className="p-3 text-right">ملاحظات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data?.items.map(p => (
+                <tr key={p.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 text-xs">{formatDate(p.payment_date)}</td>
+                  <td className="p-3 font-semibold">{p.customer?.name || '—'}</td>
+                  <td className="p-3 text-xs text-gray-600">{p.treasury?.name || '—'}</td>
+                  <td className="p-3 text-xs">{p.payment_method}</td>
+                  <td className="p-3 font-mono font-bold text-green-700">{formatEGP(p.amount)}</td>
+                  <td className="p-3 text-xs text-gray-500">{p.notes || '—'}</td>
+                </tr>
+              ))}
+              {data?.items.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد تحصيلات</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {show && <CollectionForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
+    </div>
+  );
+}
+
+function CollectionForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ customer_id: '', amount: 0, payment_method: 'نقدي', treasury_id: '', payment_date: '', notes: '' });
+  const { mutate, loading } = useApiMutation();
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [treasuries, setTreasuries] = useState<{ id: string; name: string }[]>([]);
+  const [custSearch, setCustSearch] = useState("");
+
+  useEffect(() => {
+    fetch('/api/treasury').then(r => r.json()).then(j => setTreasuries(j.data?.items || [])).catch(() => {});
+    fetch('/api/customers?limit=200').then(r => r.json()).then(j => setCustomers(j.data?.items || [])).catch(() => {});
+  }, []);
+
+  const filtered = customers.filter(c => c.name.includes(custSearch)).slice(0, 50);
+
+  async function save() {
+    if (!f.customer_id || !f.treasury_id || f.amount <= 0) { alert('❌ أكمل البيانات'); return; }
+    const { error } = await mutate('POST', '/api/payments/customers', f);
+    if (error) { alert('❌ ' + error); return; }
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+        <h2 className="text-xl font-bold">+ تحصيل من عميل</h2>
+        <div>
+          <label className="text-sm font-medium block mb-1">العميل *</label>
+          <input className="input-field" placeholder="🔍 ابحث عن عميل..." value={custSearch} onChange={(e) => setCustSearch(e.target.value)} autoFocus />
+          <select className="input-field mt-1" value={f.customer_id} onChange={(e) => setF({ ...f, customer_id: e.target.value })} size={4}>
+            {filtered.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} /></div>
+          <div>
+            <label className="text-sm font-medium block mb-1">طريقة الدفع</label>
+            <select className="input-field" value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })}>
+              {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">الخزينة *</label>
+            <select className="input-field" value={f.treasury_id} onChange={(e) => setF({ ...f, treasury_id: e.target.value })}>
+              <option value="">اختر...</option>
+              {treasuries.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div><label className="text-sm font-medium block mb-1">التاريخ</label><input type="date" className="input-field" value={f.payment_date} onChange={(e) => setF({ ...f, payment_date: e.target.value })} /></div>
+        </div>
+        <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
+        <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
       </div>
     </div>
   );
