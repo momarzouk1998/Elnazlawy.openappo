@@ -4,7 +4,10 @@ import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { useRouter } from "next/navigation";
 
-interface Product { id: string; name: string; unit: string; default_sale_price: number; total_stock: number; }
+interface Product {
+  id: string; name: string; unit: string; default_sale_price: number; total_stock: number;
+  inventory_items?: { current_stock: number; store_id: string }[];
+}
 interface Customer { id: string; name: string; balance: number; }
 interface Store { id: string; name: string; type: string; }
 interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_price: number; available: number; }
@@ -30,9 +33,20 @@ export default function POSPage() {
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - discount);
 
+  // المخزون المتاح للصنف في المخزن المختار
+  function stockFor(p: Product): number {
+    if (!storeId) return 0;
+    const perStore = p.inventory_items?.find(i => i.store_id === storeId);
+    return perStore ? Number(perStore.current_stock) : Number(p.total_stock);
+  }
+
   function addToCart(p: Product) {
     if (!storeId) { alert('اختر مخزن أولاً'); return; }
+    const available = stockFor(p);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === storeId);
+    const currentQty = existing ? existing.quantity : 0;
+    if (available <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر بالمخزن`); return; }
+    if (currentQty + 1 > available) { alert(`⚠️ الكمية المطلوبة تتجاوز المخزون المتاح (${available})`); return; }
     if (existing) {
       setCart(cart.map(c => c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
@@ -44,13 +58,37 @@ export default function POSPage() {
         store_name: store?.name || '',
         quantity: 1,
         unit_price: Number(p.default_sale_price),
-        available: Number(p.total_stock),
+        available,
       }]);
     }
   }
 
   function updateItem(idx: number, field: keyof CartItem, value: any) {
-    setCart(cart.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+    setCart(cart.map((c, i) => {
+      if (i !== idx) return c;
+      let next = { ...c, [field]: value };
+      // منع الكمية من تجاوز المخزون أو النزول تحت 0
+      if (field === 'quantity') {
+        const q = Number(value);
+        if (!Number.isFinite(q) || q <= 0) next.quantity = 0;
+        else next.quantity = Math.min(q, c.available);
+      }
+      // سعر الوحدة لا يقبل سالب
+      if (field === 'unit_price') {
+        const v = Number(value);
+        next.unit_price = Number.isFinite(v) && v >= 0 ? v : 0;
+      }
+      return next;
+    }));
+  }
+
+  // زيادة/نقصان الكمية بأزرار مع احترام المخزون
+  function adjustQty(idx: number, delta: number) {
+    setCart(cart.map((c, i) => {
+      if (i !== idx) return c;
+      const q = c.quantity + delta;
+      return { ...c, quantity: Math.max(0, Math.min(q, c.available)) };
+    }));
   }
 
   function removeItem(idx: number) {
@@ -59,6 +97,13 @@ export default function POSPage() {
 
   async function save() {
     if (cart.length === 0) { alert('السلة فارغة'); return; }
+    // فلترة الأصناف غير الصالحة (كمية أو سعر صفر) قبل الإرسال
+    const validItems = cart.filter(c => c.quantity > 0 && c.unit_price >= 0);
+    const invalid = cart.length - validItems.length;
+    if (invalid > 0) {
+      if (!confirm(`يوجد ${invalid} صنف بكمية أو سعر صفر وسيتم استبعاده. متابعة؟`)) return;
+    }
+    if (validItems.length === 0) { alert('❌ كل الأصناف لها كمية أو سعر غير صالح'); return; }
     if (invoiceType !== 'عرض سعر' && !customerId) {
       if (!confirm('لم تختر عميل. هل تريد المتابعة؟')) return;
     }
@@ -66,10 +111,10 @@ export default function POSPage() {
       customer_id: customerId || null,
       store_id: storeId,
       invoice_type: invoiceType,
-      items: cart.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
-      subtotal,
+      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
+      subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
       discount,
-      total,
+      total: Math.max(0, validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) - discount),
       notes,
     });
     if (error) { alert('❌ ' + error); return; }
@@ -150,16 +195,36 @@ export default function POSPage() {
             <div className="space-y-2">
               {cart.map((c, i) => (
                 <div key={i} className="bg-gray-50 rounded-lg p-2 text-sm">
-                  <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="font-semibold flex-1 line-clamp-2">{c.product_name}</div>
-                    <button onClick={() => removeItem(i)} className="text-red-500 text-xs">✕</button>
+                    <button onClick={() => removeItem(i)} className="text-red-500 text-xs shrink-0">✕ حذف</button>
                   </div>
-                  <div className="grid grid-cols-3 gap-1">
-                    <input type="number" min={0.01} step={0.01} className="input-field text-xs p-1" value={c.quantity} onChange={(e) => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)} />
-                    <input type="number" min={0} step={0.01} className="input-field text-xs p-1" value={c.unit_price} onChange={(e) => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)} />
-                    <div className="text-xs font-bold text-nazlawy-600 text-center pt-2">{formatEGP(c.quantity * c.unit_price)}</div>
+                  <div className="grid grid-cols-3 gap-2 items-end">
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-0.5">الكمية</label>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => adjustQty(i, -1)} className="w-6 h-7 shrink-0 rounded bg-gray-200 text-gray-700 font-bold hover:bg-gray-300">−</button>
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          className="input-field text-xs p-1 text-center w-full"
+                          value={c.quantity}
+                          onChange={(e) => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
+                        />
+                        <button type="button" onClick={() => adjustQty(i, 1)} className="w-6 h-7 shrink-0 rounded bg-gray-200 text-gray-700 font-bold hover:bg-gray-300">+</button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-0.5">سعر الوحدة (ج)</label>
+                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_price} onChange={(e) => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)} />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-0.5">الإجمالي</label>
+                      <div className="text-xs font-bold text-nazlawy-600 text-center p-1 bg-white rounded border">{formatEGP(c.quantity * c.unit_price)}</div>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-gray-500 mt-1">{c.store_name} • متاح: {formatQty(c.available)}</div>
+                  <div className="text-[10px] text-gray-500 mt-1">{c.store_name} • متاح: {formatQty(c.available)} {c.quantity >= c.available && c.available > 0 && <span className="text-red-600 font-bold">• وصلت للحد الأقصى</span>}</div>
                 </div>
               ))}
             </div>
@@ -170,7 +235,7 @@ export default function POSPage() {
           <div className="flex justify-between text-sm"><span>الإجمالي:</span><span className="font-bold">{formatEGP(subtotal)} ج</span></div>
           <div className="flex justify-between items-center text-sm">
             <span>الخصم:</span>
-            <input type="number" min={0} step={0.01} className="w-24 input-field text-sm p-1" value={discount} onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)} />
+            <input type="number" min={0} step={0.01} className="w-24 input-field text-sm p-1" value={discount} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
           </div>
           <div className="flex justify-between text-lg font-extrabold border-t pt-2">
             <span>الصافي:</span><span className="text-nazlawy-600">{formatEGP(total)} ج</span>
