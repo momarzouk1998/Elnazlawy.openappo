@@ -9,7 +9,7 @@ export async function GET() {
     where: { is_active: true },
     orderBy: { name: 'asc' },
   });
-  return NextResponse.json({ ok: true, data: treasuries });
+  return NextResponse.json({ ok: true, data: { items: treasuries, total: treasuries.length } });
 }
 
 export async function POST(request: NextRequest) {

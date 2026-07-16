@@ -81,7 +81,8 @@ function StockTab({ profile }: { profile: any }) {
   if (search) params.set('search', search);
 
   const { data, loading } = useApi<InvItem[]>(`/api/inventory?${params.toString()}`);
-  const { data: stores } = useApi<{ id: string; name: string }[]>('/api/stores');
+  const { data: storesData } = useApi<{ items: { id: string; name: string }[]; total: number }>('/api/stores');
+  const stores = storesData?.items;
   const showCost = profile?.can_see_cost;
 
   return (
@@ -265,12 +266,13 @@ function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
    تبويب الفروع (أدمن/مدير)
 ============================================ */
 function BranchesTab() {
-  const { data: stores, loading } = useApi<Store[]>('/api/stores');
+  const { data: storesData, loading: storesLoading } = useApi<{ items: Store[] }>('/api/stores');
+  const stores = storesData?.items;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-500">عرض المخازن والفروع النشطة</p>
-      {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
+      {storesLoading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">

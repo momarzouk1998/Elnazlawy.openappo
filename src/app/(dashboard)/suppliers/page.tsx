@@ -270,8 +270,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 function ChecksTab() {
   const [show, setShow] = useState(false);
-  const { data, loading, refetch } = useApi<Check[]>("/api/checks");
-  const checks = data || [];
+  const { data, loading, refetch } = useApi<{ items: Check[]; total: number }>("/api/checks");
+  const checks = data?.items || [];
 
   // الشيكات الصادرة للموردين بس + مرتبة بموعد الاستحقاق الأقرب
   const supplierChecks = checks

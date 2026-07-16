@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
-import { formatEGP, formatDate } from "@/lib/format";
+import { formatEGP, formatDate, statusColor } from "@/lib/format";
 import Link from "next/link";
+import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 
 interface PurchaseInvoice {
   id: string; purchase_number: number; purchase_date: string; total_amount: number;
@@ -14,8 +15,19 @@ interface PurchaseInvoice {
 interface ApiResponse { items: PurchaseInvoice[]; total: number; }
 
 export default function PurchasesPage() {
-  const { data, loading, refetch } = useApi<ApiResponse>("/api/purchases/invoices");
+  const [openInvoice, setOpenInvoice] = useState<string | null>(null);
+  const [supplierId, setSupplierId] = useState("");
+  const { data: suppliers } = useApi<{ items: { id: string; name: string; phone: string | null; balance: number }[]; total: number }>('/api/suppliers?limit=200');
+  const qs = supplierId ? `?supplier_id=${supplierId}` : '';
+  const { data, loading, refetch } = useApi<ApiResponse>(`/api/purchases/invoices${qs}`);
   const totalAmount = (data?.items || []).reduce((s, i) => s + Number(i.total_amount), 0);
+
+  const supplierOptions: SearchOption[] = (suppliers?.items || []).map(s => ({
+    id: s.id,
+    name: s.name,
+    sub: s.phone || undefined,
+    extra: `مستحق: ${formatEGP(s.balance)} ج`,
+  }));
 
   return (
     <div className="space-y-4">
@@ -25,6 +37,18 @@ export default function PurchasesPage() {
           <p className="text-sm text-gray-500">{data?.total ?? '...'} فاتورة • إجمالي: {formatEGP(totalAmount)} جنيه</p>
         </div>
         <Link href="/purchases/new" className="btn-primary">+ فاتورة شراء</Link>
+      </div>
+
+      <div className="card flex flex-col gap-3 md:flex-row md:flex-wrap">
+        <div className="md:flex-1 md:min-w-[200px]">
+          <SearchableSelect
+            options={supplierOptions}
+            value={supplierId}
+            onChange={setSupplierId}
+            placeholder="🔍 فلترة حسب المورد..."
+            emptyLabel="كل الموردين"
+          />
+        </div>
       </div>
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
@@ -37,27 +61,125 @@ export default function PurchasesPage() {
                 <th className="p-3 text-right">المورد</th>
                 <th className="p-3 text-right">الأصناف</th>
                 <th className="p-3 text-right">الإجمالي</th>
-                <th className="p-3 text-right">المدفوع</th>
                 <th className="p-3 text-right">الحالة</th>
               </tr>
             </thead>
             <tbody>
               {data?.items.map(inv => (
-                <tr key={inv.id} className="border-t hover:bg-gray-50">
+                <tr
+                  key={inv.id}
+                  onClick={() => setOpenInvoice(inv.id)}
+                  className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors"
+                >
                   <td className="p-3 font-mono font-bold">#{inv.purchase_number}</td>
                   <td className="p-3 text-xs">{formatDate(inv.purchase_date)}</td>
                   <td className="p-3 font-semibold">{inv.supplier?.name || '—'}</td>
                   <td className="p-3 text-center">{inv._count?.items ?? 0}</td>
                   <td className="p-3 font-mono font-bold">{formatEGP(inv.total_amount)}</td>
-                  <td className="p-3 font-mono text-green-700">{formatEGP(inv.paid_amount)}</td>
-                  <td className="p-3"><span className="badge bg-green-100 text-green-800">{inv.status}</span></td>
+                  <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
                 </tr>
               ))}
-              {data?.items.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-gray-400">لا توجد فواتير مشتريات</td></tr>}
+              {data?.items.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد فواتير مشتريات</td></tr>}
             </tbody>
           </table>
         </div>
       )}
+
+      {openInvoice && (
+        <PurchaseDetailsModal
+          invoiceId={openInvoice}
+          onClose={() => setOpenInvoice(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
+  const { data: inv, loading } = useApi<any>(`/api/purchases/invoices/${invoiceId}`);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl p-8">⏳ جاري التحميل...</div>
+      </div>
+    );
+  }
+  if (!inv) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl p-8">❌ لم يتم العثور على الفاتورة</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between gap-2 z-10">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold">
+              📥 فاتورة مشتريات #{inv.purchase_number}
+              <span className={`badge ${statusColor(inv.status)} mr-2`}>{inv.status}</span>
+            </h2>
+            <p className="text-xs text-gray-500">{formatDate(inv.purchase_date)}</p>
+          </div>
+          <button onClick={onClose} className="text-2xl text-gray-400 hover:text-red-500">✕</button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <Info label="المورد" value={inv.supplier?.name || '—'} />
+            <Info label="المنشئ" value={inv.creator?.full_name || '—'} />
+          </div>
+
+          <div>
+            <h3 className="font-bold mb-2">الأصناف ({inv.items.length})</h3>
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-2 text-right">الصنف</th>
+                  <th className="p-2 text-center">الكمية</th>
+                  <th className="p-2 text-left">سعر الشراء</th>
+                  <th className="p-2 text-left">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inv.items.map((it: any) => (
+                  <tr key={it.id} className="border-t">
+                    <td className="p-2">{it.product_name}</td>
+                    <td className="p-2 text-center font-mono">{Number(it.quantity)}</td>
+                    <td className="p-2 text-left font-mono">{formatEGP(Number(it.unit_cost))}</td>
+                    <td className="p-2 text-left font-mono font-bold">{formatEGP(Number(it.line_total))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t pt-3 space-y-1 text-sm">
+            <div className="flex justify-between text-lg font-extrabold border-t pt-2 text-nazlawy-600">
+              <span>الإجمالي:</span><span className="font-mono">{formatEGP(Number(inv.total_amount))} ج</span>
+            </div>
+            {inv.notes && (
+              <div className="text-xs text-gray-600 pt-2 border-t">📝 {inv.notes}</div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-3 border-t">
+            <button onClick={onClose} className="btn-secondary text-sm">إغلاق</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: any }) {
+  return (
+    <div>
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="font-semibold">{value || '—'}</div>
     </div>
   );
 }

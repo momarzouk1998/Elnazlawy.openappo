@@ -3,9 +3,10 @@ import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { useRouter } from "next/navigation";
+import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 
 interface Product { id: string; name: string; unit: string; last_purchase_price: number; total_stock: number; }
-interface Supplier { id: string; name: string; balance: number; }
+interface Supplier { id: string; name: string; balance: number; phone?: string | null; }
 interface Store { id: string; name: string; type: string; }
 interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_cost: number; }
 
@@ -16,10 +17,13 @@ export default function NewPurchasePage() {
   const [supplierId, setSupplierId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [notes, setNotes] = useState("");
+  const [showNewProduct, setShowNewProduct] = useState(false);
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
-  const { data: suppliers } = useApi<{ items: Supplier[] }>('/api/suppliers?limit=200');
-  const { data: stores } = useApi<Store[]>('/api/stores');
+  const { data: suppliersData } = useApi<{ items: Supplier[] }>('/api/suppliers?limit=200');
+  const { data: storesData } = useApi<{ items: Store[] }>('/api/stores');
+
+  const stores = storesData?.items;
 
   useEffect(() => {
     if (stores && stores.length > 0 && !storeId) setStoreId(stores[0].id);
@@ -49,12 +53,10 @@ export default function NewPurchasePage() {
     setCart(cart.map((c, i) => {
       if (i !== idx) return c;
       const next = { ...c, [field]: value };
-      // منع الكمية من النزول تحت 0
       if (field === 'quantity') {
         const q = Number(value);
         next.quantity = Number.isFinite(q) && q >= 0 ? q : 0;
       }
-      // سعر الشراء لا يقبل سالب
       if (field === 'unit_cost') {
         const v = Number(value);
         next.unit_cost = Number.isFinite(v) && v >= 0 ? v : 0;
@@ -63,7 +65,6 @@ export default function NewPurchasePage() {
     }));
   }
 
-  // زيادة/نقصان الكمية بأزرار (المشتريات ليس لها حد أقصى)
   function adjustQty(idx: number, delta: number) {
     setCart(cart.map((c, i) => {
       if (i !== idx) return c;
@@ -78,7 +79,6 @@ export default function NewPurchasePage() {
   async function save() {
     if (cart.length === 0) { alert('السلة فارغة'); return; }
     if (!storeId) { alert('اختر مخزن للاستلام'); return; }
-    // فلترة الأصناف غير الصالحة (كمية أو سعر صفر)
     const validItems = cart.filter(c => c.quantity > 0 && c.unit_cost >= 0);
     const invalid = cart.length - validItems.length;
     if (invalid > 0) {
@@ -99,6 +99,13 @@ export default function NewPurchasePage() {
     alert(`✅ تم حفظ فاتورة الشراء رقم ${data?.purchase_number}`);
     router.push('/purchases');
   }
+
+  const supplierOptions: SearchOption[] = (suppliersData?.items || []).map(s => ({
+    id: s.id,
+    name: s.name,
+    sub: s.phone || undefined,
+    extra: `مستحق: ${formatEGP(s.balance)} ج`,
+  }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -131,7 +138,19 @@ export default function NewPurchasePage() {
               </div>
             </button>
           ))}
-          {productsData?.items.length === 0 && <div className="card text-center text-gray-400 py-12">لا توجد نتائج</div>}
+          {search.trim() !== "" && productsData?.items.length === 0 && (
+            <div className="col-span-full card p-4 text-center">
+              <p className="text-gray-500 mb-2">لا توجد نتائج لـ "{search}"</p>
+              <button
+                type="button"
+                onClick={() => setShowNewProduct(true)}
+                className="btn-primary text-sm"
+              >+ إضافة صنف جديد بهذا الاسم</button>
+            </div>
+          )}
+          {search.trim() === "" && productsData?.items.length === 0 && (
+            <div className="card text-center text-gray-400 py-12 col-span-full">ابدأ بكتابة اسم الصنف للبحث</div>
+          )}
         </div>
       </div>
 
@@ -140,14 +159,17 @@ export default function NewPurchasePage() {
         <div className="card space-y-2">
           <h2 className="font-bold text-lg">🛍️ السلة ({cart.length})</h2>
           <div>
-            <label className="text-xs text-gray-600">المورد</label>
-            <select className="input-field text-sm" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">— بدون مورد —</option>
-              {suppliers?.items.map(s => <option key={s.id} value={s.id}>{s.name} (مستحق: {formatEGP(s.balance)})</option>)}
-            </select>
+            <label className="text-xs text-gray-600 block mb-1">المورد</label>
+            <SearchableSelect
+              options={supplierOptions}
+              value={supplierId}
+              onChange={setSupplierId}
+              placeholder="🔍 ابحث عن مورد بالاسم أو الهاتف..."
+              emptyLabel="— بدون مورد —"
+            />
           </div>
           <div>
-            <label className="text-xs text-gray-600">مخزن الاستلام</label>
+            <label className="text-xs text-gray-600 block mb-1">مخزن الاستلام</label>
             <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
               {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -205,6 +227,64 @@ export default function NewPurchasePage() {
           <button onClick={save} disabled={saving || cart.length === 0} className="btn-primary w-full">
             {saving ? '⏳ جاري الحفظ...' : `✅ حفظ الفاتورة (${formatEGP(total)} ج)`}
           </button>
+        </div>
+      </div>
+
+      {showNewProduct && (
+        <NewProductModal
+          initialName={search}
+          onClose={() => setShowNewProduct(false)}
+          onAdded={(p) => { addToCart(p); setShowNewProduct(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewProductModal({ initialName, onClose, onAdded }: { initialName: string; onClose: () => void; onAdded: (p: Product) => void }) {
+  const [f, setF] = useState({
+    name: initialName,
+    default_sale_price: 0,
+    last_purchase_price: 0,
+    category: "",
+    unit: "piece",
+  });
+  const { mutate, loading } = useApiMutation();
+
+  async function save() {
+    if (!f.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
+    if (f.default_sale_price < 0 || f.last_purchase_price < 0) { alert('❌ الأسعار يجب أن تكون موجبة'); return; }
+    const { error, data } = await mutate<Product>('POST', '/api/products', f);
+    if (error) { alert('❌ ' + error); return; }
+    onAdded(data!);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-3">
+        <h2 className="text-lg font-bold">+ إضافة صنف جديد</h2>
+        <div>
+          <label className="text-sm font-medium block mb-1">الاسم *</label>
+          <input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">سعر البيع *</label>
+            <input type="number" step="0.01" min={0} className="input-field" value={f.default_sale_price} onChange={(e) => setF({ ...f, default_sale_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">سعر الشراء *</label>
+            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">الفئة</label>
+          <input className="input-field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="مثال: إضاءة، كشافات، أسلاك..." />
+        </div>
+        <p className="text-xs text-gray-500">💡 بعد الإضافة ستتم إضافته تلقائياً للفاتورة. يمكن تعديل التفاصيل لاحقاً من صفحة الأصناف.</p>
+        <div className="flex gap-2 pt-2">
+          <button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ وإضافة للفاتورة'}</button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
         </div>
       </div>
     </div>

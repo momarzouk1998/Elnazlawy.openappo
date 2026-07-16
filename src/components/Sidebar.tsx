@@ -45,7 +45,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-header-gradient text-white min-h-screen shadow-2xl">
+      <aside className="hidden md:flex flex-col w-64 bg-header-gradient text-white h-screen sticky top-0 shadow-2xl">
         <SidebarContent visible={visible} pathname={pathname} onNavigate={() => {}} />
         <div className="p-4 border-t border-white/10">
           <div className="text-xs text-white/60 mb-1">المستخدم:</div>

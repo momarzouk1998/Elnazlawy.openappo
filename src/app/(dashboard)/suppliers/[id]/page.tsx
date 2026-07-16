@@ -260,8 +260,8 @@ function InvoicesSection({ supplierId }: { supplierId: string }) {
    قسم شيكات المورد
 ============================================ */
 function ChecksSection({ supplierId, onAdd }: { supplierId: string; onAdd: () => void }) {
-  const { data, loading, refetch } = useApi<Check[]>("/api/checks");
-  const checks = (data || []).filter(c => c.direction === 'outgoing').sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+  const { data, loading, refetch } = useApi<{ items: Check[]; total: number }>("/api/checks");
+  const checks = (data?.items || []).filter(c => c.direction === 'outgoing').sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
   return (
     <div className="space-y-3">

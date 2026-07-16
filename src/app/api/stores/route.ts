@@ -14,7 +14,7 @@ export async function GET() {
       _count: { select: { inventory: true } },
     },
   });
-  return NextResponse.json({ ok: true, data: stores });
+  return NextResponse.json({ ok: true, data: { items: stores, total: stores.length } });
 }
 
 export async function POST(request: NextRequest) {

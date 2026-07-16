@@ -61,23 +61,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // === Validate inventory availability ===
-    for (const item of invoiceItems) {
-      if (invoiceData.invoice_type === 'عرض سعر' || invoiceData.invoice_type === 'Quotation') continue;
-      if (item.row_type !== 'بيع') continue;
-      const inv = await prisma.inventory.findUnique({
-        where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-      });
-      if (!inv || Number(inv.current_stock) < Number(item.quantity)) {
-        const available = inv ? Number(inv.current_stock) : 0;
-        return NextResponse.json(
-          { ok: false, error: { code: 'INSUFFICIENT_STOCK', message: `الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})` } },
-          { status: 400 }
-        );
+    // === Validate inventory availability (فقط لو الحالة مكتملة أو فاتورة عادية/ضريبية) ===
+    const isQuotation = invoiceData.invoice_type === 'عرض سعر';
+    const willBeCompleted = (invoiceData.status || 'قيد التنفيذ') === 'مكتملة';
+    if (willBeCompleted && !isQuotation) {
+      for (const item of invoiceItems) {
+        if (item.row_type !== 'بيع') continue;
+        const inv = await prisma.inventory.findUnique({
+          where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
+        });
+        if (!inv || Number(inv.current_stock) < Number(item.quantity)) {
+          const available = inv ? Number(inv.current_stock) : 0;
+          return NextResponse.json(
+            { ok: false, error: { code: 'INSUFFICIENT_STOCK', message: `الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})` } },
+            { status: 400 }
+          );
+        }
       }
     }
 
-    // === Transaction: invoice + items + stock decrement + customer balance ===
+    // === Transaction: invoice + items + (stock decrement if completed) + customer balance ===
     const result = await prisma.$transaction(async (tx) => {
       // 1. Get next invoice number
       const maxInv = await tx.sales_invoices.aggregate({ _max: { invoice_number: true } });
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
           customer_id: invoiceData.customer_id || null,
           store_id: invoiceData.store_id || null,
           invoice_type: invoiceData.invoice_type || 'عادية',
-          status: 'مكتملة',
+          status: invoiceData.status || 'قيد التنفيذ',
           subtotal: invoiceData.subtotal || 0,
           discount: invoiceData.discount || 0,
           total: invoiceData.total || 0,
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
 
       let totalCost = 0;
 
-      // 4. Create items + decrement stock
+      // 4. Create items + decrement stock if completed
       for (const item of invoiceItems) {
         const product = await tx.products.findUnique({ where: { id: item.product_id } });
         if (!product) throw new Error('PRODUCT_NOT_FOUND');
@@ -139,8 +142,8 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Decrement inventory (only for sales, not for quotations)
-        if (invoiceData.invoice_type !== 'عرض سعر' && item.row_type === 'بيع') {
+        // Decrement inventory فقط لو مكتملة وليست عرض سعر
+        if (willBeCompleted && !isQuotation && item.row_type === 'بيع') {
           const inv = await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
             update: {},
@@ -160,8 +163,8 @@ export async function POST(request: NextRequest) {
         data: { net_profit },
       });
 
-      // 6. Customer balance
-      if (invoiceData.customer_id && invoiceData.invoice_type !== 'عرض سعر') {
+      // 6. Customer balance (فقط لو مكتملة)
+      if (invoiceData.customer_id && willBeCompleted && !isQuotation) {
         await tx.customers.update({
           where: { id: invoiceData.customer_id },
           data: { balance: { increment: invoiceData.total || 0 } },

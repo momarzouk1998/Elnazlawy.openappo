@@ -3,13 +3,6 @@ import { useState, useEffect } from "react";
 import { useApi } from "@/hooks/useApi";
 import { formatEGP } from "@/lib/format";
 
-interface Customer { balance: number; }
-interface Supplier { balance: number; }
-interface CustomerPayment { amount: number; }
-interface SupplierPayment { amount: number; }
-interface Expense { amount: number; }
-interface SalesInvoice { total: number; net_profit: number; }
-
 export default function ReportsPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -19,49 +12,44 @@ export default function ReportsPage() {
     netCash: number;
   } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   async function load() {
     setLoading(true);
-    setError(null);
+    setErrors([]);
     try {
       const qs = from && to ? `?from=${from}&to=${to}` : "";
-      const responses = await Promise.all([
-        fetch("/api/customers?limit=9999").then(async r => {
-          if (!r.ok) throw new Error(`Customers API: ${r.status}`);
-          return r.json();
-        }),
-        fetch("/api/suppliers?limit=9999").then(async r => {
-          if (!r.ok) throw new Error(`Suppliers API: ${r.status}`);
-          return r.json();
-        }),
-        fetch(`/api/payments/customers${qs}&limit=9999`).then(async r => {
-          if (!r.ok) throw new Error(`Customer Payments API: ${r.status}`);
-          return r.json();
-        }),
-        fetch(`/api/payments/suppliers${qs}&limit=9999`).then(async r => {
-          if (!r.ok) throw new Error(`Supplier Payments API: ${r.status}`);
-          return r.json();
-        }),
-        fetch(`/api/expenses${qs}&limit=9999`).then(async r => {
-          if (!r.ok) throw new Error(`Expenses API: ${r.status}`);
-          return r.json();
-        }),
-        fetch(`/api/sales/invoices?status=مكتملة&limit=9999`).then(async r => {
-          if (!r.ok) throw new Error(`Sales API: ${r.status}`);
-          return r.json();
-        }),
+      const responses = await Promise.allSettled([
+        fetch("/api/customers?limit=9999").then(r => { if (!r.ok) throw new Error(`Customers API: ${r.status}`); return r.json(); }),
+        fetch("/api/suppliers?limit=9999").then(r => { if (!r.ok) throw new Error(`Suppliers API: ${r.status}`); return r.json(); }),
+        fetch(`/api/payments/customers${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Customer Payments API: ${r.status}`); return r.json(); }),
+        fetch(`/api/payments/suppliers${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Supplier Payments API: ${r.status}`); return r.json(); }),
+        fetch(`/api/expenses${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Expenses API: ${r.status}`); return r.json(); }),
+        fetch(`/api/sales/invoices?status=مكتملة&limit=9999`).then(r => { if (!r.ok) throw new Error(`Sales API: ${r.status}`); return r.json(); }),
       ]);
 
-      const [cust, sup, cp, sp, ex, sales] = responses;
+      const errs: string[] = [];
+      const getData = (idx: number, defaultVal: any = { data: { items: [] } }) => {
+        const r = responses[idx];
+        if (r.status === 'fulfilled') return r.value;
+        errs.push(r.reason?.message || 'خطأ غير معروف');
+        return defaultVal;
+      };
 
-      const customerDebt = (cust?.data?.items || []).reduce((s: number, c: Customer) => s + Number(c.balance), 0);
-      const supplierDebt = (sup?.data?.items || []).reduce((s: number, c: Supplier) => s + Number(c.balance), 0);
-      const totalCollections = (cp?.data?.items || []).reduce((s: number, p: CustomerPayment) => s + Number(p.amount), 0);
-      const totalPayments = (sp?.data?.items || []).reduce((s: number, p: SupplierPayment) => s + Number(p.amount), 0);
-      const totalExpenses = (ex?.data?.items || []).reduce((s: number, e: Expense) => s + Number(e.amount), 0);
-      const totalSales = (sales?.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.total), 0);
-      const totalProfit = (sales?.data?.items || []).reduce((s: number, i: SalesInvoice) => s + Number(i.net_profit), 0);
+      const cust = getData(0);
+      const sup = getData(1);
+      const cp = getData(2);
+      const sp = getData(3);
+      const ex = getData(4);
+      const sales = getData(5);
+
+      const customerDebt = (cust?.data?.items || []).reduce((s: number, c: any) => s + Number(c.balance), 0);
+      const supplierDebt = (sup?.data?.items || []).reduce((s: number, c: any) => s + Number(c.balance), 0);
+      const totalCollections = (cp?.data?.items || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+      const totalPayments = (sp?.data?.items || []).reduce((s: number, p: any) => s + Number(p.amount), 0);
+      const totalExpenses = (ex?.data?.items || []).reduce((s: number, e: any) => s + Number(e.amount), 0);
+      const totalSales = (sales?.data?.items || []).reduce((s: number, i: any) => s + Number(i.total), 0);
+      const totalProfit = (sales?.data?.items || []).reduce((s: number, i: any) => s + Number(i.net_profit), 0);
 
       setStats({
         customerDebt,
@@ -73,8 +61,9 @@ export default function ReportsPage() {
         totalExpenses,
         netCash: totalCollections - totalPayments - totalExpenses,
       });
+      setErrors(errs);
     } catch (e: any) {
-      setError(e?.message || "حدث خطأ في تحميل البيانات");
+      setErrors([e?.message || "حدث خطأ في تحميل البيانات"]);
     } finally {
       setLoading(false);
     }
@@ -102,10 +91,18 @@ export default function ReportsPage() {
           <input type="date" className="input-field" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <button onClick={load} disabled={loading} className="btn-primary">{loading ? "⏳" : "🔄 تحديث"}</button>
-        {(from || to) && <button onClick={() => { setFrom(""); setTo(""); }} className="btn-secondary">مسح الفلتر</button>}
+        {(from || to) && <button onClick={() => { setFrom(""); setTo(""); setTimeout(load, 0); }} className="btn-secondary">مسح الفلتر</button>}
       </div>
 
-      {error && <div className="card p-4 text-red-700 bg-red-50">❌ {error}</div>}
+      {errors.length > 0 && (
+        <div className="card p-4 text-amber-700 bg-amber-50 border border-amber-200">
+          <p className="font-bold mb-1">⚠️ لم نتمكن من تحميل بعض البيانات:</p>
+          <ul className="text-sm list-disc list-inside space-y-0.5">
+            {errors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+          <p className="text-xs mt-2 text-amber-600">الأرقام قد تكون غير مكتملة. حاول التحديث لاحقاً.</p>
+        </div>
+      )}
 
       {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحليل...</div> : stats && (
         <>

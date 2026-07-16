@@ -24,8 +24,8 @@ export interface AllModule {
 export const ALL_MODULES: AllModule[] = [
   // 🟢 للمدير (Admin / Manager)
   { key: 'dashboard',    label: 'الرئيسية',                icon: '📊', path: '/dashboard' },
-  { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
   { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
+  { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
   { key: 'inventory',    label: 'المخازن',                 icon: '📦', path: '/inventory' },
   { key: 'products',     label: 'الأصناف',                 icon: '🏷️', path: '/products' },
   { key: 'customers',    label: 'العملاء',                 icon: '👥', path: '/customers' },

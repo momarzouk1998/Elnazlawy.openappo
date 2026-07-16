@@ -3,12 +3,14 @@ import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { useRouter } from "next/navigation";
+import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 
 interface Product {
   id: string; name: string; unit: string; default_sale_price: number; total_stock: number;
+  category?: string | null;
   inventory_items?: { current_stock: number; store_id: string }[];
 }
-interface Customer { id: string; name: string; balance: number; }
+interface Customer { id: string; name: string; balance: number; phone?: string | null; }
 interface Store { id: string; name: string; type: string; }
 interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_price: number; available: number; }
 
@@ -19,15 +21,17 @@ export default function POSPage() {
   const [customerId, setCustomerId] = useState("");
   const [storeId, setStoreId] = useState("");
   const [invoiceType, setInvoiceType] = useState("عادية");
+  const [status, setStatus] = useState("قيد التنفيذ");
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
+  const [showNewProduct, setShowNewProduct] = useState(false);
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
-  const { data: stores } = useApi<Store[]>('/api/stores');
+  const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
 
   useEffect(() => {
-    if (stores && stores.length > 0 && !storeId) setStoreId(stores[0].id);
+    if (stores?.items && stores.items.length > 0 && !storeId) setStoreId(stores.items[0].id);
   }, [stores, storeId]);
 
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
@@ -50,7 +54,7 @@ export default function POSPage() {
     if (existing) {
       setCart(cart.map(c => c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
-      const store = stores?.find(s => s.id === storeId);
+      const store = stores?.items.find(s => s.id === storeId);
       setCart([...cart, {
         product_id: p.id,
         product_name: p.name,
@@ -67,13 +71,11 @@ export default function POSPage() {
     setCart(cart.map((c, i) => {
       if (i !== idx) return c;
       let next = { ...c, [field]: value };
-      // منع الكمية من تجاوز المخزون أو النزول تحت 0
       if (field === 'quantity') {
         const q = Number(value);
         if (!Number.isFinite(q) || q <= 0) next.quantity = 0;
         else next.quantity = Math.min(q, c.available);
       }
-      // سعر الوحدة لا يقبل سالب
       if (field === 'unit_price') {
         const v = Number(value);
         next.unit_price = Number.isFinite(v) && v >= 0 ? v : 0;
@@ -82,7 +84,6 @@ export default function POSPage() {
     }));
   }
 
-  // زيادة/نقصان الكمية بأزرار مع احترام المخزون
   function adjustQty(idx: number, delta: number) {
     setCart(cart.map((c, i) => {
       if (i !== idx) return c;
@@ -97,20 +98,20 @@ export default function POSPage() {
 
   async function save() {
     if (cart.length === 0) { alert('السلة فارغة'); return; }
-    // فلترة الأصناف غير الصالحة (كمية أو سعر صفر) قبل الإرسال
     const validItems = cart.filter(c => c.quantity > 0 && c.unit_price >= 0);
     const invalid = cart.length - validItems.length;
     if (invalid > 0) {
       if (!confirm(`يوجد ${invalid} صنف بكمية أو سعر صفر وسيتم استبعاده. متابعة؟`)) return;
     }
     if (validItems.length === 0) { alert('❌ كل الأصناف لها كمية أو سعر غير صالح'); return; }
-    if (invoiceType !== 'عرض سعر' && !customerId) {
+    if (status !== 'قيد التنفيذ' && !customerId) {
       if (!confirm('لم تختر عميل. هل تريد المتابعة؟')) return;
     }
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
       store_id: storeId,
       invoice_type: invoiceType,
+      status,
       items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
       subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
       discount,
@@ -122,8 +123,19 @@ export default function POSPage() {
     setCart([]);
     setDiscount(0);
     setNotes("");
-    router.push(`/print/invoice/${data?.id}`);
+    if (status === 'مكتملة') {
+      router.push(`/print/invoice/${data?.id}`);
+    } else {
+      router.push(`/sales`);
+    }
   }
+
+  const customerOptions: SearchOption[] = (customers?.items || []).map(c => ({
+    id: c.id,
+    name: c.name,
+    sub: c.phone || undefined,
+    extra: `مديون: ${formatEGP(c.balance)} ج`,
+  }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -155,7 +167,19 @@ export default function POSPage() {
               </div>
             </button>
           ))}
-          {productsData?.items.length === 0 && <div className="card text-center text-gray-400 py-12">لا توجد نتائج</div>}
+          {search.trim() !== "" && productsData?.items.length === 0 && (
+            <div className="col-span-full card p-4 text-center">
+              <p className="text-gray-500 mb-2">لا توجد نتائج لـ "{search}"</p>
+              <button
+                type="button"
+                onClick={() => setShowNewProduct(true)}
+                className="btn-primary text-sm"
+              >+ إضافة صنف جديد بهذا الاسم</button>
+            </div>
+          )}
+          {search.trim() === "" && productsData?.items.length === 0 && (
+            <div className="card text-center text-gray-400 py-12 col-span-full">ابدأ بكتابة اسم الصنف للبحث</div>
+          )}
         </div>
       </div>
 
@@ -164,27 +188,37 @@ export default function POSPage() {
         <div className="card space-y-2">
           <h2 className="font-bold text-lg">🛍️ السلة ({cart.length})</h2>
           <div>
-            <label className="text-xs text-gray-600">العميل</label>
-            <select className="input-field text-sm" value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">— بدون عميل —</option>
-              {customers?.items.map(c => <option key={c.id} value={c.id}>{c.name} (مديون: {formatEGP(c.balance)})</option>)}
-            </select>
+            <label className="text-xs text-gray-600 block mb-1">العميل</label>
+            <SearchableSelect
+              options={customerOptions}
+              value={customerId}
+              onChange={setCustomerId}
+              placeholder="🔍 ابحث عن عميل بالاسم أو الهاتف..."
+              emptyLabel="— بدون عميل —"
+            />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-600">المخزن</label>
+              <label className="text-xs text-gray-600 block mb-1">المخزن</label>
               <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-                {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {stores?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-600">النوع</label>
+              <label className="text-xs text-gray-600 block mb-1">النوع</label>
               <select className="input-field text-sm" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)}>
                 <option value="عادية">عادية</option>
                 <option value="ضريبية">ضريبية</option>
                 <option value="عرض سعر">عرض سعر</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">حالة الفاتورة</label>
+            <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="قيد التنفيذ">قيد التنفيذ (مسودة — قابلة للتعديل)</option>
+              <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
+            </select>
           </div>
         </div>
 
@@ -242,8 +276,66 @@ export default function POSPage() {
           </div>
           <textarea className="input-field text-xs" rows={2} placeholder="ملاحظات (اختياري)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <button onClick={save} disabled={saving || cart.length === 0} className="btn-primary w-full">
-            {saving ? '⏳ جاري الحفظ...' : `✅ حفظ وطباعة (${formatEGP(total)} ج)`}
+            {saving ? '⏳ جاري الحفظ...' : (status === 'مكتملة' ? `✅ حفظ وطباعة (${formatEGP(total)} ج)` : `💾 حفظ كمسودة (${formatEGP(total)} ج)`)}
           </button>
+        </div>
+      </div>
+
+      {showNewProduct && (
+        <NewProductModal
+          initialName={search}
+          onClose={() => setShowNewProduct(false)}
+          onAdded={(p) => { addToCart(p); setShowNewProduct(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewProductModal({ initialName, onClose, onAdded }: { initialName: string; onClose: () => void; onAdded: (p: Product) => void }) {
+  const [f, setF] = useState({
+    name: initialName,
+    default_sale_price: 0,
+    last_purchase_price: 0,
+    category: "",
+    unit: "piece",
+  });
+  const { mutate, loading } = useApiMutation();
+
+  async function save() {
+    if (!f.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
+    if (f.default_sale_price < 0 || f.last_purchase_price < 0) { alert('❌ الأسعار يجب أن تكون موجبة'); return; }
+    const { error, data } = await mutate<Product>('POST', '/api/products', f);
+    if (error) { alert('❌ ' + error); return; }
+    onAdded(data!);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-3">
+        <h2 className="text-lg font-bold">+ إضافة صنف جديد</h2>
+        <div>
+          <label className="text-sm font-medium block mb-1">الاسم *</label>
+          <input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium block mb-1">سعر البيع *</label>
+            <input type="number" step="0.01" min={0} className="input-field" value={f.default_sale_price} onChange={(e) => setF({ ...f, default_sale_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">سعر الشراء *</label>
+            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-1">الفئة</label>
+          <input className="input-field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="مثال: إضاءة، كشافات، أسلاك..." />
+        </div>
+        <p className="text-xs text-gray-500">💡 بعد الإضافة ستتم إضافته تلقائياً للفاتورة. يمكن تعديل التفاصيل لاحقاً من صفحة الأصناف.</p>
+        <div className="flex gap-2 pt-2">
+          <button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ وإضافة للفاتورة'}</button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
         </div>
       </div>
     </div>

@@ -9,7 +9,7 @@ export async function GET() {
     orderBy: { due_date: 'asc' },
     take: 200,
   });
-  return NextResponse.json({ ok: true, data: checks });
+  return NextResponse.json({ ok: true, data: { items: checks, total: checks.length } });
 }
 
 export async function POST(request: NextRequest) {

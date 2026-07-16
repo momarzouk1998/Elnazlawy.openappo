@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma-direct';
 import { notFound } from 'next/navigation';
 import { formatEGP, formatDate } from '@/lib/format';
+import PrintActions from './PrintActions';
 
 export default async function InvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,11 +20,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
   return (
     <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
-      {/* Action buttons - hidden on print */}
-      <div className="no-print max-w-[600px] mx-auto mb-4 flex flex-wrap gap-3 justify-center">
-        <button onClick={() => window.print()} className="bg-button-orange text-white px-6 py-2.5 rounded-full font-bold">🖨️ طباعة</button>
-        <button onClick={() => window.close()} className="bg-button-gray text-white px-6 py-2.5 rounded-full font-bold">✕ إغلاق</button>
-      </div>
+      <PrintActions />
 
       <div className="print-page max-w-[600px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
         {/* Header */}
