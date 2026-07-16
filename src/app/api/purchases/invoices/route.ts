@@ -50,12 +50,15 @@ export async function POST(request: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       const maxN = await tx.purchase_invoices.aggregate({ _max: { purchase_number: true } });
       const purchase_number = (maxN._max.purchase_number || 0) + 1;
+      const status = purchaseData.status || 'مكتملة';
+      const willBeCompleted = status === 'مكتملة';
+
       const invoice = await tx.purchase_invoices.create({
         data: {
           purchase_number,
           purchase_date: purchaseData.purchase_date ? new Date(purchaseData.purchase_date) : new Date(),
           supplier_id: purchaseData.supplier_id || null,
-          status: 'مكتملة',
+          status,
           total_amount: purchaseData.total_amount || 0,
           notes: purchaseData.notes || null,
           created_by: profile.id,
@@ -77,7 +80,7 @@ export async function POST(request: NextRequest) {
           },
         });
         // Update product last_purchase_price (track history)
-        if (it.row_type === 'شراء' && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
+        if (willBeCompleted && it.row_type === 'شراء' && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
           await tx.product_price_history.create({
             data: {
               product_id: it.product_id,
@@ -96,7 +99,7 @@ export async function POST(request: NextRequest) {
           });
         }
         // Increment inventory
-        if (it.row_type === 'شراء') {
+        if (willBeCompleted && it.row_type === 'شراء') {
           await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
             create: { product_id: it.product_id, store_id: it.store_id, current_stock: it.quantity },
@@ -105,7 +108,7 @@ export async function POST(request: NextRequest) {
         }
       }
       // Update supplier balance
-      if (purchaseData.supplier_id) {
+      if (willBeCompleted && purchaseData.supplier_id) {
         await tx.suppliers.update({
           where: { id: purchaseData.supplier_id },
           data: { balance: { increment: purchaseData.total_amount || 0 } },

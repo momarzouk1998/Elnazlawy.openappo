@@ -96,7 +96,37 @@ export default function PurchasesPage() {
 }
 
 function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClose: () => void }) {
-  const { data: inv, loading } = useApi<any>(`/api/purchases/invoices/${invoiceId}`);
+  const { data: inv, loading, refetch } = useApi<any>(`/api/purchases/invoices/${invoiceId}`);
+  const { mutate } = useApiMutation();
+  const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const isCompleted = inv?.status === 'مكتملة';
+  const isCancelled = inv?.status === 'ملغاة';
+
+  if (!loading && inv && status === "") {
+    setStatus(inv.status);
+    setNotes(inv.notes || '');
+  }
+
+  async function saveChanges() {
+    const { error } = await mutate('PATCH', `/api/purchases/invoices/${invoiceId}`, { status, notes });
+    if (error) { alert('❌ ' + error); return; }
+    alert('✅ تم حفظ التعديلات');
+    setEditing(false);
+    refetch();
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('focus'));
+  }
+
+  async function cancelInvoice() {
+    if (!confirm('هل تريد إلغاء هذه الفاتورة؟ سيتم خصم المخزون المضاف وإرجاع المبلغ لخصمه من رصيد المورد.')) return;
+    const { error } = await mutate('DELETE', `/api/purchases/invoices/${invoiceId}`);
+    if (error) { alert('❌ ' + error); return; }
+    alert('✅ تم إلغاء الفاتورة');
+    onClose();
+    if (typeof window !== 'undefined') window.location.reload();
+  }
 
   if (loading) {
     return (
@@ -166,7 +196,44 @@ function PurchaseDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClo
             )}
           </div>
 
+          {/* Editable fields */}
+          {editing && !isCompleted && !isCancelled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">الحالة</label>
+                <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="قيد التنفيذ">قيد التنفيذ (مسودة)</option>
+                  <option value="مكتملة">مكتملة (نهائية)</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs text-gray-600 block mb-1">ملاحظات</label>
+                <textarea
+                  className="input-field text-sm"
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2 pt-3 border-t">
+            {editing ? (
+              <>
+                <button onClick={saveChanges} className="btn-primary text-sm">💾 حفظ التعديلات</button>
+                <button onClick={() => setEditing(false)} className="btn-secondary text-sm text-gray-600">إلغاء التعديل</button>
+              </>
+            ) : (
+              <>
+                {!isCompleted && !isCancelled && (
+                  <button onClick={() => setEditing(true)} className="btn-secondary text-sm">✏️ تعديل</button>
+                )}
+                {!isCancelled && (
+                  <button onClick={cancelInvoice} className="btn-secondary text-sm !bg-red-50 !text-red-600 hover:!bg-red-100 !border-red-200">🗑️ إلغاء الفاتورة</button>
+                )}
+              </>
+            )}
             <button onClick={onClose} className="btn-secondary text-sm">إغلاق</button>
           </div>
         </div>

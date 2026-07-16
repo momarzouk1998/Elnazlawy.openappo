@@ -225,7 +225,7 @@ function InvoiceDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClos
         row_type: i.row_type || 'بيع',
       })),
       discount,
-      status,
+      status: invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status,
       invoice_type: invoiceType,
       notes,
     });
@@ -348,13 +348,15 @@ function InvoiceDetailsModal({ invoiceId, onClose }: { invoiceId: string; onClos
                   <option value="عرض سعر">عرض سعر</option>
                 </select>
               </div>
-              <div>
-                <label className="text-xs text-gray-600 block mb-1">الحالة</label>
-                <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-                  <option value="قيد التنفيذ">قيد التنفيذ (مسودة)</option>
-                  <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
-                </select>
-              </div>
+              {invoiceType !== 'عرض سعر' && (
+                <div>
+                  <label className="text-xs text-gray-600 block mb-1">الحالة</label>
+                  <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+                    <option value="قيد التنفيذ">قيد التنفيذ (مسودة)</option>
+                    <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-gray-600 block mb-1">الخصم</label>
                 <input

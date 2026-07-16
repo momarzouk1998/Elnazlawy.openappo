@@ -18,13 +18,13 @@ export default function ReportsPage() {
     setLoading(true);
     setErrors([]);
     try {
-      const qs = from && to ? `?from=${from}&to=${to}` : "";
+      const qs = from && to ? `from=${from}&to=${to}&` : "";
       const responses = await Promise.allSettled([
         fetch("/api/customers?limit=9999").then(r => { if (!r.ok) throw new Error(`Customers API: ${r.status}`); return r.json(); }),
         fetch("/api/suppliers?limit=9999").then(r => { if (!r.ok) throw new Error(`Suppliers API: ${r.status}`); return r.json(); }),
-        fetch(`/api/payments/customers${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Customer Payments API: ${r.status}`); return r.json(); }),
-        fetch(`/api/payments/suppliers${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Supplier Payments API: ${r.status}`); return r.json(); }),
-        fetch(`/api/expenses${qs}&limit=9999`).then(r => { if (!r.ok) throw new Error(`Expenses API: ${r.status}`); return r.json(); }),
+        fetch(`/api/payments/customers?${qs}limit=9999`).then(r => { if (!r.ok) throw new Error(`Customer Payments API: ${r.status}`); return r.json(); }),
+        fetch(`/api/payments/suppliers?${qs}limit=9999`).then(r => { if (!r.ok) throw new Error(`Supplier Payments API: ${r.status}`); return r.json(); }),
+        fetch(`/api/expenses?${qs}limit=9999`).then(r => { if (!r.ok) throw new Error(`Expenses API: ${r.status}`); return r.json(); }),
         fetch(`/api/sales/invoices?status=مكتملة&limit=9999`).then(r => { if (!r.ok) throw new Error(`Sales API: ${r.status}`); return r.json(); }),
       ]);
 

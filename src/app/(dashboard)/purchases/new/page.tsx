@@ -16,6 +16,7 @@ export default function NewPurchasePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [storeId, setStoreId] = useState("");
+  const [status, setStatus] = useState("قيد التنفيذ");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
   const { mutate, loading: saving } = useApiMutation();
@@ -91,6 +92,7 @@ export default function NewPurchasePage() {
     const validTotal = validItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0);
     const { error, data } = await mutate<{ id: string; purchase_number: number }>('POST', '/api/purchases/invoices', {
       supplier_id: supplierId || null,
+      status,
       total_amount: validTotal,
       notes,
       items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_cost: c.unit_cost, row_type: 'شراء' })),
@@ -172,6 +174,13 @@ export default function NewPurchasePage() {
             <label className="text-xs text-gray-600 block mb-1">مخزن الاستلام</label>
             <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
               {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">الحالة</label>
+            <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="قيد التنفيذ">قيد التنفيذ (مسودة - لا تخصم المخزون)</option>
+              <option value="مكتملة">مكتملة (نهائية - تضيف للمخزون)</option>
             </select>
           </div>
         </div>

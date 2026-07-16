@@ -12,7 +12,7 @@ interface Product {
 }
 interface Customer { id: string; name: string; balance: number; phone?: string | null; }
 interface Store { id: string; name: string; type: string; }
-interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_price: number; available: number; }
+interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_price: number; available: number; product_ref: Product; }
 
 export default function POSPage() {
   const router = useRouter();
@@ -25,6 +25,7 @@ export default function POSPage() {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
+  const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
@@ -38,9 +39,9 @@ export default function POSPage() {
   const total = Math.max(0, subtotal - discount);
 
   // المخزون المتاح للصنف في المخزن المختار
-  function stockFor(p: Product): number {
-    if (!storeId) return 0;
-    const perStore = p.inventory_items?.find(i => i.store_id === storeId);
+  function stockFor(p: Product, sId: string = storeId): number {
+    if (!sId) return 0;
+    const perStore = p.inventory_items?.find(i => i.store_id === sId);
     return perStore ? Number(perStore.current_stock) : Number(p.total_stock);
   }
 
@@ -49,10 +50,24 @@ export default function POSPage() {
     const available = stockFor(p);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === storeId);
     const currentQty = existing ? existing.quantity : 0;
-    if (available <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر بالمخزن`); return; }
-    if (currentQty + 1 > available) { alert(`⚠️ الكمية المطلوبة تتجاوز المخزون المتاح (${available})`); return; }
+    
+    if (available <= 0 && p.total_stock > 0) {
+      setSmartSplitItem({ product: p, requestedQty: 1, currentStoreId: storeId });
+      return;
+    }
+    if (available <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر في أي مخزن`); return; }
+    
+    if (currentQty + 1 > available) {
+      if (p.total_stock >= currentQty + 1) {
+        setSmartSplitItem({ product: p, requestedQty: currentQty + 1, currentStoreId: storeId });
+      } else {
+        alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح في جميع المخازن (${p.total_stock})`);
+      }
+      return;
+    }
+    
     if (existing) {
-      setCart(cart.map(c => c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c));
+      setCart(cart.map(c => c.product_id === p.id && c.store_id === storeId ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
       const store = stores?.items.find(s => s.id === storeId);
       setCart([...cart, {
@@ -63,18 +78,34 @@ export default function POSPage() {
         quantity: 1,
         unit_price: Number(p.default_sale_price),
         available,
+        product_ref: p
       }]);
     }
   }
 
   function updateItem(idx: number, field: keyof CartItem, value: any) {
+    let shouldOpenSplit = false;
+    let splitParams: any = null;
+
     setCart(cart.map((c, i) => {
       if (i !== idx) return c;
       let next = { ...c, [field]: value };
       if (field === 'quantity') {
         const q = Number(value);
-        if (!Number.isFinite(q) || q <= 0) next.quantity = 0;
-        else next.quantity = Math.min(q, c.available);
+        if (!Number.isFinite(q) || q <= 0) {
+          next.quantity = 0;
+        } else if (q > c.available) {
+          if (c.product_ref.total_stock >= q) {
+            shouldOpenSplit = true;
+            splitParams = { product: c.product_ref, requestedQty: q, currentStoreId: c.store_id, itemIdx: i };
+            return c; // لا تحدث الكمية هنا، سنحدثها في الـ Modal
+          } else {
+            alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح في جميع المخازن (${c.product_ref.total_stock})`);
+            next.quantity = c.available;
+          }
+        } else {
+          next.quantity = q;
+        }
       }
       if (field === 'unit_price') {
         const v = Number(value);
@@ -82,18 +113,53 @@ export default function POSPage() {
       }
       return next;
     }));
+
+    if (shouldOpenSplit && splitParams) {
+      setSmartSplitItem(splitParams);
+    }
   }
 
   function adjustQty(idx: number, delta: number) {
-    setCart(cart.map((c, i) => {
-      if (i !== idx) return c;
-      const q = c.quantity + delta;
-      return { ...c, quantity: Math.max(0, Math.min(q, c.available)) };
-    }));
+    const c = cart[idx];
+    if (!c) return;
+    const newQty = c.quantity + delta;
+    updateItem(idx, 'quantity', newQty);
   }
 
   function removeItem(idx: number) {
     setCart(cart.filter((_, i) => i !== idx));
+  }
+  
+  function handleSmartSplitConfirm(splits: { store_id: string, store_name: string, quantity: number }[]) {
+    if (!smartSplitItem) return;
+    const { product, itemIdx } = smartSplitItem;
+    
+    // إزالة العنصر القديم إذا كنا نعدل
+    let newCart = [...cart];
+    if (itemIdx !== undefined) {
+      newCart = newCart.filter(c => c.product_id !== product.id);
+    } else {
+      newCart = newCart.filter(c => c.product_id !== product.id);
+    }
+    
+    // إضافة الأسطر الجديدة
+    splits.forEach(split => {
+      if (split.quantity > 0) {
+        newCart.push({
+          product_id: product.id,
+          product_name: product.name,
+          store_id: split.store_id,
+          store_name: split.store_name,
+          quantity: split.quantity,
+          unit_price: Number(product.default_sale_price),
+          available: stockFor(product, split.store_id),
+          product_ref: product
+        });
+      }
+    });
+    
+    setCart(newCart);
+    setSmartSplitItem(null);
   }
 
   async function save() {
@@ -104,14 +170,17 @@ export default function POSPage() {
       if (!confirm(`يوجد ${invalid} صنف بكمية أو سعر صفر وسيتم استبعاده. متابعة؟`)) return;
     }
     if (validItems.length === 0) { alert('❌ كل الأصناف لها كمية أو سعر غير صالح'); return; }
-    if (status !== 'قيد التنفيذ' && !customerId) {
+    if (status !== 'قيد التنفيذ' && invoiceType !== 'عرض سعر' && !customerId) {
       if (!confirm('لم تختر عميل. هل تريد المتابعة؟')) return;
     }
+    
+    const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
+
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
-      store_id: storeId,
+      store_id: storeId, // المخزن الافتراضي للفاتورة، بس كل سطر ليه مخزنه الخاص
       invoice_type: invoiceType,
-      status,
+      status: finalStatus,
       items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
       subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
       discount,
@@ -123,7 +192,7 @@ export default function POSPage() {
     setCart([]);
     setDiscount(0);
     setNotes("");
-    if (status === 'مكتملة') {
+    if (finalStatus === 'مكتملة') {
       router.push(`/print/invoice/${data?.id}`);
     } else {
       router.push(`/sales`);
@@ -199,7 +268,7 @@ export default function POSPage() {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-600 block mb-1">المخزن</label>
+              <label className="text-xs text-gray-600 block mb-1">المخزن الأساسي للفاتورة</label>
               <select className="input-field text-sm" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
                 {stores?.items.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
@@ -213,13 +282,15 @@ export default function POSPage() {
               </select>
             </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-600 block mb-1">حالة الفاتورة</label>
-            <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="قيد التنفيذ">قيد التنفيذ (مسودة — قابلة للتعديل)</option>
-              <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
-            </select>
-          </div>
+          {invoiceType !== 'عرض سعر' && (
+            <div>
+              <label className="text-xs text-gray-600 block mb-1">حالة الفاتورة</label>
+              <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="قيد التنفيذ">قيد التنفيذ (مسودة — قابلة للتعديل)</option>
+                <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="card max-h-[300px] overflow-y-auto p-2">
@@ -276,7 +347,7 @@ export default function POSPage() {
           </div>
           <textarea className="input-field text-xs" rows={2} placeholder="ملاحظات (اختياري)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <button onClick={save} disabled={saving || cart.length === 0} className="btn-primary w-full">
-            {saving ? '⏳ جاري الحفظ...' : (status === 'مكتملة' ? `✅ حفظ وطباعة (${formatEGP(total)} ج)` : `💾 حفظ كمسودة (${formatEGP(total)} ج)`)}
+            {saving ? '⏳ جاري الحفظ...' : ((status === 'مكتملة' && invoiceType !== 'عرض سعر') ? `✅ حفظ وطباعة (${formatEGP(total)} ج)` : `💾 حفظ كمسودة (${formatEGP(total)} ج)`)}
           </button>
         </div>
       </div>
@@ -286,6 +357,15 @@ export default function POSPage() {
           initialName={search}
           onClose={() => setShowNewProduct(false)}
           onAdded={(p) => { addToCart(p); setShowNewProduct(false); }}
+        />
+      )}
+      
+      {smartSplitItem && stores && (
+        <SmartSplitModal
+          item={smartSplitItem}
+          stores={stores.items}
+          onClose={() => setSmartSplitItem(null)}
+          onConfirm={handleSmartSplitConfirm}
         />
       )}
     </div>
@@ -335,6 +415,118 @@ function NewProductModal({ initialName, onClose, onAdded }: { initialName: strin
         <p className="text-xs text-gray-500">💡 بعد الإضافة ستتم إضافته تلقائياً للفاتورة. يمكن تعديل التفاصيل لاحقاً من صفحة الأصناف.</p>
         <div className="flex gap-2 pt-2">
           <button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ وإضافة للفاتورة'}</button>
+          <button onClick={onClose} className="btn-secondary">إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SmartSplitModal({ item, stores, onClose, onConfirm }: {
+  item: { product: Product, requestedQty: number, currentStoreId: string },
+  stores: Store[],
+  onClose: () => void,
+  onConfirm: (splits: { store_id: string, store_name: string, quantity: number }[]) => void
+}) {
+  const { product, requestedQty } = item;
+  
+  // تجميع المخزون لكل مخزن
+  const storeStocks = stores.map(store => {
+    const invItem = product.inventory_items?.find(i => i.store_id === store.id);
+    return {
+      store_id: store.id,
+      store_name: store.name,
+      available: invItem ? Number(invItem.current_stock) : 0,
+      quantity: 0
+    };
+  }).filter(s => s.available > 0);
+  
+  // توزيع تلقائي للكمية المطلوبة
+  const [splits, setSplits] = useState(() => {
+    let remaining = requestedQty;
+    const initialSplits = storeStocks.map(s => ({ ...s, quantity: 0 }));
+    
+    // الأولوية للمخزن الحالي المختار
+    const currentStore = initialSplits.find(s => s.store_id === item.currentStoreId);
+    if (currentStore && currentStore.available > 0) {
+      const take = Math.min(remaining, currentStore.available);
+      currentStore.quantity = take;
+      remaining -= take;
+    }
+    
+    // توزيع الباقي على المخازن الأخرى
+    for (const s of initialSplits) {
+      if (remaining <= 0) break;
+      if (s.store_id === item.currentStoreId) continue; // تم خصمه بالفعل
+      const take = Math.min(remaining, s.available);
+      s.quantity = take;
+      remaining -= take;
+    }
+    
+    return initialSplits;
+  });
+
+  const totalAssigned = splits.reduce((sum, s) => sum + s.quantity, 0);
+
+  function handleQuantityChange(store_id: string, qty: number) {
+    setSplits(splits.map(s => {
+      if (s.store_id !== store_id) return s;
+      return { ...s, quantity: Math.max(0, Math.min(qty, s.available)) };
+    }));
+  }
+
+  function confirm() {
+    if (totalAssigned <= 0) {
+      alert('يجب توزيع كمية واحدة على الأقل');
+      return;
+    }
+    onConfirm(splits);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4">
+        <div className="text-center">
+          <div className="text-4xl mb-2">💡</div>
+          <h2 className="text-lg font-bold">توزيع ذكي للمخزون</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            الصنف "{product.name}" غير كافٍ في المخزن المختار.<br/>تم اقتراح سحبه من مخازن متعددة.
+          </p>
+        </div>
+        
+        <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm flex justify-between font-bold border border-blue-100">
+          <span>الكمية المطلوبة: {requestedQty}</span>
+          <span>إجمالي المتاح: {product.total_stock}</span>
+        </div>
+
+        <div className="space-y-2">
+          {splits.map(s => (
+            <div key={s.store_id} className="flex items-center justify-between bg-gray-50 p-2 rounded border">
+              <div>
+                <div className="font-semibold text-sm">{s.store_name}</div>
+                <div className="text-xs text-gray-500">متاح: {formatQty(s.available)}</div>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={s.available}
+                value={s.quantity || ''}
+                onChange={(e) => handleQuantityChange(s.store_id, parseFloat(e.target.value) || 0)}
+                className="input-field w-20 text-center font-mono"
+              />
+            </div>
+          ))}
+        </div>
+        
+        <div className="flex justify-between items-center text-sm font-bold pt-2 border-t">
+          <span>الإجمالي الموزع:</span>
+          <span className={totalAssigned === requestedQty ? 'text-green-600' : 'text-orange-600'}>
+            {totalAssigned} / {requestedQty}
+          </span>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={confirm} className="btn-primary flex-1">اعتماد التوزيع</button>
           <button onClick={onClose} className="btn-secondary">إلغاء</button>
         </div>
       </div>

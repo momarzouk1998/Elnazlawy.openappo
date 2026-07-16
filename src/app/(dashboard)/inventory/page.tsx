@@ -27,7 +27,6 @@ interface Store { id: string; name: string; type: string; _count?: { inventory: 
 const TABS = [
   { key: 'stock', label: 'المخزون', icon: '📦' },
   { key: 'transfers', label: 'التحويلات', icon: '🚛' },
-  { key: 'branches', label: 'الفروع', icon: '🏢' },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
@@ -36,8 +35,8 @@ export default function InventoryPage() {
   const [profile, setProfile] = useState<any>(null);
   useEffect(() => { getCurrentUserClient().then(setProfile); }, []);
 
-  // تبويب الفروع للأدمن/المدير فقط
-  const visibleTabs = TABS.filter(t => t.key !== 'branches' || profile?.role === 'admin' || profile?.role === 'manager');
+  // لا حاجة لتبويب الفروع بعد الآن، تم دمجه في كاردات المخزون
+  const visibleTabs = TABS;
 
   return (
     <div className="space-y-4">
@@ -62,7 +61,6 @@ export default function InventoryPage() {
 
       {tab === 'stock' && <StockTab profile={profile} />}
       {tab === 'transfers' && <TransfersTab />}
-      {tab === 'branches' && <BranchesTab />}
     </div>
   );
 }
@@ -80,13 +78,67 @@ function StockTab({ profile }: { profile: any }) {
   if (lowOnly) params.set('low_stock', '1');
   if (search) params.set('search', search);
 
+  const { data: summaryData, loading: summaryLoading } = useApi<any>('/api/inventory/summary');
   const { data, loading } = useApi<InvItem[]>(`/api/inventory?${params.toString()}`);
-  const { data: storesData } = useApi<{ items: { id: string; name: string }[]; total: number }>('/api/stores');
-  const stores = storesData?.items;
+  const stores = summaryData?.stores || [];
+  const overall = summaryData?.overall;
   const showCost = profile?.can_see_cost;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Cards Section */}
+      {summaryLoading ? (
+        <div className="card text-center py-6 text-gray-500">⏳ جاري تحميل إحصائيات المخازن...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Overall Card */}
+          <div className="card bg-gradient-to-r from-nazlawy-600 to-nazlawy-800 text-white shadow-xl transform hover:scale-[1.02] transition-transform">
+            <h3 className="text-lg font-bold opacity-90 mb-2">إجمالي كل المخازن</h3>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-sm opacity-80">عدد الأصناف:</span>
+                <span className="font-mono font-bold">{overall?.total_items || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm opacity-80">إجمالي القطع:</span>
+                <span className="font-mono font-bold text-yellow-300">{formatQty(overall?.total_qty || 0)}</span>
+              </div>
+              {showCost && (
+                <div className="flex justify-between pt-2 border-t border-white/20 mt-2">
+                  <span className="text-sm opacity-80">إجمالي التكلفة:</span>
+                  <span className="font-mono font-bold text-green-300">{formatEGP(overall?.total_value || 0)} ج</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Store Cards */}
+          {stores.map((s: any) => (
+            <div key={s.store_id} className="card border-l-4 border-l-nazlawy-500 hover:shadow-lg transition-shadow bg-white">
+              <h3 className="text-md font-bold text-gray-800 mb-2">🏢 {s.store_name}</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>عدد الأصناف:</span>
+                  <span className="font-mono font-bold text-gray-900">{s.total_items}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>إجمالي القطع:</span>
+                  <span className="font-mono font-bold text-nazlawy-600">{formatQty(s.total_qty)}</span>
+                </div>
+                {showCost && (
+                  <div className="flex justify-between pt-2 border-t mt-2">
+                    <span>إجمالي التكلفة:</span>
+                    <span className="font-mono font-bold text-green-600">{formatEGP(s.total_value)} ج</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Details Section */}
+      <h2 className="text-xl font-bold text-slate-700 mt-6">تفاصيل المخزون</h2>
       <div className="card flex flex-wrap gap-2">
         <select className="input-field text-sm w-auto" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
           <option value="">كل المخازن</option>
@@ -262,41 +314,3 @@ function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   );
 }
 
-/* ============================================
-   تبويب الفروع (أدمن/مدير)
-============================================ */
-function BranchesTab() {
-  const { data: storesData, loading: storesLoading } = useApi<{ items: Store[] }>('/api/stores');
-  const stores = storesData?.items;
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-500">عرض المخازن والفروع النشطة</p>
-      {storesLoading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
-        <div className="card overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="p-3 text-right">الاسم</th>
-                <th className="p-3 text-right">النوع</th>
-                <th className="p-3 text-right">العناصر</th>
-                <th className="p-3 text-right">الخزينة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stores?.map(s => (
-                <tr key={s.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-semibold">{s.name}</td>
-                  <td className="p-3">{s.type}</td>
-                  <td className="p-3">{s._count?.inventory ?? '—'}</td>
-                  <td className="p-3 text-xs">{s.treasury ? `${s.treasury.name} (${formatEGP(s.treasury.current_balance)})` : '—'}</td>
-                </tr>
-              ))}
-              {stores?.length === 0 && <tr><td colSpan={4} className="p-12 text-center text-gray-400">لا توجد فروع</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
