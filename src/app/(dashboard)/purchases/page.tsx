@@ -165,6 +165,16 @@ function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: stri
     if (typeof window !== 'undefined') window.location.reload();
   }
 
+  async function deleteInvoice() {
+    if (!confirm('⚠️ هل أنت متأكد من الحذف النهائي لهذه الفاتورة؟\n\nسيتم حذف الفاتورة نهائياً من قاعدة البيانات.\nهذا الإجراء لا يمكن التراجع عنه!')) return;
+    if (!confirm('⚠️⚠️ تأكيد نهائي:\n\nأنت على وشك حذف الفاتورة نهائياً.\nلن يمكن استرجاعها أبداً.\n\nهل تريد المتابعة؟')) return;
+    const { error } = await mutate('DELETE', `/api/purchases/invoices/${invoiceId}?permanent=true`);
+    if (error) { alert('❌ ' + error); return; }
+    alert('✅ تم الحذف النهائي');
+    onClose();
+    if (typeof window !== 'undefined') window.location.reload();
+  }
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -269,6 +279,11 @@ function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: stri
                 {!isCancelled && (
                   <button onClick={cancelInvoice} className={`text-sm px-4 py-2 rounded-lg font-semibold border transition ${isAdmin ? 'bg-red-600 text-white hover:bg-red-700 border-red-700' : 'bg-red-50 text-red-700 hover:bg-red-100 border-red-200'}`}>
                     {isAdmin ? '⚠️ إلغاء (صلاحية مدير)' : '🗑️ إلغاء الفاتورة'}
+                  </button>
+                )}
+                {isAdmin && (
+                  <button onClick={deleteInvoice} className="text-sm px-4 py-2 rounded-lg font-semibold bg-red-700 text-white hover:bg-red-800 border border-red-800 transition">
+                    🗑️💀 حذف نهائي (أدمن)
                   </button>
                 )}
               </>

@@ -157,12 +157,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 // DELETE /api/purchases/invoices/[id] - إلغاء الفاتورة (خصم المخزون مرة أخرى)
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
 
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const permanent = searchParams.get('permanent') === 'true';
+
     const invoice = await prisma.purchase_invoices.findUnique({
       where: { id },
       include: { items: true },
@@ -173,6 +176,21 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
     }
 
+    // الحذف النهائي - للأدمن فقط
+    if (permanent) {
+      if (profile.role !== 'admin') {
+        return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'الحذف النهائي متاح للأدمن فقط' } }, { status: 403 });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.purchase_invoice_items.deleteMany({ where: { purchase_id: id } });
+        await tx.purchase_invoices.delete({ where: { id } });
+      });
+
+      return NextResponse.json({ ok: true, data: { message: 'تم الحذف النهائي للفاتورة' } });
+    }
+
+    // الإلغاء العادي
     if (invoice.status === 'ملغاة') {
       return NextResponse.json({ ok: false, error: { code: 'ALREADY_CANCELLED' } }, { status: 400 });
     }
