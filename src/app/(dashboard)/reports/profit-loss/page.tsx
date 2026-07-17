@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, canSeeCost } from "@/lib/auth-server";
+import { getCurrentUser } from "@/lib/auth-server";
+import { canSeeCost } from "@/lib/auth";
 import prisma from "@/lib/db/prisma";
 import { formatEGP } from "@/lib/format";
 
