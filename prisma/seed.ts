@@ -14,22 +14,48 @@ async function main() {
   // Ensure schema exists
   await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS elnazlawy;`);
 
-  // Clean existing data (idempotent re-seed)
-  console.log('🧹 Cleaning existing data...');
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE elnazlawy.audit_log, elnazlawy.treasury_transactions, elnazlawy.customer_payments, elnazlawy.supplier_payments, elnazlawy.checks, elnazlawy.expenses, elnazlawy.sales_invoice_items, elnazlawy.sales_invoices, elnazlawy.purchase_invoice_items, elnazlawy.purchase_invoices, elnazlawy.stock_transfers, elnazlawy.product_price_history, elnazlawy.inventory, elnazlawy.products, elnazlawy.customers, elnazlawy.suppliers, elnazlawy.stores, elnazlawy.treasuries, elnazlawy.users RESTART IDENTITY CASCADE;`);
+  // Clean business data while preserving existing users
+  console.log('🧹 Cleaning business data while preserving users...');
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE elnazlawy.audit_log, elnazlawy.treasury_transactions, elnazlawy.customer_payments, elnazlawy.supplier_payments, elnazlawy.checks, elnazlawy.expenses, elnazlawy.sales_invoice_items, elnazlawy.sales_invoices, elnazlawy.purchase_invoice_items, elnazlawy.purchase_invoices, elnazlawy.stock_transfers, elnazlawy.product_price_history, elnazlawy.inventory, elnazlawy.products, elnazlawy.customers, elnazlawy.suppliers, elnazlawy.stores, elnazlawy.treasuries RESTART IDENTITY CASCADE;`);
 
   const pwd = await bcrypt.hash('123456', 10);
 
   // === Users (من MIGRATION_PLAN.md - 2.4) ===
-  console.log('👥 Creating users...');
-  const users = await Promise.all([
-    prisma.users.create({ data: { username: 'openapps',  full_name: 'OPEN APPS',    phone: '01558282760', password_hash: pwd, role: 'admin',      can_see_cost: true } }),
-    prisma.users.create({ data: { username: 'mahmoud',    full_name: 'حاج/ محمود حسين', phone: '01006172668', password_hash: pwd, role: 'manager',    can_see_cost: true } }),
-    prisma.users.create({ data: { username: 'abumahmoud', full_name: 'أبو محمود',      phone: '01129093469', password_hash: pwd, role: 'manager',    can_see_cost: true } }),
-    prisma.users.create({ data: { username: 'ibrahim',    full_name: 'إبرام يوسف',    phone: '01095463383', password_hash: pwd, role: 'accountant', can_see_cost: false } }),
-    prisma.users.create({ data: { username: 'rep1',       full_name: 'مندوب 1',         phone: '01000000001', password_hash: pwd, role: 'rep',        can_see_cost: false } }),
-    prisma.users.create({ data: { username: 'rep2',       full_name: 'مندوب 2',         phone: '01000000002', password_hash: pwd, role: 'rep',        can_see_cost: false } }),
-  ]);
+  console.log('👥 Ensuring default users exist...');
+  const userDefinitions = [
+    { username: 'openapps',    full_name: 'OPEN APPS',       phone: '01558282760', role: 'admin',      can_see_cost: true },
+    { username: 'mahmoud',     full_name: 'حاج/ محمود حسين', phone: '01006172668', role: 'manager',    can_see_cost: true },
+    { username: 'abumahmoud',  full_name: 'أبو محمود',       phone: '01129093469', role: 'manager',    can_see_cost: true },
+    { username: 'ibram',       full_name: 'إبرام يوسف',      phone: '01095463383', role: 'accountant', can_see_cost: false },
+    { username: 'rep1',        full_name: 'مندوب 1',         phone: '01000000001', role: 'rep',        can_see_cost: false },
+    { username: 'rep2',        full_name: 'مندوب 2',         phone: '01000000002', role: 'rep',        can_see_cost: false },
+  ];
+
+  const users = await Promise.all(
+    userDefinitions.map(async (user) => {
+      return prisma.users.upsert({
+        where: { username: user.username },
+        update: {
+          full_name: user.full_name,
+          phone: user.phone,
+          password_hash: pwd,
+          role: user.role,
+          can_see_cost: user.can_see_cost,
+          is_active: true,
+        },
+        create: {
+          username: user.username,
+          full_name: user.full_name,
+          phone: user.phone,
+          password_hash: pwd,
+          role: user.role,
+          can_see_cost: user.can_see_cost,
+          is_active: true,
+        },
+      });
+    })
+  );
+
   const [openapps, mahmoud, abumahmoud] = users;
 
   // === Stores (من MIGRATION_PLAN.md - 2.5) ===

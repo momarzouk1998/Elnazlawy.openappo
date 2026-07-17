@@ -56,7 +56,7 @@ export function useApi<T>(path: string | null) {
     abortRef.current = controller
     setState((prev) => ({ ...prev, loading: true, error: null }))
     try {
-      const res = await fetch(path, { signal: controller.signal })
+      const res = await fetch(path, { signal: controller.signal, cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
         const msg = json?.error?.message || json?.error || `HTTP ${res.status}`

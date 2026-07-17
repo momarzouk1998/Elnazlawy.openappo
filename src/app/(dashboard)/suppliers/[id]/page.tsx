@@ -136,7 +136,7 @@ export default function SupplierDetailPage() {
 // حذف المورد (آمن)
 async function deleteSupplier(supplier: SupplierDetail, router: ReturnType<typeof useRouter>) {
   if (!confirm(`حذف المورد "${supplier.name}"؟`)) return;
-  const res = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE' });
+  const res = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE', cache: 'no-store' });
   const json = await res.json();
   if (!res.ok) {
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
@@ -144,6 +144,7 @@ async function deleteSupplier(supplier: SupplierDetail, router: ReturnType<typeo
   }
   alert(json?.data?.soft_deleted ? '✅ تم إخفاء المورد (له حركات تاريخية)' : '✅ تم حذف المورد');
   router.push('/suppliers');
+  router.refresh(); // إجبار تحديث البيانات
 }
 
 /* ============================================

@@ -125,7 +125,7 @@ export default function CustomerDetailPage() {
 // حذف العميل (آمن)
 async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeof useRouter>) {
   if (!confirm(`حذف العميل "${customer.name}"؟`)) return;
-  const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' });
+  const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE', cache: 'no-store' });
   const json = await res.json();
   if (!res.ok) {
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
@@ -133,6 +133,7 @@ async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeo
   }
   alert(json?.data?.soft_deleted ? '✅ تم إخفاء العميل (له حركات تاريخية)' : '✅ تم حذف العميل');
   router.push('/customers');
+  router.refresh(); // إجبار تحديث البيانات
 }
 
 /* ============================================
