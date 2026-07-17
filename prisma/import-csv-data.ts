@@ -128,8 +128,8 @@ async function importData() {
           category: row['Category P'] || null,
           unit: row['Unit_Of_Measure P'] || 'قطعة',
           units_per_carton: parseInt(row['Units_Per_Carton P']) || 1,
-          default_sale_price: purchasePrice * 1.3,
-          last_purchase_price: purchasePrice,
+          default_sale_price: 0, // سعر البيع صفر
+          last_purchase_price: purchasePrice, // سعر الشراء (ممكن يكون صفر)
           reorder_level: 5,
           is_active: true,
         },
