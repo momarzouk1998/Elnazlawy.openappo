@@ -14,6 +14,7 @@ interface CustomerDetail {
   address: string | null;
   opening_balance: number;
   balance: number;
+  route_days: string[];
   notes: string | null;
 }
 interface Payment {
@@ -340,6 +341,7 @@ function EditForm({ customer, onClose, onSaved }: { customer: CustomerDetail; on
     whatsapp: customer.whatsapp || '',
     address: customer.address || '',
     opening_balance: customer.opening_balance,
+    route_days: customer.route_days || [],
     notes: customer.notes || '',
   });
   const { mutate, loading } = useApiMutation();
@@ -352,15 +354,25 @@ function EditForm({ customer, onClose, onSaved }: { customer: CustomerDetail; on
       whatsapp: f.whatsapp || null,
       address: f.address || null,
       opening_balance: Number(f.opening_balance) || 0,
+      route_days: f.route_days,
       notes: f.notes || null,
     });
     if (error) { alert('❌ ' + error); return; }
     onSaved();
   }
 
+  function toggleDay(day: string) {
+    setF(prev => ({
+      ...prev,
+      route_days: prev.route_days.includes(day) ? prev.route_days.filter(d => d !== day) : [...prev.route_days, day],
+    }));
+  }
+
+  const DAYS = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-3 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold">✏️ تعديل بيانات العميل</h2>
         <div><label className="text-sm font-medium block mb-1">اسم العميل *</label><input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus /></div>
         <div className="grid grid-cols-2 gap-3">
@@ -375,6 +387,18 @@ function EditForm({ customer, onClose, onSaved }: { customer: CustomerDetail; on
             <span className="font-bold text-orange-800">⚠️ تنبيه:</span> تعديل الرصيد الافتتاحي يغيّر الرصيد الحالي تلقائياً بنفس القيمة (يُضاف الفرق للعميل أو يُخصم منه).<br/>
             <span className="text-red-700">موجب</span> = العميل مدين لك • <span className="text-green-700">سالب</span> = أنت مدين للعميل.
           </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium block mb-2">🗓️ أيام خط السير</label>
+          <div className="flex flex-wrap gap-2">
+            {DAYS.map(day => (
+              <button key={day} type="button" onClick={() => toggleDay(day)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${f.route_days.includes(day) ? 'bg-nazlawy-500 text-white border-nazlawy-500' : 'bg-white text-gray-600 border-gray-300 hover:border-nazlawy-400'}`}>
+                {day}
+              </button>
+            ))}
+          </div>
+          {f.route_days.length > 0 && <p className="text-xs text-nazlawy-600 mt-1">✓ {f.route_days.length} يوم محدد</p>}
         </div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><textarea className="input-field" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>

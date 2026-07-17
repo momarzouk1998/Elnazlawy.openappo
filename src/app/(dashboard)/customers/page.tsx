@@ -178,7 +178,7 @@ function CustomersTab() {
 }
 
 function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: '', phone: '', whatsapp: '', address: '', opening_balance: 0, notes: '' });
+  const [f, setF] = useState({ name: '', phone: '', whatsapp: '', address: '', opening_balance: 0, route_days: [] as string[], notes: '' });
   const { mutate, loading } = useApiMutation();
 
   async function save() {
@@ -188,9 +188,16 @@ function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     onSaved();
   }
 
+  function toggleDay(day: string) {
+    setF(prev => ({
+      ...prev,
+      route_days: prev.route_days.includes(day) ? prev.route_days.filter(d => d !== day) : [...prev.route_days, day],
+    }));
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold">+ إضافة عميل</h2>
         <div><label className="text-sm font-medium block mb-1">الاسم *</label><input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus /></div>
         <div className="grid grid-cols-2 gap-3">
@@ -208,6 +215,19 @@ function CustomerForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
             <div>• <strong>صفر</strong>: حساب جديد لا يوجد عليه رصيد سابق.</div>
           </div>
         </div>
+        <div>
+          <label className="text-sm font-medium block mb-2">🗓️ أيام خط السير</label>
+          <div className="flex flex-wrap gap-2">
+            {DAYS.map(day => (
+              <button key={day} type="button" onClick={() => toggleDay(day)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${f.route_days.includes(day) ? 'bg-nazlawy-500 text-white border-nazlawy-500' : 'bg-white text-gray-600 border-gray-300 hover:border-nazlawy-400'}`}>
+                {day}
+              </button>
+            ))}
+          </div>
+          {f.route_days.length > 0 && <p className="text-xs text-nazlawy-600 mt-1">✓ {f.route_days.length} يوم محدد</p>}
+        </div>
+        <div><label className="text-sm font-medium block mb-1">ملاحظات</label><textarea className="input-field" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading || !f.name} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
       </div>
     </div>
