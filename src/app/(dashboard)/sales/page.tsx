@@ -325,6 +325,12 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
     !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
   ).slice(0, 30);
 
+  // Debug: log products data
+  if (typeof window !== 'undefined' && showProductPicker) {
+    console.log('Products data:', productsData);
+    console.log('Filtered products:', filteredProducts);
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 md:p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -509,7 +515,8 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
                 />
               </div>
               <div className="overflow-y-auto flex-1">
-                {filteredProducts.map(p => (
+                {!productsData && <div className="p-8 text-center text-gray-400">⏳ جاري تحميل الأصناف...</div>}
+                {productsData && filteredProducts.map(p => (
                   <button key={p.id} onClick={() => addItem(p)} className="w-full text-right p-3 border-b hover:bg-gray-50 flex justify-between items-center">
                     <div>
                       <div className="font-semibold text-sm">{p.name}</div>
@@ -518,7 +525,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
                     <span className="text-xs text-gray-400">+ إضافة</span>
                   </button>
                 ))}
-                {filteredProducts.length === 0 && <div className="p-8 text-center text-gray-400">لا توجد نتائج</div>}
+                {productsData && filteredProducts.length === 0 && <div className="p-8 text-center text-gray-400">لا توجد نتائج</div>}
               </div>
               <div className="p-3 border-t">
                 <button onClick={() => setShowProductPicker(false)} className="btn-secondary w-full">إغلاق</button>
