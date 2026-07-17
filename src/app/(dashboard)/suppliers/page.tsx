@@ -170,7 +170,16 @@ function SupplierForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <div><label className="text-sm font-medium block mb-1">الاسم *</label><input className="input-field" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus /></div>
         <div><label className="text-sm font-medium block mb-1">الهاتف</label><input className="input-field" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
         <div><label className="text-sm font-medium block mb-1">العنوان</label><input className="input-field" value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></div>
-        <div><label className="text-sm font-medium block mb-1">رصيد سابق (مستحق للمورد)</label><input type="number" step="0.01" className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} /></div>
+        <div>
+          <label className="text-sm font-medium block mb-1">رصيد سابق (مستحق للمورد)</label>
+          <input type="number" step="0.01" className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} />
+          <div className="text-xs text-gray-600 mt-2 bg-blue-50 border border-blue-100 rounded p-2 leading-relaxed">
+            <div className="font-bold text-blue-800 mb-1">💡 شرح الرصيد الافتتاحي:</div>
+            <div>• <strong>بالموجب</strong> (مثلاً 1000): المورد له <span className="text-red-700 font-bold">مستحقات</span> عليك (أنت مدين له / لم تسدد له).</div>
+            <div>• <strong>بالسالب</strong> (مثلاً -500): رصيد <span className="text-green-700 font-bold">دائن</span> لك (المورد مدين لك / دفعت له مقدماً).</div>
+            <div>• <strong>صفر</strong>: حساب جديد لا يوجد عليه رصيد سابق.</div>
+          </div>
+        </div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading || !f.name} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
       </div>
     </div>
@@ -296,6 +305,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 function ChecksTab() {
   const [show, setShow] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const { data, loading, refetch } = useApi<{ items: Check[]; total: number }>("/api/checks");
   const checks = data?.items || [];
 
@@ -321,7 +331,10 @@ function ChecksTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-gray-500">{supplierChecks.length} شيك صادر</p>
-        <button onClick={() => setShow(true)} className="btn-primary">+ إضافة شيك</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShow(true)} className="btn-primary">+ إضافة شيك</button>
+          <button onClick={() => setShowBulk(true)} className="btn-secondary">📋 إضافة شيكات متعددة</button>
+        </div>
       </div>
 
       {/* مؤشرات مواعيد السداد */}
@@ -392,6 +405,7 @@ function ChecksTab() {
       )}
 
       {show && <CheckForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}
+      {showBulk && <BulkCheckForm onClose={() => setShowBulk(false)} onSaved={() => { setShowBulk(false); refetch(); }} />}
     </div>
   );
 }
@@ -454,6 +468,194 @@ function CheckForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
         <div><label className="text-sm font-medium block mb-1">تاريخ الاستحقاق *</label><input type="date" className="input-field" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} /></div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
         <div className="flex gap-2 pt-3"><button onClick={save} disabled={loading} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ'}</button><button onClick={onClose} className="btn-secondary">إلغاء</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================
+   نموذج إضافة شيكات متعددة (حتى 15)
+============================================ */
+interface BulkCheck {
+  supplier_id: string;
+  bank_name: string;
+  check_number: string;
+  amount: number;
+  issue_date: string;
+  due_date: string;
+  notes: string;
+}
+
+function BulkCheckForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [count, setCount] = useState<number | null>(null);
+  const [checks, setChecks] = useState<BulkCheck[]>([]);
+  const { mutate, loading } = useApiMutation();
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/suppliers?limit=200').then(r => r.json()).then(j => setSuppliers(j.data?.items || [])).catch(() => {});
+  }, []);
+
+  function initChecks(n: number) {
+    const today = new Date().toISOString().split('T')[0];
+    setCount(n);
+    setChecks(Array.from({ length: n }, () => ({
+      supplier_id: '',
+      bank_name: '',
+      check_number: '',
+      amount: 0,
+      issue_date: today,
+      due_date: today,
+      notes: '',
+    })));
+  }
+
+  function updateCheck(idx: number, field: keyof BulkCheck, value: any) {
+    setChecks(checks.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+  }
+
+  async function save() {
+    const valid = checks.filter(c => c.supplier_id && c.amount > 0 && c.issue_date && c.due_date);
+    if (valid.length === 0) { alert('❌ لازم شيك واحد على الأقل بمورد وتواريخ ومبلغ'); return; }
+    const { error } = await mutate('POST', '/api/checks/bulk', { checks: valid.map(c => ({ ...c, direction: 'outgoing' })) });
+    if (error) { alert('❌ ' + error); return; }
+    alert(`✅ تم إضافة ${valid.length} شيك`);
+    onSaved();
+  }
+
+  if (count === null) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <h2 className="text-xl font-bold">📋 إضافة شيكات متعددة</h2>
+          <div>
+            <label className="text-sm font-medium block mb-2">كم شيك تريد إضافة؟ (أقصى 15)</label>
+            <select
+              className="input-field text-center text-lg font-bold"
+              defaultValue=""
+              onChange={(e) => {
+                const n = parseInt(e.target.value);
+                if (n > 0) initChecks(n);
+              }}
+              autoFocus
+            >
+              <option value="" disabled>اختر العدد...</option>
+              {Array.from({ length: 15 }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>{n} شيك</option>
+              ))}
+            </select>
+          </div>
+          <button onClick={onClose} className="btn-secondary w-full">إلغاء</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-10">
+          <h2 className="text-xl font-bold">📋 إضافة {count} شيك</h2>
+          <button onClick={onClose} className="text-2xl text-gray-400 hover:text-red-500">✕</button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="p-2 text-right border">#</th>
+                  <th className="p-2 text-right border min-w-[150px]">المورد *</th>
+                  <th className="p-2 text-right border min-w-[120px]">البنك</th>
+                  <th className="p-2 text-right border min-w-[100px]">رقم الشيك</th>
+                  <th className="p-2 text-right border min-w-[100px]">المبلغ *</th>
+                  <th className="p-2 text-right border min-w-[130px]">تاريخ الإصدار *</th>
+                  <th className="p-2 text-right border min-w-[130px]">تاريخ الاستحقاق *</th>
+                  <th className="p-2 text-right border min-w-[150px]">ملاحظات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {checks.map((c, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="p-2 border text-center font-bold">{i + 1}</td>
+                    <td className="p-2 border">
+                      <select
+                        className="input-field text-xs p-1 w-full"
+                        value={c.supplier_id}
+                        onChange={(e) => updateCheck(i, 'supplier_id', e.target.value)}
+                      >
+                        <option value="">اختر...</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        className="input-field text-xs p-1 w-full"
+                        value={c.bank_name}
+                        onChange={(e) => updateCheck(i, 'bank_name', e.target.value)}
+                        placeholder="البنك"
+                      />
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        className="input-field text-xs p-1 w-full"
+                        value={c.check_number}
+                        onChange={(e) => updateCheck(i, 'check_number', e.target.value)}
+                        placeholder="رقم"
+                      />
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="input-field text-xs p-1 w-full"
+                        value={c.amount || ''}
+                        onChange={(e) => updateCheck(i, 'amount', parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                      />
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        type="date"
+                        className="input-field text-xs p-1 w-full"
+                        value={c.issue_date}
+                        onChange={(e) => updateCheck(i, 'issue_date', e.target.value)}
+                      />
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        type="date"
+                        className="input-field text-xs p-1 w-full"
+                        value={c.due_date}
+                        onChange={(e) => updateCheck(i, 'due_date', e.target.value)}
+                      />
+                    </td>
+                    <td className="p-2 border">
+                      <input
+                        className="input-field text-xs p-1 w-full"
+                        value={c.notes}
+                        onChange={(e) => updateCheck(i, 'notes', e.target.value)}
+                        placeholder="ملاحظات..."
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex gap-2 pt-3 border-t">
+            <button onClick={save} disabled={loading} className="btn-primary flex-1">
+              {loading ? '⏳ جاري الحفظ...' : `💾 حفظ ${checks.filter(c => c.supplier_id && c.amount > 0).length} شيك`}
+            </button>
+            <button onClick={onClose} className="btn-secondary">إلغاء</button>
+          </div>
+
+          <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3">
+            💡 يمكنك تعديل كل الحقول مباشرة في الجدول. سيتم حفظ الشيكات التي بها مورد ومبلغ وتواريخ فقط.
+          </div>
+        </div>
       </div>
     </div>
   );

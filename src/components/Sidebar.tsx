@@ -46,19 +46,19 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
     <>
       {/* ====== Mobile top bar (يظهر على الشاشات الصغيرة فقط) ====== */}
       <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-header-gradient text-white px-3 py-2.5 flex items-center justify-between shadow-lg safe-area-top">
-        <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 text-2xl shrink-0 order-1"
+          aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}
+        >
+          {open ? '✕' : '☰'}
+        </button>
+        <div className="flex items-center gap-2 min-w-0 order-2">
           <div className="w-9 h-9 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
             <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={32} height={32} className="rounded" />
           </div>
           <div className="font-bold text-sm truncate">معرض النزلاوي</div>
         </div>
-        <button
-          onClick={() => setOpen(!open)}
-          className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 text-2xl shrink-0"
-          aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}
-        >
-          {open ? '✕' : '☰'}
-        </button>
       </header>
 
       {/* ====== Mobile drawer (overlay) ====== */}

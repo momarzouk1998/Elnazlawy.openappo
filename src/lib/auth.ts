@@ -24,16 +24,15 @@ export interface AllModule {
 export const ALL_MODULES: AllModule[] = [
   // 🟢 للمدير (Admin / Manager)
   { key: 'dashboard',    label: 'الرئيسية',                icon: '📊', path: '/dashboard' },
-  { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
   { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
-  { key: 'inventory',    label: 'المخازن',                 icon: '📦', path: '/inventory' },
-  { key: 'products',     label: 'الأصناف',                 icon: '🏷️', path: '/products' },
+  { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
   { key: 'customers',    label: 'العملاء',                 icon: '👥', path: '/customers' },
+  { key: 'collections',  label: 'التحصيلات',               icon: '💰', path: '/collections' },
   { key: 'suppliers',    label: 'الموردين',                icon: '🏭', path: '/suppliers' },
+  { key: 'products',     label: 'الأصناف',                 icon: '🏷️', path: '/products' },
+  { key: 'inventory',    label: 'المخازن',                 icon: '📦', path: '/inventory' },
   { key: 'treasury',     label: 'الخزائن',                 icon: '🏦', path: '/treasury' },
   { key: 'expenses',     label: 'المصروفات',               icon: '📉', path: '/expenses' },
-  { key: 'checks',       label: 'الشيكات',                 icon: '🧾', path: '/checks' },
-  { key: 'collections',  label: 'التحصيلات',               icon: '💰', path: '/collections' },
   // 🔵 للمحاسب
   { key: 'reports',      label: 'التقارير',                icon: '📈', path: '/reports' },
   // 🟣 Admin only

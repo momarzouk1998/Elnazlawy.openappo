@@ -1,17 +1,27 @@
 // Common formatters & helpers
 
 export function formatEGP(n: number | string | null | undefined): string {
-  if (n === null || n === undefined) return '0.00';
+  if (n === null || n === undefined) return '0';
   const num = typeof n === 'string' ? parseFloat(n) : n;
-  if (isNaN(num)) return '0.00';
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (isNaN(num)) return '0';
+  // Show decimals only if there's a non-zero fractional part
+  const hasDecimals = num % 1 !== 0;
+  return num.toLocaleString('en-US', { 
+    minimumFractionDigits: hasDecimals ? 2 : 0, 
+    maximumFractionDigits: 2 
+  });
 }
 
 export function formatQty(n: number | string | null | undefined): string {
   if (n === null || n === undefined) return '0';
   const num = typeof n === 'string' ? parseFloat(n) : n;
   if (isNaN(num)) return '0';
-  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  // Show decimals only if there's a non-zero fractional part
+  const hasDecimals = num % 1 !== 0;
+  return num.toLocaleString('en-US', { 
+    minimumFractionDigits: hasDecimals ? 2 : 0, 
+    maximumFractionDigits: 2 
+  });
 }
 
 export function formatDate(d: Date | string | null | undefined): string {

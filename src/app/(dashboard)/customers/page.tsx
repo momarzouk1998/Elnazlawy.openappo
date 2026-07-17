@@ -94,15 +94,15 @@ function CustomersTab() {
           <div className="text-2xl font-extrabold text-slate-650">{visibleCustomers.length}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-gray-500">إجمالي الديون</div>
+          <div className="text-xs text-gray-500">إجمالي الديون (لينا)</div>
           <div className="text-2xl font-extrabold text-red-700">{formatEGP(visibleCustomers.reduce((s, c) => s + (Number(c.balance) > 0 ? Number(c.balance) : 0), 0))} ج</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-gray-500">عملاء تحت السداد</div>
+          <div className="text-xs text-gray-500">عملاء مدينين</div>
           <div className="text-2xl font-extrabold text-orange-700">{visibleCustomers.filter(c => Number(c.balance) > 0.01).length}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-gray-500">رصيد دائن (لنا)</div>
+          <div className="text-xs text-gray-500">مدفوعات مقدمة (علينا)</div>
           <div className="text-2xl font-extrabold text-green-700">{formatEGP(visibleCustomers.reduce((s, c) => s + (Number(c.balance) < 0 ? Math.abs(Number(c.balance)) : 0), 0))} ج</div>
         </div>
       </div>

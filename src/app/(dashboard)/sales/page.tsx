@@ -289,6 +289,18 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
     if (typeof window !== 'undefined') window.location.reload();
   }
 
+  async function deleteInvoice() {
+    const confirmText = '⚠️⚠️ تحذير: حذف نهائي\n\nسيتم حذف الفاتورة بالكامل من قاعدة البيانات.\nهذا الإجراء لا يمكن التراجع عنه!\n\nهل أنت متأكد 100%؟';
+    if (!confirm(confirmText)) return;
+    const doubleConfirm = confirm('❗ تأكيد أخير: هل تريد فعلاً حذف الفاتورة نهائياً؟');
+    if (!doubleConfirm) return;
+    const { error } = await mutate('DELETE', `/api/sales/invoices/${invoiceId}?permanent=true`);
+    if (error) { alert('❌ ' + error); return; }
+    alert('✅ تم حذف الفاتورة نهائياً');
+    onClose();
+    if (typeof window !== 'undefined') window.location.reload();
+  }
+
   async function printInvoice() {
     window.open(`/print/invoice/${invoiceId}`, '_blank');
   }
@@ -460,6 +472,10 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
               <button onClick={cancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء الفاتورة (سيتم إرجاع المخزون)</button>
             )}
             {isCancelled && <span className="text-sm text-red-700 font-bold self-center">🚫 هذه الفاتورة ملغاة</span>}
+            {/* زر الحذف النهائي — للأدمن فقط */}
+            {isAdmin && (
+              <button onClick={deleteInvoice} className="text-sm px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black ml-auto">🗑️ حذف نهائي</button>
+            )}
           </div>
         </div>
 
