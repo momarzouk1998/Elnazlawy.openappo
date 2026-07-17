@@ -35,7 +35,7 @@ function getClientIP(request: NextRequest): string | null {
     return real;
   }
   
-  return request.ip || null;
+  return (request as NextRequest & { ip?: string }).ip || null;
 }
 
 // Cleanup old entries periodically
