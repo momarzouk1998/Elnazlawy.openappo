@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-server";
 import Sidebar from "@/components/Sidebar";
 
+// Force all pages in this layout to be dynamic (no static generation at build time)
+// This prevents next build from trying to connect to the DB during CI/Docker builds
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentUser();
   if (!profile) redirect('/login');

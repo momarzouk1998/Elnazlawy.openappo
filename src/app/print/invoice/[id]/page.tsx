@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { formatEGP, formatDate } from '@/lib/format';
 import PrintActions from './PrintActions';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const invoice = await prisma.sales_invoices.findUnique({
