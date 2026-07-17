@@ -3,7 +3,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import { useApiMutation } from "@/hooks/useApi";
-import type { CurrentProfile } from "@/lib/auth";
+
+interface CurrentProfile {
+  id: number;
+  username: string;
+  full_name: string;
+  role: string;
+  can_see_cost: boolean;
+  is_active: boolean;
+}
 
 export default function ProfilePage() {
   const router = useRouter();
