@@ -81,6 +81,20 @@ export default async function RootLayout({
       </head>
       <body className="min-h-screen font-[var(--font-cairo)]">
         {children}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined') {
+                let deferredPrompt;
+                window.addEventListener('beforeinstallprompt', (e) => {
+                  e.preventDefault();
+                  deferredPrompt = e;
+                  window.deferredPrompt = deferredPrompt;
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

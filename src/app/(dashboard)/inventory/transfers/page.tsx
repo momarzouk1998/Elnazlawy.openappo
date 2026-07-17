@@ -66,7 +66,7 @@ export default function TransfersPage() {
 function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({ product_id: '', from_store_id: '', to_store_id: '', quantity: 0, notes: '', transfer_date: '' });
   const { mutate, loading } = useApiMutation();
-  const [products, setProducts] = useState<{id:string;name:string}[]>([]);
+  const [products, setProducts] = useState<{id:string;name:string;inventory_items?:{store_id:string;current_stock:number}[]}[]>([]);
   const [stores, setStores] = useState<{id:string;name:string}[]>([]);
   const [search, setSearch] = useState("");
 
@@ -77,6 +77,11 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
   useEffect(() => {
     fetch(`/api/products?search=${encodeURIComponent(search)}&limit=50`).then(r => r.json()).then(j => setProducts(j.data?.items || [])).catch(() => {});
   }, [search]);
+
+  // حساب المخازن اللي فيها الصنف المختار
+  const selectedProduct = products.find(p => p.id === f.product_id);
+  const availableStores = selectedProduct?.inventory_items?.filter(inv => Number(inv.current_stock) > 0) || [];
+  const availableStoreIds = availableStores.map(inv => inv.store_id);
 
   async function save() {
     if (!f.product_id || !f.from_store_id || !f.to_store_id || f.quantity <= 0) {
@@ -95,23 +100,29 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
         <div>
           <label className="text-sm font-medium block mb-1">المنتج *</label>
           <input className="input-field" placeholder="🔍 ابحث عن منتج..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <select className="input-field mt-1" value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value })} size={3}>
+          <select className="input-field mt-1" value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value, from_store_id: '', to_store_id: '' })} size={3}>
             {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">من مخزن *</label>
-            <select className="input-field" value={f.from_store_id} onChange={(e) => setF({ ...f, from_store_id: e.target.value })}>
+            <select className="input-field" value={f.from_store_id} onChange={(e) => setF({ ...f, from_store_id: e.target.value })} disabled={!f.product_id}>
               <option value="">اختر...</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => availableStoreIds.includes(s.id)).map(s => {
+                const inv = availableStores.find(i => i.store_id === s.id);
+                return <option key={s.id} value={s.id}>{s.name} (متاح: {inv?.current_stock || 0})</option>;
+              })}
             </select>
+            {f.product_id && availableStores.length === 0 && (
+              <p className="text-xs text-red-600 mt-1">⚠️ لا يوجد مخزون لهذا المنتج</p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">إلى مخزن *</label>
             <select className="input-field" value={f.to_store_id} onChange={(e) => setF({ ...f, to_store_id: e.target.value })}>
               <option value="">اختر...</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {stores.filter(s => s.id !== f.from_store_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
         </div>

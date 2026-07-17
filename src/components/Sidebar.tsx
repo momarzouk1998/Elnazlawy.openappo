@@ -97,6 +97,24 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
               <Link href="/profile" onClick={() => setOpen(false)} className="block w-full py-2.5 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm font-medium text-center mb-2">
                 👤 الملف الشخصي
               </Link>
+              <button 
+                onClick={() => {
+                  if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
+                    // @ts-ignore
+                    const deferredPrompt = window.deferredPrompt;
+                    if (deferredPrompt) {
+                      deferredPrompt.prompt();
+                    } else {
+                      alert('📱 التطبيق مثبّت بالفعل أو متاح للتثبيت من إعدادات المتصفح');
+                    }
+                  } else {
+                    alert('📱 يمكنك تثبيت التطبيق من إعدادات المتصفح (المزيد > تثبيت التطبيق)');
+                  }
+                }}
+                className="block w-full py-2.5 rounded-lg bg-blue-500/20 text-blue-100 hover:bg-blue-500/30 text-sm font-medium text-center mb-2"
+              >
+                📱 تثبيت التطبيق
+              </button>
               <button onClick={logout} className="w-full py-2.5 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm font-medium">
                 🚪 تسجيل خروج
               </button>
@@ -115,6 +133,24 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
           <Link href="/profile" className="block w-full py-2 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm text-center mb-2">
             👤 الملف الشخصي
           </Link>
+          <button 
+            onClick={() => {
+              if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
+                // @ts-ignore
+                const deferredPrompt = window.deferredPrompt;
+                if (deferredPrompt) {
+                  deferredPrompt.prompt();
+                } else {
+                  alert('📱 التطبيق مثبّت بالفعل أو متاح للتثبيت من إعدادات المتصفح');
+                }
+              } else {
+                alert('📱 يمكنك تثبيت التطبيق من إعدادات المتصفح (المزيد > تثبيت التطبيق)');
+              }
+            }}
+            className="block w-full py-2 rounded-lg bg-blue-500/20 text-blue-100 hover:bg-blue-500/30 text-sm text-center mb-2"
+          >
+            📱 تثبيت التطبيق
+          </button>
           <button onClick={logout} className="w-full py-2 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm">
             🚪 تسجيل خروج
           </button>

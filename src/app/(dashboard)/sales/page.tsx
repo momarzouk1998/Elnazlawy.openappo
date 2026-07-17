@@ -86,26 +86,35 @@ export default function SalesListPage() {
           {/* ===== Mobile: كاردات (تجنب جدول عريض) ===== */}
           <div className="space-y-2 md:hidden">
             {data?.items.map(inv => (
-              <div
-                key={inv.id}
-                onClick={() => setOpenInvoice(inv.id)}
-                className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
-              >
-                <div className="flex items-start justify-between mb-1.5">
-                  <div className="font-mono font-bold text-nazlawy-600 text-lg">#{inv.invoice_number}</div>
-                  <span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span>
+              <div key={inv.id} className="card p-3">
+                <div
+                  onClick={() => setOpenInvoice(inv.id)}
+                  className="cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-1.5">
+                    <div className="font-mono font-bold text-nazlawy-600 text-lg">#{inv.invoice_number}</div>
+                    <span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                    <span>{formatDate(inv.invoice_date)}</span>
+                    <span>{inv.invoice_type}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-sm truncate flex-1">{inv.customer?.name || '—'}</div>
+                    <div className="font-bold text-nazlawy-600 text-base shrink-0 ml-2">{formatEGP(inv.total)} ج</div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1">
+                    <span>📦 {inv._count.items} صنف{inv._count.items !== 1 ? 'ات' : ''}</span>
+                    {inv.store?.name && <span>🏢 {inv.store.name}</span>}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-                  <span>{formatDate(inv.invoice_date)}</span>
-                  <span>{inv.invoice_type}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-sm truncate flex-1">{inv.customer?.name || '—'}</div>
-                  <div className="font-bold text-nazlawy-600 text-base shrink-0 ml-2">{formatEGP(inv.total)} ج</div>
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1">
-                  <span>📦 {inv._count.items} صنف{inv._count.items !== 1 ? 'ات' : ''}</span>
-                  {inv.store?.name && <span>🏢 {inv.store.name}</span>}
+                <div className="flex gap-2 mt-2 pt-2 border-t">
+                  <button onClick={(e) => { e.stopPropagation(); window.open(`/print/invoice/${inv.id}`, '_blank'); }} className="flex-1 text-xs px-2 py-1.5 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">
+                    🖨️ طباعة
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); window.open(`/print/invoice/${inv.id}?format=pdf`, '_blank'); }} className="flex-1 text-xs px-2 py-1.5 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">
+                    📄 PDF
+                  </button>
                 </div>
               </div>
             ))}
@@ -146,7 +155,14 @@ export default function SalesListPage() {
                     <td className="p-3 font-bold text-nazlawy-600">{formatEGP(inv.total)}</td>
                     <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
                     <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                      <Link href={`/print/invoice/${inv.id}`} className="text-nazlawy-600 underline text-xs">🖨️ طباعة</Link>
+                      <div className="flex gap-1">
+                        <button onClick={() => window.open(`/print/invoice/${inv.id}`, '_blank')} className="text-xs px-2 py-1 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">
+                          🖨️
+                        </button>
+                        <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, '_blank')} className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">
+                          📄
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
