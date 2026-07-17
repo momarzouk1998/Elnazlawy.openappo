@@ -98,16 +98,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     ]);
 
     if (purchaseCount > 0 || paymentsCount > 0) {
-      const sup = await prisma.suppliers.findUnique({ where: { id } });
-      if (!sup) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
-      if (Number(sup.balance) !== 0) {
-        return NextResponse.json(
-          { ok: false, error: { code: 'HAS_BALANCE', message: `لا يمكن الحذف: على المورد رصيد ${sup.balance} ج. صفِّ الحساب أولاً.` } },
-          { status: 400 }
-        );
-      }
-      await prisma.suppliers.update({ where: { id }, data: { is_active: false, updated_at: new Date() } });
-      return NextResponse.json({ ok: true, data: { soft_deleted: true, message: 'تم إخفاء المورد (له حركات تاريخية)' } });
+      return NextResponse.json(
+        { ok: false, error: { code: 'HAS_TRANSACTIONS', message: `لا يمكن حذف المورد: له ${purchaseCount} فاتورة و ${paymentsCount} مدفوعة. احذف الحركات أولاً.` } },
+        { status: 400 }
+      );
     }
 
     await prisma.suppliers.delete({ where: { id } });

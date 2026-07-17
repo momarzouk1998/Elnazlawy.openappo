@@ -163,7 +163,7 @@ export default function ProductsPage() {
       alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
       return;
     }
-    alert(json?.data?.soft_deleted ? '✅ تم إخفاء الصنف (له فواتير تاريخية)' : '✅ تم حذف الصنف');
+    alert('✅ تم حذف الصنف');
     refetch();
   }
 }

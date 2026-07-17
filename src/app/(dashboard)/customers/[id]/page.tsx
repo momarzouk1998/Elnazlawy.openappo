@@ -131,7 +131,7 @@ async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeo
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
     return;
   }
-  alert(json?.data?.soft_deleted ? '✅ تم إخفاء العميل (له حركات تاريخية)' : '✅ تم حذف العميل');
+  alert('✅ تم حذف العميل');
   router.push('/customers');
   router.refresh(); // إجبار تحديث البيانات
 }

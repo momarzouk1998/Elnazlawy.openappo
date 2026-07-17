@@ -47,12 +47,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   try {
     const { id } = await params;
 
-    // فحص: هل توجد حركات مرتبطة؟
+    // فحص: هل توجد حركات مرتبطة؟ — منع الحذف نهائياً
     const txCount = await prisma.treasury_transactions.count({ where: { treasury_id: id } });
     if (txCount > 0) {
-      // soft-delete
-      await prisma.treasuries.update({ where: { id }, data: { is_active: false, updated_at: new Date() } });
-      return NextResponse.json({ ok: true, data: { soft_deleted: true, message: 'تم إخفاء الخزينة (لها حركات مسجلة)' } });
+      return NextResponse.json(
+        { ok: false, error: { code: 'HAS_TRANSACTIONS', message: `لا يمكن حذف الخزينة: لها ${txCount} حركة مسجلة. احذف الحركات أولاً.` } },
+        { status: 400 }
+      );
     }
 
     await prisma.treasuries.delete({ where: { id } });

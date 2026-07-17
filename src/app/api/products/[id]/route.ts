@@ -81,15 +81,16 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
       );
     }
 
-    // فحص: هل يوجد فواتير مرتبطة؟
+    // فحص: هل يوجد فواتير مرتبطة؟ — منع الحذف نهائياً
     const [salesCount, purchaseCount] = await Promise.all([
       prisma.sales_invoice_items.count({ where: { product_id: id } }),
       prisma.purchase_invoice_items.count({ where: { product_id: id } }),
     ]);
     if (salesCount > 0 || purchaseCount > 0) {
-      // soft-delete بدلاً من الحذف الفعلي
-      await prisma.products.update({ where: { id }, data: { is_active: false, updated_at: new Date() } });
-      return NextResponse.json({ ok: true, data: { soft_deleted: true, message: 'تم إخفاء الصنف (له فواتير تاريخية)' } });
+      return NextResponse.json(
+        { ok: false, error: { code: 'HAS_TRANSACTIONS', message: `لا يمكن حذف الصنف: له ${salesCount} فاتورة بيع و ${purchaseCount} فاتورة شراء. احذف الفواتير أولاً.` } },
+        { status: 400 }
+      );
     }
 
     // آمن للحذف الفعلي

@@ -97,28 +97,19 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   try {
     const { id } = await params;
 
-    // فحص: يوجد فواتير أو مدفوعات؟
+    // فحص: يوجد فواتير أو مدفوعات؟ — منع الحذف نهائياً
     const [salesCount, paymentsCount] = await Promise.all([
       prisma.sales_invoices.count({ where: { customer_id: id } }),
       prisma.customer_payments.count({ where: { customer_id: id } }),
     ]);
 
     if (salesCount > 0 || paymentsCount > 0) {
-      // soft-delete فقط (الحركات التاريخية محفوظة)
-      const cust = await prisma.customers.findUnique({ where: { id } });
-      if (!cust) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
-      // لو عليه رصيد، امنع الحذف (مش إخفاء) لأنه أثر على الحسابات
-      if (Number(cust.balance) !== 0) {
-        return NextResponse.json(
-          { ok: false, error: { code: 'HAS_BALANCE', message: `لا يمكن الحذف: على العميل رصيد ${cust.balance} ج. صفِّ الحساب أولاً.` } },
-          { status: 400 }
-        );
-      }
-      await prisma.customers.update({ where: { id }, data: { is_active: false, updated_at: new Date() } });
-      return NextResponse.json({ ok: true, data: { soft_deleted: true, message: 'تم إخفاء العميل (له حركات تاريخية)' } });
+      return NextResponse.json(
+        { ok: false, error: { code: 'HAS_TRANSACTIONS', message: `لا يمكن حذف العميل: له ${salesCount} فاتورة و ${paymentsCount} مدفوعة. احذف الحركات أولاً.` } },
+        { status: 400 }
+      );
     }
 
-    // آمن للحذف الفعلي
     await prisma.customers.delete({ where: { id } });
     return NextResponse.json({ ok: true, data: { deleted: true } });
   } catch (e: any) {

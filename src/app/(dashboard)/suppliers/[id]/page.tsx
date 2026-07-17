@@ -142,7 +142,7 @@ async function deleteSupplier(supplier: SupplierDetail, router: ReturnType<typeo
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
     return;
   }
-  alert(json?.data?.soft_deleted ? '✅ تم إخفاء المورد (له حركات تاريخية)' : '✅ تم حذف المورد');
+  alert('✅ تم حذف المورد');
   router.push('/suppliers');
   router.refresh(); // إجبار تحديث البيانات
 }
