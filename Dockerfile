@@ -20,6 +20,11 @@ COPY --from=deps /app/prisma ./prisma
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_OPTIONS="--max-old-space-size=1280"
+# Dummy DATABASE_URL so prisma generate + next build succeed without a real DB
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV JWT_SECRET="dummy-secret-for-build"
+ENV NEXT_PUBLIC_SITE_URL="https://elnazlawy.openappo.com"
+ENV NEXT_PUBLIC_APP_NAME="معرض النزلاوي"
 RUN npx prisma generate && npm run build
 
 FROM base AS runner
