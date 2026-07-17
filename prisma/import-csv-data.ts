@@ -59,9 +59,9 @@ async function clearData() {
   console.log('🗑️  Clearing existing data (keeping users)...');
   
   await prisma.product_price_history.deleteMany({});
-  await prisma.sale_invoice_items.deleteMany({});
+  await prisma.sales_invoice_items.deleteMany({});
   await prisma.purchase_invoice_items.deleteMany({});
-  await prisma.sale_invoices.deleteMany({});
+  await prisma.sales_invoices.deleteMany({});
   await prisma.purchase_invoices.deleteMany({});
   await prisma.customer_payments.deleteMany({});
   await prisma.supplier_payments.deleteMany({});
