@@ -90,7 +90,7 @@ function SuppliersTab() {
           <div className="text-2xl font-extrabold text-red-700">{formatEGP((data?.items || []).reduce((s, c) => s + Number(c.balance), 0))} ج</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-gray-500">موردين عليهم مستحقات</div>
+          <div className="text-xs text-gray-500">موردين ليهم مستحقات (علينا)</div>
           <div className="text-2xl font-extrabold text-orange-700">{(data?.items || []).filter(c => Number(c.balance) > 0).length}</div>
         </div>
       </div>
@@ -102,7 +102,7 @@ function SuppliersTab() {
             {data?.items.map(s => (
               <div
                 key={s.id}
-                onClick={() => router.push(`/reports/statements?type=supplier&id=${s.id}`)}
+                onClick={() => router.push(`/suppliers/${s.id}`)}
                 className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
               >
                 <div className="font-bold text-sm truncate mb-1">{s.name}</div>
@@ -133,7 +133,7 @@ function SuppliersTab() {
               </thead>
               <tbody>
                 {data?.items.map(s => (
-                  <tr key={s.id} onClick={() => router.push(`/reports/statements?type=supplier&id=${s.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
+                  <tr key={s.id} onClick={() => router.push(`/suppliers/${s.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
                     <td className="p-3 font-semibold">{s.name}</td>
                     <td className="p-3 text-sm font-mono">{s.phone || '—'}</td>
                     <td className="p-3 font-mono text-xs">{formatEGP(s.opening_balance)}</td>

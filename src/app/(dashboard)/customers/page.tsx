@@ -19,8 +19,8 @@ interface Payment {
 
 const TABS = [
   { key: 'customers', label: 'العملاء', icon: '👥' },
-  { key: 'route', label: 'خط السير', icon: '🗺️' },
   { key: 'collections', label: 'التحصيلات', icon: '💰' },
+  { key: 'route', label: 'خط السير', icon: '🗺️' },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
@@ -48,8 +48,8 @@ export default function CustomersPage() {
       </div>
 
       {tab === 'customers' && <CustomersTab />}
-      {tab === 'route' && <RouteTab />}
       {tab === 'collections' && <CollectionsTab />}
+      {tab === 'route' && <RouteTab />}
     </div>
   );
 }
@@ -117,7 +117,7 @@ function CustomersTab() {
               return (
                 <div
                   key={c.id}
-                  onClick={() => router.push(`/reports/statements?type=customer&id=${c.id}`)}
+                  onClick={() => router.push(`/customers/${c.id}`)}
                   className="card p-3 cursor-pointer hover:border-nazlawy-500 hover:shadow-md transition-all"
                 >
                   <div className="flex items-start justify-between mb-1.5">
@@ -156,7 +156,7 @@ function CustomersTab() {
                   const status = c.balance > 0.01 ? 'لم يتم السداد' : c.balance < -0.01 ? 'مدفوعات زائدة' : 'حساب خالص';
                   const statusClass = c.balance > 0.01 ? 'bg-red-100 text-red-800' : c.balance < -0.01 ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
                   return (
-                    <tr key={c.id} onClick={() => router.push(`/reports/statements?type=customer&id=${c.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
+                    <tr key={c.id} onClick={() => router.push(`/customers/${c.id}`)} className="border-t hover:bg-gray-50 cursor-pointer transition-colors hover:text-nazlawy-600">
                       <td className="p-3 font-semibold">{c.name}</td>
                       <td className="p-3 text-sm font-mono">{c.phone || '—'}</td>
                       <td className="p-3 font-mono text-xs">{formatEGP(c.opening_balance)}</td>
