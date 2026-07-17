@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// DELETE /api/users/[id] - تعطيل مستخدم
+// DELETE /api/users/[id] - حذف مستخدم نهائياً (admin only)
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile || profile.role !== 'admin') {
@@ -60,16 +60,17 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     const numId = Number(id);
     if (numId === profile.id) {
       return NextResponse.json(
-        { ok: false, error: { code: 'CANNOT_DELETE_SELF', message: 'لا يمكنك تعطيل حسابك بنفسك' } },
+        { ok: false, error: { code: 'CANNOT_DELETE_SELF', message: 'لا يمكنك حذف حسابك بنفسك' } },
         { status: 400 }
       );
     }
-    // soft-delete
-    await prisma.users.update({
+    
+    // حذف نهائي
+    await prisma.users.delete({
       where: { id: numId },
-      data: { is_active: false, updated_at: new Date() },
     });
-    return NextResponse.json({ ok: true, data: { message: 'تم تعطيل المستخدم' } });
+    
+    return NextResponse.json({ ok: true, data: { message: 'تم حذف المستخدم نهائياً' } });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }

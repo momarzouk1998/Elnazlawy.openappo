@@ -94,6 +94,9 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
               <div className="text-xs text-white/60 mb-0.5">المستخدم:</div>
               <div className="font-semibold text-sm truncate">{profile.full_name}</div>
               <div className="text-xs text-nazlawy-300 mb-3">{ROLE_LABELS[profile.role]}</div>
+              <Link href="/profile" onClick={() => setOpen(false)} className="block w-full py-2.5 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm font-medium text-center mb-2">
+                👤 الملف الشخصي
+              </Link>
               <button onClick={logout} className="w-full py-2.5 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm font-medium">
                 🚪 تسجيل خروج
               </button>
@@ -109,6 +112,9 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
           <div className="text-xs text-white/60 mb-1">المستخدم:</div>
           <div className="font-semibold text-sm truncate">{profile.full_name}</div>
           <div className="text-xs text-nazlawy-300 mb-3">{ROLE_LABELS[profile.role]}</div>
+          <Link href="/profile" className="block w-full py-2 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm text-center mb-2">
+            👤 الملف الشخصي
+          </Link>
           <button onClick={logout} className="w-full py-2 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm">
             🚪 تسجيل خروج
           </button>

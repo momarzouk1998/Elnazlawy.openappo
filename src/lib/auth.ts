@@ -27,7 +27,6 @@ export const ALL_MODULES: AllModule[] = [
   { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
   { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
   { key: 'customers',    label: 'العملاء',                 icon: '👥', path: '/customers' },
-  { key: 'collections',  label: 'التحصيلات',               icon: '💰', path: '/collections' },
   { key: 'suppliers',    label: 'الموردين',                icon: '🏭', path: '/suppliers' },
   { key: 'products',     label: 'الأصناف',                 icon: '🏷️', path: '/products' },
   { key: 'inventory',    label: 'المخازن',                 icon: '📦', path: '/inventory' },

@@ -47,6 +47,18 @@ export default function AdminUsersPage() {
     refetch();
   }
 
+  async function deleteUser(u: User) {
+    if (u.id === profile?.id) {
+      alert('❌ لا يمكن حذف حسابك الخاص');
+      return;
+    }
+    if (!confirm(`⚠️ هل تريد حذف المستخدم "${u.full_name}"؟\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
+    const { error } = await mutate('DELETE', `/api/users/${u.id}`);
+    if (error) { alert('❌ ' + error); return; }
+    alert('✅ تم حذف المستخدم');
+    refetch();
+  }
+
   if (profile && profile.role !== 'admin') {
     return (
       <div className="card p-8 text-center">
@@ -110,9 +122,14 @@ export default function AdminUsersPage() {
                     <div className="flex gap-1">
                       <button onClick={() => setEditing(u)} className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200">✏️</button>
                       {profile && u.id !== profile.id && (
-                        <button onClick={() => toggleActive(u)} className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700">
-                          {u.is_active ? '🚫' : '✓'}
-                        </button>
+                        <>
+                          <button onClick={() => toggleActive(u)} className="text-xs px-2 py-1 rounded bg-yellow-50 hover:bg-yellow-100 text-yellow-700">
+                            {u.is_active ? '🚫' : '✓'}
+                          </button>
+                          <button onClick={() => deleteUser(u)} className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700">
+                            🗑️
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
