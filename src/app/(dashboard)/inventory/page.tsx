@@ -26,6 +26,7 @@ interface Store { id: string; name: string; type: string; _count?: { inventory: 
 
 const TABS = [
   { key: 'stock', label: 'المخزون', icon: '📦' },
+  { key: 'stores', label: 'الفروع والمخازن الحالية', icon: '🏪' },
   { key: 'adjustments', label: 'سجل التعديلات', icon: '📊' },
   { key: 'transfers', label: 'التحويلات', icon: '🚛' },
 ] as const;
@@ -61,6 +62,7 @@ export default function InventoryPage() {
       </div>
 
       {tab === 'stock' && <StockTab profile={profile} />}
+      {tab === 'stores' && <StoresTab profile={profile} />}
       {tab === 'adjustments' && <AdjustmentsTab profile={profile} />}
       {tab === 'transfers' && <TransfersTab />}
     </div>
@@ -413,6 +415,436 @@ function StockTab({ profile }: { profile: any }) {
           onSaved={() => { setShowBulkAdd(false); refetch(); }} 
         />
       )}
+    </div>
+  );
+}
+
+/* ============================================
+   تبويب إدارة المخازن والفروع
+============================================ */
+interface Store {
+  id: string;
+  name: string;
+  type: string;
+  description: string | null;
+  assigned_user_id: number | null;
+  is_active: boolean;
+  created_at: string;
+  stats: {
+    total_products: number;
+    total_sales: number;
+  };
+}
+
+function StoresTab({ profile }: { profile: any }) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingStore, setEditingStore] = useState<Store | null>(null);
+  const { data, loading, refetch } = useApi<{ items: Store[]; total: number }>('/api/stores');
+  const { mutate, loading: saving } = useApiMutation();
+
+  const isAdmin = profile?.role === 'admin';
+  const stores = data?.items || [];
+
+  // إضافة مخزن جديد
+  async function handleAdd(storeData: any) {
+    const { error } = await mutate('POST', '/api/stores', storeData);
+    if (error) {
+      alert('❌ ' + error);
+      return;
+    }
+    
+    alert('✅ تم إضافة المخزن بنجاح');
+    setShowAddForm(false);
+    refetch();
+  }
+
+  // تعديل مخزن
+  async function handleEdit(storeData: any) {
+    if (!editingStore) return;
+    
+    const { error } = await mutate('PUT', `/api/stores/${editingStore.id}`, storeData);
+    if (error) {
+      alert('❌ ' + error);
+      return;
+    }
+    
+    alert('✅ تم تعديل المخزن بنجاح');
+    setEditingStore(null);
+    refetch();
+  }
+
+  // حذف مخزن
+  async function handleDelete(store: Store) {
+    const hasData = store.stats.total_products > 0 || store.stats.total_sales > 0;
+    const confirmMsg = hasData 
+      ? `هذا المخزن يحتوي على بيانات (${store.stats.total_products} منتج، ${store.stats.total_sales} فاتورة).\n\nسيتم إلغاء تفعيله فقط، لا يمكن حذفه نهائياً.\n\nهل تريد المتابعة؟`
+      : `حذف "${store.name}" نهائياً؟\n\nهذا المخزن لا يحتوي على بيانات وسيتم حذفه نهائياً.\n\nهل تريد المتابعة؟`;
+
+    if (!confirm(confirmMsg)) return;
+
+    const { error } = await mutate('DELETE', `/api/stores/${store.id}`);
+    if (error) {
+      alert('❌ ' + error);
+      return;
+    }
+    
+    alert('✅ تم تنفيذ العملية بنجاح');
+    refetch();
+  }
+
+  // إعادة تفعيل مخزن
+  async function handleReactivate(store: Store) {
+    if (!confirm(`إعادة تفعيل "${store.name}"؟`)) return;
+
+    const { error } = await mutate('PUT', `/api/stores/${store.id}`, {
+      ...store,
+      is_active: true
+    });
+    
+    if (error) {
+      alert('❌ ' + error);
+      return;
+    }
+    
+    alert('✅ تم إعادة تفعيل المخزن');
+    refetch();
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-700">🏪 الفروع والمخازن الحالية</h2>
+          <p className="text-sm text-gray-500 mt-1">إدارة وتعديل المخازن والفروع</p>
+        </div>
+        {isAdmin && (
+          <button 
+            onClick={() => setShowAddForm(true)} 
+            className="btn-primary text-sm"
+            disabled={saving}
+          >
+            ➕ إضافة مخزن/فرع جديد
+          </button>
+        )}
+      </div>
+
+      {/* إحصائيات سريعة */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card bg-gradient-to-r from-blue-500 to-blue-700 text-white">
+          <h3 className="text-sm opacity-90 mb-1">إجمالي المخازن</h3>
+          <div className="text-2xl font-bold">{stores.length}</div>
+        </div>
+        <div className="card bg-gradient-to-r from-green-500 to-green-700 text-white">
+          <h3 className="text-sm opacity-90 mb-1">المخازن النشطة</h3>
+          <div className="text-2xl font-bold">{stores.filter(s => s.is_active).length}</div>
+        </div>
+        <div className="card bg-gradient-to-r from-orange-500 to-orange-700 text-white">
+          <h3 className="text-sm opacity-90 mb-1">المخازن المعطلة</h3>
+          <div className="text-2xl font-bold">{stores.filter(s => !s.is_active).length}</div>
+        </div>
+      </div>
+
+      {/* قائمة المخازن */}
+      {loading ? (
+        <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div>
+      ) : (
+        <>
+          {/* Mobile: كاردات */}
+          <div className="space-y-3 md:hidden">
+            {stores.map(store => {
+              const typeEmoji = store.type === 'showroom' ? '🏪' : store.type === 'vehicle' ? '🚛' : '📦';
+              const typeLabel = store.type === 'showroom' ? 'معرض' : store.type === 'vehicle' ? 'سيارة توزيع' : 'مخزن';
+              
+              return (
+                <div key={store.id} className={`card p-4 ${!store.is_active ? 'opacity-60 border-red-200' : ''}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{typeEmoji}</span>
+                        <span className="font-bold text-sm">{store.name}</span>
+                        {!store.is_active && (
+                          <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">معطل</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">{typeLabel}</div>
+                    </div>
+                  </div>
+                  
+                  {store.description && (
+                    <div className="text-xs text-gray-600 mb-2">{store.description}</div>
+                  )}
+
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                    <span>📦 {store.stats.total_products} منتج</span>
+                    <span>📄 {store.stats.total_sales} فاتورة</span>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingStore(store)}
+                        className="flex-1 text-xs px-3 py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        disabled={saving}
+                      >
+                        ✏️ تعديل
+                      </button>
+                      {store.is_active ? (
+                        <button
+                          onClick={() => handleDelete(store)}
+                          className="flex-1 text-xs px-3 py-2 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                          disabled={saving}
+                        >
+                          🗑️ حذف
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivate(store)}
+                          className="flex-1 text-xs px-3 py-2 rounded bg-green-100 text-green-700 hover:bg-green-200"
+                          disabled={saving}
+                        >
+                          🔄 تفعيل
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: جدول */}
+          <div className="card overflow-x-auto p-0 hidden md:block">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-3 text-right">النوع</th>
+                  <th className="p-3 text-right">الاسم</th>
+                  <th className="p-3 text-right">الوصف</th>
+                  <th className="p-3 text-right">المنتجات</th>
+                  <th className="p-3 text-right">الفواتير</th>
+                  <th className="p-3 text-right">الحالة</th>
+                  {isAdmin && <th className="p-3 text-right">إجراءات</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {stores.map(store => {
+                  const typeEmoji = store.type === 'showroom' ? '🏪' : store.type === 'vehicle' ? '🚛' : '📦';
+                  const typeLabel = store.type === 'showroom' ? 'معرض' : store.type === 'vehicle' ? 'سيارة توزيع' : 'مخزن';
+                  
+                  return (
+                    <tr key={store.id} className={`border-t hover:bg-gray-50 ${!store.is_active ? 'opacity-60' : ''}`}>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{typeEmoji}</span>
+                          <span className="text-xs">{typeLabel}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-semibold">{store.name}</td>
+                      <td className="p-3 text-xs text-gray-600 max-w-[200px] truncate">
+                        {store.description || '—'}
+                      </td>
+                      <td className="p-3 font-mono text-center">{store.stats.total_products}</td>
+                      <td className="p-3 font-mono text-center">{store.stats.total_sales}</td>
+                      <td className="p-3">
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${
+                          store.is_active 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {store.is_active ? 'نشط' : 'معطل'}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="p-3">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => setEditingStore(store)}
+                              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              disabled={saving}
+                              title="تعديل"
+                            >
+                              ✏️
+                            </button>
+                            {store.is_active ? (
+                              <button
+                                onClick={() => handleDelete(store)}
+                                className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                                disabled={saving}
+                                title="حذف/إلغاء تفعيل"
+                              >
+                                🗑️
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleReactivate(store)}
+                                className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200"
+                                disabled={saving}
+                                title="إعادة تفعيل"
+                              >
+                                🔄
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {stores.length === 0 && (
+                  <tr>
+                    <td colSpan={isAdmin ? 7 : 6} className="p-12 text-center text-gray-400">
+                      لا توجد مخازن
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* نموذج الإضافة */}
+      {showAddForm && (
+        <StoreFormModal
+          title="إضافة مخزن/فرع جديد"
+          onSave={handleAdd}
+          onClose={() => setShowAddForm(false)}
+          loading={saving}
+        />
+      )}
+
+      {/* نموذج التعديل */}
+      {editingStore && (
+        <StoreFormModal
+          title="تعديل المخزن/الفرع"
+          store={editingStore}
+          onSave={handleEdit}
+          onClose={() => setEditingStore(null)}
+          loading={saving}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============================================
+   نموذج إضافة/تعديل المخزن
+============================================ */
+function StoreFormModal({ 
+  title, 
+  store, 
+  onSave, 
+  onClose, 
+  loading 
+}: { 
+  title: string;
+  store?: Store | null;
+  onSave: (data: any) => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    name: store?.name || '',
+    type: store?.type || 'store',
+    description: store?.description || '',
+    is_active: store?.is_active !== undefined ? store.is_active : true
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      alert('❌ اسم المخزن مطلوب');
+      return;
+    }
+    
+    onSave(formData);
+  }
+
+  function updateField(field: string, value: any) {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <h2 className="text-xl font-bold mb-4">{title}</h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium block mb-1">اسم المخزن/الفرع *</label>
+            <input
+              type="text"
+              className="input-field"
+              value={formData.name}
+              onChange={(e) => updateField('name', e.target.value)}
+              placeholder="مثال: المخزن الرئيسي"
+              disabled={loading}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium block mb-1">النوع *</label>
+            <select
+              className="input-field"
+              value={formData.type}
+              onChange={(e) => updateField('type', e.target.value)}
+              disabled={loading}
+            >
+              <option value="store">📦 مخزن</option>
+              <option value="showroom">🏪 معرض</option>
+              <option value="vehicle">🚛 سيارة توزيع</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium block mb-1">الوصف</label>
+            <textarea
+              className="input-field"
+              rows={2}
+              value={formData.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              placeholder="وصف المخزن أو محتوياته..."
+              disabled={loading}
+            />
+          </div>
+
+          {store && (
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => updateField('is_active', e.target.checked)}
+                  disabled={loading}
+                  className="accent-nazlawy-500"
+                />
+                <span className="text-sm">مخزن نشط</span>
+              </label>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-3">
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary flex-1"
+            >
+              {loading ? 'جاري الحفظ...' : store ? 'تحديث' : 'إضافة'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="btn-secondary"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
