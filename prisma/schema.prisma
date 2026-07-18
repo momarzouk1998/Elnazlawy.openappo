@@ -46,6 +46,7 @@ model users {
   created_expenses      expenses[]
   created_transfers_out stock_transfers[]       @relation("TransferByUser")
   treasury_transactions treasury_transactions[]
+  inventory_adjustments inventory_adjustments[] @relation("AdjustmentByUser")
 
   @@map("users")
   @@schema("elnazlawy")
@@ -134,6 +135,7 @@ model inventory {
 
   product products @relation(fields: [product_id], references: [id], onDelete: Cascade)
   store   stores   @relation(fields: [store_id], references: [id], onDelete: Cascade)
+  adjustments inventory_adjustments[]
 
   @@unique([product_id, store_id])
   @@map("inventory")
@@ -548,7 +550,43 @@ model product_price_history {
 }
 
 // =======================================
-// 19. Audit Log (سجل التدقيق)
+// 19. Inventory Adjustments (تعديلات المخزون - الجرد)
+// =======================================
+model inventory_adjustments {
+  id                String    @id @default(uuid()) @db.Uuid
+  adjustment_date   DateTime  @default(now()) @db.Timestamptz()
+  inventory_id      String    @db.Uuid
+  product_id        String    @db.Uuid
+  product_name      String    @db.Text
+  store_id          String    @db.Uuid
+  store_name        String    @db.VarChar(200)
+  // القيمة القديمة والجديدة
+  old_quantity      Decimal   @db.Decimal(15, 2)
+  new_quantity      Decimal   @db.Decimal(15, 2)
+  // الفرق (موجب = زيادة، سالب = نقص)
+  difference        Decimal   @db.Decimal(15, 2)
+  // نوع التعديل: جرد | تسوية | فاقد | إضافة أولية | تصحيح
+  adjustment_type   String    @default("جرد") @db.VarChar(50)
+  // سعر التكلفة وقت التعديل (للحسابات)
+  unit_cost         Decimal   @default(0) @db.Decimal(15, 2)
+  // التأثير المالي (difference * unit_cost)
+  financial_impact  Decimal   @default(0) @db.Decimal(15, 2)
+  // السبب/الملاحظات
+  reason            String?   @db.Text
+  notes             String?   @db.Text
+  // المستخدم الذي أجرى التعديل
+  adjusted_by       Int?
+  created_at        DateTime? @default(now()) @db.Timestamptz()
+
+  inventory inventory @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
+  user      users?    @relation("AdjustmentByUser", fields: [adjusted_by], references: [id])
+
+  @@map("inventory_adjustments")
+  @@schema("elnazlawy")
+}
+
+// =======================================
+// 20. Audit Log (سجل التدقيق)
 // =======================================
 model audit_log {
   id          String    @id @default(uuid()) @db.Uuid

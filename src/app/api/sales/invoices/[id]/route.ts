@@ -74,28 +74,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // حذف البنود القديمة
         await tx.sales_invoice_items.deleteMany({ where: { invoice_id: id } });
 
+        // Batch fetch products (تحسين N+1)
+        const productIds = newItems.map(it => it.product_id);
+        const products = await tx.products.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true, last_purchase_price: true },
+        });
+        const productMap = new Map(products.map(p => [p.id, p]));
+
         // إضافة البنود الجديدة
         let subtotal = 0;
+        const itemsToCreate = [];
         for (const it of newItems) {
-          const product = await tx.products.findUnique({ where: { id: it.product_id } });
+          const product = productMap.get(it.product_id);
           if (!product) throw new Error('PRODUCT_NOT_FOUND');
+          
           const line_total = Number(it.quantity) * Number(it.unit_price);
           subtotal += line_total;
-          await tx.sales_invoice_items.create({
-            data: {
-              invoice_id: id,
-              product_id: it.product_id,
-              product_name: product.name,
-              row_type: it.row_type || 'بيع',
-              quantity: it.quantity,
-              unit_price: it.unit_price,
-              line_total,
-              unit_cost: Number(product.last_purchase_price),
-              line_cost: Number(it.quantity) * Number(product.last_purchase_price),
-              store_id: it.store_id || existing.store_id,
-            },
+          
+          itemsToCreate.push({
+            invoice_id: id,
+            product_id: it.product_id,
+            product_name: product.name,
+            row_type: it.row_type || 'بيع',
+            quantity: it.quantity,
+            unit_price: it.unit_price,
+            line_total,
+            unit_cost: Number(product.last_purchase_price),
+            line_cost: Number(it.quantity) * Number(product.last_purchase_price),
+            store_id: it.store_id || existing.store_id,
           });
         }
+
+        // Batch create items
+        await tx.sales_invoice_items.createMany({ data: itemsToCreate });
 
         const discount = Number(body.discount ?? existing.discount ?? 0);
         const total = Math.max(0, subtotal - discount);
@@ -126,6 +138,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // 2) التعامل مع تغيير الحالة
       if (!wasCompleted && isCompletedNow && !isQuotation) {
         // من مسودة/قيد التنفيذ → مكتملة: تحقق من المخزون وخصمه + رصيد العميل
+        
+        // التحقق من المخزون أولاً (قبل أي تعديل)
         for (const it of existing.items) {
           if (it.row_type !== 'بيع' || !it.store_id) continue;
           const inv = await tx.inventory.findUnique({
@@ -136,23 +150,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             throw new Error(`المخزون غير كافٍ للصنف "${it.product_name}" (متاح: ${available})`);
           }
         }
+        
+        // خصم المخزون
         for (const it of existing.items) {
           if (it.row_type !== 'بيع' || !it.store_id) continue;
-          await tx.inventory.upsert({
+          
+          // Upsert inventory
+          const inv = await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
             update: {},
             create: { product_id: it.product_id, store_id: it.store_id, current_stock: 0 },
           });
-          const inv = await tx.inventory.findUnique({
-            where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
+          
+          // Decrement stock
+          await tx.inventory.update({
+            where: { id: inv.id },
+            data: { current_stock: { decrement: it.quantity } },
           });
-          if (inv) {
-            await tx.inventory.update({
-              where: { id: inv.id },
-              data: { current_stock: { decrement: it.quantity } },
-            });
-          }
         }
+        
         // رصيد العميل
         if (existing.customer_id) {
           await tx.customers.update({

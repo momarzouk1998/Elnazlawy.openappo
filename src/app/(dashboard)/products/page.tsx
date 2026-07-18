@@ -27,6 +27,7 @@ export default function ProductsPage() {
   const { data, loading, refetch } = useApi<{ items: Product[]; total: number }>(
     `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=200`
   );
+  const { mutate } = useApiMutation();
 
   const categoryOptions = Array.from(
     new Set((data?.items ?? []).map((p) => p.category).filter(Boolean))
@@ -43,6 +44,17 @@ export default function ProductsPage() {
   const items = data?.items ?? [];
   const stockValue = items.reduce((s, p) => s + Number(p.last_purchase_price) * Number(p.total_stock), 0);
   const lowStock = items.filter(p => Number(p.total_stock) <= p.reorder_level).length;
+
+  async function deleteProduct(p: Product) {
+    if (!confirm(`حذف الصنف "${p.name}"؟\nملاحظة: لو له فواتير تاريخية هيتم إخفاؤه فقط.`)) return;
+    const { error } = await mutate('DELETE', `/api/products/${p.id}`);
+    if (error) {
+      alert('❌ ' + error);
+      return;
+    }
+    alert('✅ تم حذف الصنف');
+    refetch();
+  }
 
   return (
     <div className="space-y-4">
@@ -154,18 +166,6 @@ export default function ProductsPage() {
       )}
     </div>
   );
-
-  async function deleteProduct(p: Product) {
-    if (!confirm(`حذف الصنف "${p.name}"؟\nملاحظة: لو له فواتير تاريخية هيتم إخفاؤه فقط.`)) return;
-    const res = await fetch(`/api/products/${p.id}`, { method: 'DELETE' });
-    const json = await res.json();
-    if (!res.ok) {
-      alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
-      return;
-    }
-    alert('✅ تم حذف الصنف');
-    refetch();
-  }
 }
 
 function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {

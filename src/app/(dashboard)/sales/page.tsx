@@ -37,7 +37,7 @@ export default function SalesListPage() {
   if (type) params.set('type', type);
   if (status) params.set('status', status);
   if (customerId) params.set('customer_id', customerId);
-  const { data, loading } = useApi<{ items: Invoice[]; total: number }>(`/api/sales/invoices?${params.toString()}&limit=100`);
+  const { data, loading, refetch } = useApi<{ items: Invoice[]; total: number }>(`/api/sales/invoices?${params.toString()}&limit=100`);
   const { data: customers } = useApi<{ items: { id: string; name: string; phone: string | null; balance: number }[]; total: number }>('/api/customers?limit=200');
 
   const customerOptions: SearchOption[] = (customers?.items || []).map(c => ({
@@ -180,6 +180,7 @@ export default function SalesListPage() {
           invoiceId={openInvoice}
           isAdmin={isAdmin}
           onClose={() => setOpenInvoice(null)}
+          onChanged={refetch}
         />
       )}
     </div>
@@ -189,7 +190,7 @@ export default function SalesListPage() {
 /* ============================================
    Modal تفاصيل/تعديل الفاتورة
 ============================================ */
-function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: string; isAdmin: boolean; onClose: () => void }) {
+function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: { invoiceId: string; isAdmin: boolean; onClose: () => void; onChanged: () => void }) {
   const router = useRouter();
   const { data: inv, loading, refetch } = useApi<any>(`/api/sales/invoices/${invoiceId}`);
   const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>('/api/stores');
@@ -289,8 +290,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
     alert('✅ تم حفظ التعديلات');
     setEditing(false);
     refetch();
-    // تحديث صفحة القائمة
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event('focus'));
+    onChanged(); // تحديث صفحة القائمة بدون reload كامل
   }
 
   async function cancelInvoice() {
@@ -302,7 +302,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم إلغاء الفاتورة وإرجاع المخزون');
     onClose();
-    if (typeof window !== 'undefined') window.location.reload();
+    onChanged(); // تحديث صفحة القائمة بدون reload كامل
   }
 
   async function deleteInvoice() {
@@ -314,7 +314,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: strin
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم حذف الفاتورة نهائياً');
     onClose();
-    if (typeof window !== 'undefined') window.location.reload();
+    onChanged(); // تحديث صفحة القائمة بدون reload كامل
   }
 
   async function printInvoice() {

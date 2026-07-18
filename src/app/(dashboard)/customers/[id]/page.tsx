@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate, statusColor } from "@/lib/format";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -33,6 +33,7 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showCollect, setShowCollect] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -47,7 +48,10 @@ export default function CustomerDetailPage() {
       }
     }
     if (params.id) load();
-  }, [params.id]);
+  }, [params.id, reloadKey]);
+
+  // تحديث بيانات العميل (رصيد، اسم... إلخ) بدون reload كامل للصفحة
+  const reloadCustomer = useCallback(() => setReloadKey(k => k + 1), []);
 
   if (loading) return <div className="card py-12 text-center text-gray-500">⏳ جاري التحميل...</div>;
 
@@ -107,17 +111,17 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* قسم كشف الحساب */}
-      <StatementSection customerId={customer.id} balance={Number(customer.balance)} onCollect={() => setShowCollect(true)} />
+      <StatementSection customerId={customer.id} balance={Number(customer.balance)} onCollect={() => setShowCollect(true)} onCustomerChanged={reloadCustomer} />
 
       {/* قسم فواتير العميل */}
       <InvoicesSection customerId={customer.id} />
 
       {showCollect && (
-        <CollectForm customerId={customer.id} onClose={() => setShowCollect(false)} onSaved={() => { setShowCollect(false); router.refresh(); }} />
+        <CollectForm customerId={customer.id} onClose={() => setShowCollect(false)} onSaved={() => { setShowCollect(false); reloadCustomer(); }} />
       )}
 
       {showEdit && (
-        <EditForm customer={customer} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); router.refresh(); }} />
+        <EditForm customer={customer} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); reloadCustomer(); }} />
       )}
     </div>
   );
@@ -133,14 +137,14 @@ async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeo
     return;
   }
   alert('✅ تم حذف العميل');
+  // router.push لوحده كافي — الكاش بيتمسح تلقائياً من useApiMutation
   router.push('/customers');
-  router.refresh(); // إجبار تحديث البيانات
 }
 
 /* ============================================
    قسم كشف الحساب
 ============================================ */
-function StatementSection({ customerId, balance, onCollect }: { customerId: string; balance: number; onCollect: () => void }) {
+function StatementSection({ customerId, balance, onCollect, onCustomerChanged }: { customerId: string; balance: number; onCollect: () => void; onCustomerChanged: () => void }) {
   const { data, loading, refetch } = useApi<{ items: Payment[]; total_amount: number }>(`/api/payments/customers?customer_id=${customerId}&limit=9999`);
   const payments = data?.items || [];
   const totalPaid = data?.total_amount || 0;
@@ -171,7 +175,7 @@ function StatementSection({ customerId, balance, onCollect }: { customerId: stri
       
       alert('✅ تم حذف المدفوعة وإرجاع المبلغ لرصيد العميل');
       refetch(); // تحديث قائمة المدفوعات
-      window.location.reload(); // تحديث رصيد العميل
+      onCustomerChanged(); // تحديث رصيد العميل بدون reload كامل
     } catch (e) {
       alert('❌ حدث خطأ أثناء الحذف');
     } finally {
@@ -264,7 +268,7 @@ function StatementSection({ customerId, balance, onCollect }: { customerId: stri
           onSaved={() => {
             setEditingPayment(null);
             refetch();
-            window.location.reload(); // تحديث رصيد العميل
+            onCustomerChanged(); // تحديث رصيد العميل بدون reload كامل
           }}
         />
       )}

@@ -1,7 +1,7 @@
 {
-  "projectName": "mazaya-furniture",
-  "projectPath": "D:\\OPEN APPS\\DigitalOcian Projects\\mazaya-system",
-  "localPort": 3001,
+  "projectName": "elnazlawy-system",
+  "projectPath": "D:\\OPEN APPS\\DigitalOcian Projects\\elnazlawy-system",
+  "localPort": 3005,
   "type": "frontend",
   "testScope": "codebase",
   "pathname": "/",

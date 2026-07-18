@@ -26,6 +26,70 @@ function setCached(path: string, data: any) {
   sessionCache.set(path, { data, ts: Date.now() });
 }
 
+// خريطة العلاقات: كل مسار API يحدد القوائم اللي ممكن تتأثر بتعديله
+// key = prefix المسار اللي اتعدّل، value = قائمة prefixes الكاش اللي لازم تتمسح
+const INVALIDATION_MAP: Array<{ match: RegExp; invalidate: string[] }> = [
+  // فواتير البيع → تؤثر على: الفواتير، العملاء (الرصيد)، المخزون، الأصناف (آخر سعر/التكلفة)
+  { match: /^\/api\/sales\/invoices/, invalidate: ['/api/sales/invoices', '/api/customers', '/api/inventory', '/api/dashboard'] },
+  // فواتير الشراء → تؤثر على: المشتريات، الموردين، المخزون، الأصناف، آخر سعر شراء
+  { match: /^\/api\/purchases\/invoices/, invalidate: ['/api/purchases/invoices', '/api/suppliers', '/api/inventory', '/api/products', '/api/dashboard'] },
+  // تحويلات المخزون → تؤثر على: المخزون، التحويلات
+  { match: /^\/api\/transfers/, invalidate: ['/api/transfers', '/api/inventory'] },
+  // مدفوعات العملاء → تؤثر على: المدفوعات، العملاء (الرصيد)، الخزائن
+  { match: /^\/api\/payments\/customers/, invalidate: ['/api/payments/customers', '/api/customers', '/api/treasury', '/api/dashboard'] },
+  // مدفوعات الموردين → تؤثر على: المدفوعات، الموردين (الرصيد)، الخزائن
+  { match: /^\/api\/payments\/suppliers/, invalidate: ['/api/payments/suppliers', '/api/suppliers', '/api/treasury', '/api/dashboard'] },
+  // العملاء → قائمة العملاء فقط
+  { match: /^\/api\/customers/, invalidate: ['/api/customers', '/api/dashboard'] },
+  // الموردين → قائمة الموردين فقط
+  { match: /^\/api\/suppliers/, invalidate: ['/api/suppliers', '/api/dashboard'] },
+  // الأصناف → قائمة الأصناف + المخزون
+  { match: /^\/api\/products/, invalidate: ['/api/products', '/api/inventory'] },
+  // المخزون → نفسه فقط
+  { match: /^\/api\/inventory/, invalidate: ['/api/inventory'] },
+  // المخازن → نفسها فقط
+  { match: /^\/api\/stores/, invalidate: ['/api/stores'] },
+  // الخزائن → نفسها + حركاتها
+  { match: /^\/api\/treasury/, invalidate: ['/api/treasury', '/api/dashboard'] },
+  // المصروفات → المصروفات + الخزائن
+  { match: /^\/api\/expenses/, invalidate: ['/api/expenses', '/api/treasury', '/api/dashboard'] },
+  // الشيكات → نفسها
+  { match: /^\/api\/checks/, invalidate: ['/api/checks'] },
+];
+
+// مسح كاش كل المسارات اللي بتبدأ بأي من الـ prefixes المحددة
+// (مثلاً لو عدّلنا عميل /api/customers/123، نمسح كل /api/customers?... )
+function invalidateCacheFor(path: string) {
+  for (const { match, invalidate } of INVALIDATION_MAP) {
+    if (match.test(path)) {
+      // امسح كل الـ cache keys اللي تطابق أي من الـ invalidation prefixes
+      const keysToDelete: string[] = [];
+      for (const k of sessionCache.keys()) {
+        // نشيل الـ query string من الـ cache key عشان نقارن الـ path بس
+        const cachePathOnly = k.split('?')[0];
+        // نفحص لو الـ cache path بيبدأ بأي prefix من الـ invalidate list
+        for (const prefix of invalidate) {
+          if (cachePathOnly.startsWith(prefix)) {
+            keysToDelete.push(k);
+            break; // لقينا match، مش محتاجين نفحص باقي الـ prefixes
+          }
+        }
+      }
+      // امسح كل الـ keys اللي لقيناها
+      for (const k of keysToDelete) {
+        sessionCache.delete(k);
+      }
+      return;
+    }
+  }
+  // fallback: مسح المسار نفسه + أي query variations
+  for (const k of sessionCache.keys()) {
+    if (k.split('?')[0] === path.split('?')[0]) {
+      sessionCache.delete(k);
+    }
+  }
+}
+
 export function useApi<T>(path: string | null) {
   // عرض البيانات المخزنة فوراً (لتجنب وميض "جاري التحميل")
   const initialData = path ? getCached<T>(path) : null;
@@ -90,30 +154,9 @@ export function useApiMutation() {
   const [loading, setLoading] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const mutate = useCallback(async <T = any>(method: string, path: string, body?: unknown): Promise<{ error: string | null; data: T | null }> => {
-    // عند POST/PATCH/DELETE: نمسح الكاش الخاص بمسار GET المشابه
+    // عند POST/PATCH/DELETE: نمسح كاش المسارات المرتبطة بذكاء
     if (method !== 'GET') {
-      // مسح كاش المسار نفسه
-      sessionCache.delete(path);
-      // مسح كاش القوائم التي قد تتأثر (best-effort heuristic)
-      if (path.startsWith('/api/sales/invoices')) {
-        for (const k of sessionCache.keys()) {
-          if (k.startsWith('/api/sales/invoices') || k.startsWith('/api/customers') || k.startsWith('/api/inventory') || k.startsWith('/api/products')) {
-            sessionCache.delete(k);
-          }
-        }
-      } else if (path.startsWith('/api/purchases/invoices')) {
-        for (const k of sessionCache.keys()) {
-          if (k.startsWith('/api/purchases/invoices') || k.startsWith('/api/suppliers') || k.startsWith('/api/inventory') || k.startsWith('/api/products')) {
-            sessionCache.delete(k);
-          }
-        }
-      } else if (path.startsWith('/api/checks')) {
-        for (const k of sessionCache.keys()) {
-          if (k.startsWith('/api/checks')) sessionCache.delete(k);
-        }
-      } else if (path.startsWith('/api/customers') || path.startsWith('/api/products') || path.startsWith('/api/inventory') || path.startsWith('/api/stores') || path.startsWith('/api/treasury') || path.startsWith('/api/suppliers')) {
-        sessionCache.delete(path);
-      }
+      invalidateCacheFor(path);
     }
     abortRef.current?.abort()
     const controller = new AbortController()

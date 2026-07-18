@@ -8,14 +8,21 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const storeId = searchParams.get('store_id') || '';
+  const category = searchParams.get('category') || '';
   const lowStock = searchParams.get('low_stock') === '1';
   const search = searchParams.get('search')?.trim() || '';
 
   const where: any = {};
   if (storeId) where.store_id = storeId;
 
-  if (search) {
-    where.product = { name: { contains: search, mode: 'insensitive' } };
+  if (search || category) {
+    where.product = {};
+    if (search) {
+      where.product.name = { contains: search, mode: 'insensitive' };
+    }
+    if (category) {
+      where.product.category = category;
+    }
   }
 
   const items = await prisma.inventory.findMany({

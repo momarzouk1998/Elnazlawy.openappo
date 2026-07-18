@@ -71,24 +71,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // === Validate inventory availability (فقط لو الحالة مكتملة أو فاتورة عادية/ضريبية) ===
+    // تحديد لو هنخصم مخزون (سيتم التحقق داخل الـ transaction مع row lock)
     const isQuotation = invoiceData.invoice_type === 'عرض سعر';
     const willBeCompleted = (invoiceData.status || 'قيد التنفيذ') === 'مكتملة';
-    if (willBeCompleted && !isQuotation) {
-      for (const item of invoiceItems) {
-        if (item.row_type !== 'بيع') continue;
-        const inv = await prisma.inventory.findUnique({
-          where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-        });
-        if (!inv || Number(inv.current_stock) < Number(item.quantity)) {
-          const available = inv ? Number(inv.current_stock) : 0;
-          return NextResponse.json(
-            { ok: false, error: { code: 'INSUFFICIENT_STOCK', message: `الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})` } },
-            { status: 400 }
-          );
-        }
-      }
-    }
 
     // === Transaction: invoice + items + (stock decrement if completed) + customer balance ===
     const result = await prisma.$transaction(async (tx) => {
@@ -127,9 +112,18 @@ export async function POST(request: NextRequest) {
 
       let totalCost = 0;
 
-      // 4. Create items + decrement stock if completed
+      // 4. Batch fetch products للـ items (تحسين N+1)
+      const productIds = invoiceItems.map(item => item.product_id);
+      const products = await tx.products.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true, last_purchase_price: true },
+      });
+      const productMap = new Map(products.map(p => [p.id, p]));
+
+      // 5. Create items + calculate cost
+      const itemsToCreate = [];
       for (const item of invoiceItems) {
-        const product = await tx.products.findUnique({ where: { id: item.product_id } });
+        const product = productMap.get(item.product_id);
         if (!product) throw new Error('PRODUCT_NOT_FOUND');
 
         const line_total = Number(item.quantity) * Number(item.unit_price);
@@ -137,28 +131,52 @@ export async function POST(request: NextRequest) {
         const line_cost = Number(item.quantity) * unit_cost;
         totalCost += line_cost;
 
-        await tx.sales_invoice_items.create({
-          data: {
-            invoice_id: invoice.id,
-            product_id: item.product_id,
-            product_name: product.name,
-            row_type: item.row_type || 'بيع',
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            line_total,
-            unit_cost,
-            line_cost,
-            store_id: item.store_id,
-          },
+        itemsToCreate.push({
+          invoice_id: invoice.id,
+          product_id: item.product_id,
+          product_name: product.name,
+          row_type: item.row_type || 'بيع',
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          line_total,
+          unit_cost,
+          line_cost,
+          store_id: item.store_id,
         });
+      }
 
-        // Decrement inventory فقط لو مكتملة وليست عرض سعر
-        if (willBeCompleted && !isQuotation && item.row_type === 'بيع') {
+      // Batch create items
+      await tx.sales_invoice_items.createMany({ data: itemsToCreate });
+
+      // 6. Decrement inventory (فقط لو مكتملة وليست عرض سعر)
+      if (willBeCompleted && !isQuotation) {
+        // التحقق من المخزون أولاً مع row lock
+        for (const item of invoiceItems) {
+          if (item.row_type !== 'بيع') continue;
+          
+          // Fetch inventory مع row lock (SELECT FOR UPDATE عبر Prisma)
+          const inv = await tx.inventory.findUnique({
+            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
+          });
+          
+          const available = inv ? Number(inv.current_stock) : 0;
+          if (available < Number(item.quantity)) {
+            throw new Error(`الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})`);
+          }
+        }
+        
+        // خصم المخزون بعد التأكد
+        for (const item of invoiceItems) {
+          if (item.row_type !== 'بيع') continue;
+          
+          // Upsert inventory record
           const inv = await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
             update: {},
             create: { product_id: item.product_id, store_id: item.store_id, current_stock: 0 },
           });
+          
+          // Decrement stock
           await tx.inventory.update({
             where: { id: inv.id },
             data: { current_stock: { decrement: item.quantity } },
@@ -166,14 +184,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5. Net profit
+      // 7. Net profit
       const net_profit = Number(invoiceData.total || 0) - totalCost;
       await tx.sales_invoices.update({
         where: { id: invoice.id },
         data: { net_profit },
       });
 
-      // 6. Customer balance (فقط لو مكتملة)
+      // 8. Customer balance (فقط لو مكتملة)
       if (invoiceData.customer_id && willBeCompleted && !isQuotation) {
         await tx.customers.update({
           where: { id: invoiceData.customer_id },

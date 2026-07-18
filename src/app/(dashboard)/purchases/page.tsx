@@ -123,13 +123,14 @@ export default function PurchasesPage() {
           invoiceId={openInvoice}
           isAdmin={isAdmin}
           onClose={() => setOpenInvoice(null)}
+          onChanged={refetch}
         />
       )}
     </div>
   );
 }
 
-function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: string; isAdmin: boolean; onClose: () => void }) {
+function PurchaseDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: { invoiceId: string; isAdmin: boolean; onClose: () => void; onChanged: () => void }) {
   const { data: inv, loading, refetch } = useApi<any>(`/api/purchases/invoices/${invoiceId}`);
   const { mutate } = useApiMutation();
   const [editing, setEditing] = useState(false);
@@ -162,7 +163,7 @@ function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: stri
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم إلغاء الفاتورة');
     onClose();
-    if (typeof window !== 'undefined') window.location.reload();
+    onChanged(); // تحديث صفحة القائمة بدون reload كامل
   }
 
   async function deleteInvoice() {
@@ -172,7 +173,7 @@ function PurchaseDetailsModal({ invoiceId, isAdmin, onClose }: { invoiceId: stri
     if (error) { alert('❌ ' + error); return; }
     alert('✅ تم الحذف النهائي');
     onClose();
-    if (typeof window !== 'undefined') window.location.reload();
+    onChanged(); // تحديث صفحة القائمة بدون reload كامل
   }
 
   if (loading) {

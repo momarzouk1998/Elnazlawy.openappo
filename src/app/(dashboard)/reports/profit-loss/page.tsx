@@ -35,17 +35,14 @@ export default async function ProfitLossPage({
   const toDate = to ? new Date(to) : new Date();
   toDate.setHours(23, 59, 59, 999); // نهاية اليوم
 
-  const where = {
-    created_at: {
-      gte: fromDate,
-      lte: toDate,
-    },
-  };
-
   const [salesData, expensesData, collectionsData, supplierPaymentsData] = await Promise.all([
-    // المبيعات المكتملة
+    // المبيعات المكتملة - يجب استخدام invoice_date مش created_at
     prisma.sales_invoices.aggregate({
-      where: { ...where, status: "مكتملة", invoice_type: { not: "عرض سعر" } },
+      where: { 
+        invoice_date: { gte: fromDate, lte: toDate },
+        status: "مكتملة", 
+        invoice_type: { not: "عرض سعر" } 
+      },
       _sum: { total: true, net_profit: true },
       _count: true,
     }),
