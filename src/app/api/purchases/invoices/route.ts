@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
             purchase_id: invoice.id,
             product_id: it.product_id,
             product_name: product.name,
-            row_type: it.row_type || 'شراء',
+            row_type: 'شراء',
             quantity: it.quantity,
             unit_cost: it.unit_cost,
             line_total: Number(it.quantity) * Number(it.unit_cost),
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
           },
         });
         // Update product last_purchase_price (track history)
-        if (willBeCompleted && it.row_type === 'شراء' && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
+        if (willBeCompleted && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
           await tx.product_price_history.create({
             data: {
               product_id: it.product_id,
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
           });
         }
         // Increment inventory
-        if (willBeCompleted && it.row_type === 'شراء') {
+        if (willBeCompleted) {
           await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
             create: { product_id: it.product_id, store_id: it.store_id, current_stock: it.quantity },

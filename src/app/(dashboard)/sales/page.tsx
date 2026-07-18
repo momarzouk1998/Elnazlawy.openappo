@@ -279,7 +279,6 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: { invoi
         store_id: i.store_id || inv.store_id,
         quantity: i.quantity,
         unit_price: i.unit_price,
-        row_type: i.row_type || 'بيع',
       })),
       discount,
       status: invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status,

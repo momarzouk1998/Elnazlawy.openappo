@@ -78,11 +78,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               purchase_id: id,
               product_id: it.product_id,
               product_name: product.name,
-              row_type: it.row_type || 'شراء',
+              row_type: 'شراء',
               quantity: it.quantity,
               unit_cost: it.unit_cost,
               line_total,
-              store_id: it.store_id, // items should have store_id
+              store_id: it.store_id,
             },
           });
         }
@@ -99,7 +99,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // 2) التعامل مع تغيير الحالة (من قيد التنفيذ إلى مكتملة)
       if (!wasCompleted && isCompletedNow) {
         for (const it of existing.items) {
-          if (it.row_type !== 'شراء' || !it.store_id) continue;
+          if (!it.store_id) continue;
           
           const product = await tx.products.findUnique({ where: { id: it.product_id } });
           if (product && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
@@ -198,7 +198,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await prisma.$transaction(async (tx) => {
       if (invoice.status === 'مكتملة') {
         for (const it of invoice.items) {
-          if (it.row_type !== 'شراء' || !it.store_id) continue;
+          if (!it.store_id) continue;
           
           const inv = await tx.inventory.findUnique({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },

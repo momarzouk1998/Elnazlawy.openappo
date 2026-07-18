@@ -23,19 +23,21 @@ export interface AllModule {
 
 export const ALL_MODULES: AllModule[] = [
   // 🟢 للمدير (Admin / Manager)
-  { key: 'dashboard',    label: 'الرئيسية',                icon: '📊', path: '/dashboard' },
-  { key: 'sales',        label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
-  { key: 'purchases',    label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
-  { key: 'customers',    label: 'العملاء',                 icon: '👥', path: '/customers' },
-  { key: 'suppliers',    label: 'الموردين',                icon: '🏭', path: '/suppliers' },
-  { key: 'products',     label: 'الأصناف',                 icon: '🏷️', path: '/products' },
-  { key: 'inventory',    label: 'المخازن',                 icon: '📦', path: '/inventory' },
-  { key: 'treasury',     label: 'الخزائن',                 icon: '🏦', path: '/treasury' },
-  { key: 'expenses',     label: 'المصروفات',               icon: '📉', path: '/expenses' },
+  { key: 'dashboard',         label: 'الرئيسية',                icon: '📊', path: '/dashboard' },
+  { key: 'sales',             label: 'فواتير المبيعات',         icon: '🛒', path: '/sales' },
+  { key: 'purchases',         label: 'فواتير المشتريات',        icon: '📥', path: '/purchases' },
+  { key: 'customer_returns',  label: 'مرتجعات العملاء',         icon: '↩️', path: '/returns/customer' },
+  { key: 'supplier_returns',  label: 'مرتجعات الموردين',        icon: '↩️', path: '/returns/supplier' },
+  { key: 'customers',         label: 'العملاء',                 icon: '👥', path: '/customers' },
+  { key: 'suppliers',         label: 'الموردين',                icon: '🏭', path: '/suppliers' },
+  { key: 'products',          label: 'الأصناف',                 icon: '🏷️', path: '/products' },
+  { key: 'inventory',         label: 'المخازن',                 icon: '📦', path: '/inventory' },
+  { key: 'treasury',          label: 'الخزائن',                 icon: '🏦', path: '/treasury' },
+  { key: 'expenses',          label: 'المصروفات',               icon: '📉', path: '/expenses' },
   // 🔵 للمحاسب
-  { key: 'reports',      label: 'التقارير',                icon: '📈', path: '/reports' },
+  { key: 'reports',           label: 'التقارير',                icon: '📈', path: '/reports' },
   // 🟣 Admin only
-  { key: 'users',        label: 'المستخدمين',              icon: '👤', path: '/admin/users',           adminOnly: true },
+  { key: 'users',             label: 'المستخدمين',              icon: '👤', path: '/admin/users', adminOnly: true },
 ];
 
 export const MODULE_KEYS = ALL_MODULES.map((m) => m.key);
@@ -56,8 +58,7 @@ export function canSeeModule(profile: CurrentProfile | null, moduleKey: string):
   // Reps see only their own modules (يبدأ فاتورة المبيعات من زر الصفحة)
   if (profile.role === 'rep') {
     return ['sales', 'products', 'customers'].includes(moduleKey);
-  }
-  // Managers + Accountants see everything except admin
+  }  // Managers + Accountants see everything except admin
   return true;
 }
 

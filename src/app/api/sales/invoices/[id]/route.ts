@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             invoice_id: id,
             product_id: it.product_id,
             product_name: product.name,
-            row_type: it.row_type || 'بيع',
+            row_type: 'بيع',
             quantity: it.quantity,
             unit_price: it.unit_price,
             line_total,
@@ -141,7 +141,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         
         // التحقق من المخزون أولاً (قبل أي تعديل)
         for (const it of existing.items) {
-          if (it.row_type !== 'بيع' || !it.store_id) continue;
+          if (!it.store_id) continue;
           const inv = await tx.inventory.findUnique({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
           });
@@ -153,7 +153,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         
         // خصم المخزون
         for (const it of existing.items) {
-          if (it.row_type !== 'بيع' || !it.store_id) continue;
+          if (!it.store_id) continue;
           
           // Upsert inventory
           const inv = await tx.inventory.upsert({
@@ -244,7 +244,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       // إرجاع المخزون لو كانت مكتملة
       if (invoice.status === 'مكتملة' && invoice.invoice_type !== 'عرض سعر') {
         for (const it of invoice.items) {
-          if (it.row_type !== 'بيع' || !it.store_id) continue;
+          if (!it.store_id) continue;
           await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
             create: { product_id: it.product_id, store_id: it.store_id, current_stock: Number(it.quantity) },

@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
           invoice_id: invoice.id,
           product_id: item.product_id,
           product_name: product.name,
-          row_type: item.row_type || 'بيع',
+          row_type: 'بيع',
           quantity: item.quantity,
           unit_price: item.unit_price,
           line_total,
@@ -152,9 +152,6 @@ export async function POST(request: NextRequest) {
       if (willBeCompleted && !isQuotation) {
         // التحقق من المخزون أولاً مع row lock
         for (const item of invoiceItems) {
-          if (item.row_type !== 'بيع') continue;
-          
-          // Fetch inventory مع row lock (SELECT FOR UPDATE عبر Prisma)
           const inv = await tx.inventory.findUnique({
             where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
           });
@@ -167,8 +164,6 @@ export async function POST(request: NextRequest) {
         
         // خصم المخزون بعد التأكد
         for (const item of invoiceItems) {
-          if (item.row_type !== 'بيع') continue;
-          
           // Upsert inventory record
           const inv = await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },

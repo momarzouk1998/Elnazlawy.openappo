@@ -91,7 +91,7 @@ export default function NewPurchasePage() {
       status,
       total_amount: validTotal,
       notes,
-      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_cost: c.unit_cost, row_type: 'شراء' })),
+      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_cost: c.unit_cost })),
     });
     if (error) { alert('❌ ' + error); return; }
     alert(`✅ تم حفظ فاتورة الشراء رقم ${data?.purchase_number}`);

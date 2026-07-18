@@ -198,7 +198,7 @@ export default function POSPage() {
       store_id: primaryStoreId,
       invoice_type: invoiceType,
       status: finalStatus,
-      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price, row_type: 'بيع' })),
+      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price })),
       subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
       discount,
       total: Math.max(0, validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) - discount),
