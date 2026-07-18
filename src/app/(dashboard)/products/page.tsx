@@ -116,7 +116,6 @@ export default function ProductsPage() {
                 <th className="p-3 text-right">الفئة</th>
                 <th className="p-3 text-right">الوحدة</th>
                 <th className="p-3 text-right">إجمالي المخزون</th>
-                <th className="p-3 text-right">سعر البيع</th>
                 <th className="p-3 text-right">التوزيع بالمخازن</th>
                 <th className="p-3 text-right">إجراءات</th>
               </tr>
@@ -128,7 +127,6 @@ export default function ProductsPage() {
                   <td className="p-3 text-gray-600">{p.category || '—'}</td>
                   <td className="p-3">{p.unit === 'piece' ? 'قطعة' : p.unit === 'box' ? 'علبة' : 'كرتونة'}</td>
                   <td className="p-3 font-bold text-nazlawy-600">{formatQty(p.total_stock)}</td>
-                  <td className="p-3 font-mono">{formatEGP(p.default_sale_price)}</td>
                   <td className="p-3 text-xs text-gray-600">
                     {p.inventory_items.length > 0
                       ? p.inventory_items.map(i => `${i.store.name}: ${formatQty(i.current_stock)}`).join(' • ')
@@ -143,7 +141,7 @@ export default function ProductsPage() {
                 </tr>
               ))}
               {data?.items.length === 0 && (
-                <tr><td colSpan={7} className="p-12 text-center text-gray-400">لا توجد أصناف</td></tr>
+                <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد أصناف</td></tr>
               )}
             </tbody>
           </table>
@@ -174,7 +172,6 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
   async function save() {
     if (!form.name.trim()) { alert('❌ اسم المنتج مطلوب'); return; }
-    if (form.default_sale_price < 0) { alert('❌ سعر البيع لا يمكن أن يكون سالباً'); return; }
     if (form.last_purchase_price < 0) { alert('❌ سعر الشراء لا يمكن أن يكون سالباً'); return; }
     if (form.units_per_carton < 1) { alert('❌ قطع/كرتونة يجب أن تكون 1 على الأقل'); return; }
     const { error } = await mutate('POST', '/api/products', form);
@@ -206,10 +203,6 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">قطع/كرتونة</label>
             <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">سعر البيع</label>
-            <input type="number" step="0.01" className="input-field" value={form.default_sale_price} onChange={(e) => setForm({ ...form, default_sale_price: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
@@ -248,7 +241,6 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
 
   async function save() {
     if (!form.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
-    if (form.default_sale_price < 0) { alert('❌ سعر البيع لا يمكن أن يكون سالباً'); return; }
     if (form.last_purchase_price < 0) { alert('❌ سعر الشراء لا يمكن أن يكون سالباً'); return; }
     if (form.units_per_carton < 1) { alert('❌ قطع/كرتونة يجب أن تكون 1 على الأقل'); return; }
     const { error } = await mutate('PATCH', `/api/products/${product.id}`, form);
@@ -280,10 +272,6 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">قطع/كرتونة</label>
             <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">سعر البيع</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={form.default_sale_price} onChange={(e) => setForm({ ...form, default_sale_price: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
