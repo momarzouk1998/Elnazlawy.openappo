@@ -256,7 +256,6 @@ export default function NewPurchasePage() {
 function NewProductModal({ initialName, onClose, onAdded }: { initialName: string; onClose: () => void; onAdded: (p: Product) => void }) {
   const [f, setF] = useState({
     name: initialName,
-    default_sale_price: 0,
     last_purchase_price: 0,
     category: "",
     unit: "piece",
@@ -265,7 +264,7 @@ function NewProductModal({ initialName, onClose, onAdded }: { initialName: strin
 
   async function save() {
     if (!f.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
-    if (f.default_sale_price < 0 || f.last_purchase_price < 0) { alert('❌ الأسعار يجب أن تكون موجبة'); return; }
+    if (f.last_purchase_price < 0) { alert('❌ سعر الشراء يجب أن يكون موجباً'); return; }
     const { error, data } = await mutate<Product>('POST', '/api/products', f);
     if (error) { alert('❌ ' + error); return; }
     onAdded(data!);
@@ -281,17 +280,13 @@ function NewProductModal({ initialName, onClose, onAdded }: { initialName: strin
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-sm font-medium block mb-1">سعر البيع *</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={f.default_sale_price} onChange={(e) => setF({ ...f, default_sale_price: parseFloat(e.target.value) || 0 })} />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">سعر الشراء *</label>
+            <label className="text-sm font-medium block mb-1">سعر الشراء</label>
             <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} />
           </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">الفئة</label>
-          <input className="input-field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="مثال: إضاءة، كشافات، أسلاك..." />
+          <div>
+            <label className="text-sm font-medium block mb-1">الفئة</label>
+            <input className="input-field" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="مثال: إضاءة، أسلاك..." />
+          </div>
         </div>
         <p className="text-xs text-gray-500">💡 بعد الإضافة ستتم إضافته تلقائياً للفاتورة. يمكن تعديل التفاصيل لاحقاً من صفحة الأصناف.</p>
         <div className="flex gap-2 pt-2">
