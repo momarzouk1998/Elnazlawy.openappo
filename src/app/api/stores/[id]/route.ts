@@ -7,7 +7,7 @@ import { getCurrentUser } from '@/lib/auth-server';
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const profile = await getCurrentUser();
   if (!profile || profile.role !== 'admin') {
@@ -18,7 +18,7 @@ export async function PUT(
   }
 
   try {
-    const storeId = params.id;
+    const { id: storeId } = await params;
     const body = await request.json();
     const { name, type, description, assigned_user_id, is_active } = body;
 
@@ -99,7 +99,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const profile = await getCurrentUser();
   if (!profile || profile.role !== 'admin') {
@@ -110,7 +110,7 @@ export async function DELETE(
   }
 
   try {
-    const storeId = params.id;
+    const { id: storeId } = await params;
 
     // التحقق من وجود المخزن
     const existingStore = await prisma.stores.findUnique({
