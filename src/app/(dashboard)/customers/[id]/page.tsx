@@ -70,7 +70,8 @@ export default function CustomerDetailPage() {
           <h1 className="text-2xl font-extrabold text-slate-650">👤 {customer.name}</h1>
           <p className="text-sm text-gray-500">تفاصيل العميل</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => window.open(`/print/statement/customer/${customer.id}`, '_blank')} className="text-sm px-3 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200">🖨️ كشف حساب</button>
           <button onClick={() => setShowEdit(true)} className="btn-secondary text-sm">✏️ تعديل</button>
           <button onClick={() => deleteCustomer(customer, router)} className="text-sm px-3 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200">🗑️ حذف</button>
           <button onClick={() => router.back()} className="btn-secondary">↩️ العودة</button>

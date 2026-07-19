@@ -20,6 +20,11 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
   const isTax = invoice.invoice_type === 'ضريبية';
 
+  // الرصيد السابق = الرصيد الحالي - قيمة الفاتورة (لأن الفاتورة أُضيفت بالفعل)
+  const hasCustomer = !!invoice.customer;
+  const prevBalance = hasCustomer ? Number(invoice.customer!.balance) - Number(invoice.total) : null;
+  const newBalance  = hasCustomer ? Number(invoice.customer!.balance) : null;
+
   return (
     <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
       <PrintActions />
@@ -46,7 +51,10 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
           <div><span className="text-gray-500">رقم:</span> <strong className="font-mono">#{invoice.invoice_number}</strong></div>
           <div className="text-left"><span className="text-gray-500">التاريخ:</span> <strong>{formatDate(invoice.invoice_date)}</strong></div>
           {invoice.customer && (
-            <div className="col-span-2"><span className="text-gray-500">العميل:</span> <strong>{invoice.customer.name}</strong>{invoice.customer.phone && <span className="text-gray-500 mr-2">• {invoice.customer.phone}</span>}</div>
+            <div className="col-span-2">
+              <span className="text-gray-500">العميل:</span> <strong>{invoice.customer.name}</strong>
+              {invoice.customer.phone && <span className="text-gray-500 mr-2">• {invoice.customer.phone}</span>}
+            </div>
           )}
           {invoice.store && <div className="col-span-2"><span className="text-gray-500">المخزن:</span> {invoice.store.name}</div>}
         </div>
@@ -77,22 +85,55 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
         {/* Totals */}
         <div className="px-5 py-3 space-y-1 border-t-2 border-nazlawy-500">
-          <div className="flex justify-between text-sm"><span>الإجمالي قبل الخصم:</span><span className="font-mono font-bold">{formatEGP(Number(invoice.subtotal))} ج</span></div>
-          {Number(invoice.discount) > 0 && <div className="flex justify-between text-sm text-yellow-700 bg-yellow-50 px-2 py-1 rounded"><span>الخصم:</span><span className="font-mono font-bold">- {formatEGP(Number(invoice.discount))} ج</span></div>}
+          <div className="flex justify-between text-sm">
+            <span>الإجمالي قبل الخصم:</span>
+            <span className="font-mono font-bold">{formatEGP(Number(invoice.subtotal))} ج</span>
+          </div>
+          {Number(invoice.discount) > 0 && (
+            <div className="flex justify-between text-sm text-yellow-700 bg-yellow-50 px-2 py-1 rounded">
+              <span>الخصم:</span>
+              <span className="font-mono font-bold">- {formatEGP(Number(invoice.discount))} ج</span>
+            </div>
+          )}
           <div className="flex justify-between text-xl font-extrabold border-t pt-2 text-red-700">
-            <span>الإجمالي النهائي:</span>
+            <span>إجمالي الفاتورة:</span>
             <span className="font-mono">{formatEGP(Number(invoice.total))} ج</span>
           </div>
         </div>
+
+        {/* Account balance section */}
+        {hasCustomer && prevBalance !== null && newBalance !== null && (
+          <div className="mx-5 mb-4 rounded-xl border-2 border-nazlawy-300 overflow-hidden text-sm">
+            <div className="bg-nazlawy-500 text-white text-center font-bold py-1.5 text-xs tracking-wide">
+              حساب العميل
+            </div>
+            <div className="divide-y divide-gray-100">
+              <div className="flex justify-between px-4 py-2">
+                <span className="text-gray-600">الحساب السابق</span>
+                <span className={`font-mono font-bold ${prevBalance > 0.01 ? 'text-red-700' : prevBalance < -0.01 ? 'text-green-700' : 'text-gray-500'}`}>
+                  {formatEGP(prevBalance)} ج
+                </span>
+              </div>
+              <div className="flex justify-between px-4 py-2">
+                <span className="text-gray-600">الفاتورة الحالية</span>
+                <span className="font-mono font-bold text-nazlawy-700">+ {formatEGP(Number(invoice.total))} ج</span>
+              </div>
+              <div className="flex justify-between px-4 py-2.5 bg-gray-50">
+                <span className="font-bold">الرصيد المتبقي</span>
+                <span className={`font-mono font-extrabold text-base ${newBalance > 0.01 ? 'text-red-700' : newBalance < -0.01 ? 'text-green-700' : 'text-gray-700'}`}>
+                  {formatEGP(newBalance)} ج
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="bg-[#f8f9fa] p-4 border-t text-center text-[#666] text-[0.85em]">
           <p className="font-bold text-[#2c3e50] text-[1.1em] mb-2">شكراً لتعاملكم معنا في فرع النزلاوي</p>
           <p className="mb-2 text-[#555]">📍 الفيوم - دلة - أمام مدرسة الزراعة بجوار كافيه الغابة</p>
-          <div className="flex justify-evenly flex-wrap gap-3 font-bold text-[#444]">
-            <span>الحاج مهدي: <span className="text-nazlawy-500">01069991623</span></span>
+          <div className="flex justify-center font-bold text-[#444]">
             <span>أ/محمود حسين: <span className="text-nazlawy-500">01006172668</span></span>
-            <span>أ/محمد حسين: <span className="text-nazlawy-500">01098700313</span></span>
           </div>
           {isTax && (
             <p className="mt-2 text-[#444] border-t border-dashed pt-2">
