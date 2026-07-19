@@ -75,24 +75,31 @@ jobs:
               : > "$ENV_FILE"
             fi
 
-            echo "=== [6/8] Recreate swarm service with the latest image ==="
-            docker service rm elnazlawy-x9y8z7 >/dev/null 2>&1 || true
-            ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
-            [ -n "${{ secrets.DATABASE_URL }}" ] && ENV_FLAGS+=(--env DATABASE_URL="${{ secrets.DATABASE_URL }}")
-            [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && ENV_FLAGS+=(--env NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}")
-            [ -n "${{ secrets.NEXTAUTH_URL }}" ] && ENV_FLAGS+=(--env NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}")
-            docker service create \
-              --name elnazlawy-x9y8z7 \
-              --replicas 1 \
-              --network host \
-              --env-file "$ENV_FILE" \
-              "${ENV_FLAGS[@]}" \
-              --restart-condition on-failure \
-              --restart-max-attempts 5 \
-              "$LOCAL_IMAGE"
+            echo "=== [6/8] Update or create swarm service (zero-downtime) ==="
+            if docker service inspect elnazlawy-x9y8z7 >/dev/null 2>&1; then
+              echo "  Service exists — performing rolling update (no downtime)"
+              docker service update \
+                --image "$LOCAL_IMAGE" \
+                --env-add NODE_ENV=production \
+                --env-add PORT=${APP_PORT} \
+                --force \
+                elnazlawy-x9y8z7
+            else
+              echo "  Service not found — creating fresh"
+              ENV_FLAGS=(--env NODE_ENV=production --env PORT=${APP_PORT})
+              docker service create \
+                --name elnazlawy-x9y8z7 \
+                --replicas 1 \
+                --network host \
+                --env-file "$ENV_FILE" \
+                "${ENV_FLAGS[@]}" \
+                --restart-condition on-failure \
+                --restart-max-attempts 5 \
+                "$LOCAL_IMAGE"
+            fi
 
-            echo "=== [7/8] Waiting 25s for service to settle ==="
-            sleep 25
+            echo "=== [7/8] Waiting 30s for service to settle ==="
+            sleep 30
 
             echo "=== Service status ==="
             docker service ps elnazlawy-x9y8z7 --no-trunc

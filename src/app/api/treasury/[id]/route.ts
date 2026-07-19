@@ -5,8 +5,8 @@ import { getCurrentUser } from '@/lib/auth-server';
 // PATCH /api/treasury/[id] - تعديل خزينة
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
+  if (!profile || !['admin', 'manager', 'accountant'].includes(profile.role)) {
+    return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'هذه العملية للإدارة فقط' } }, { status: 403 });
   }
 
   try {
