@@ -123,7 +123,8 @@ export function useApi<T>(path: string | null) {
       const res = await fetch(path, { signal: controller.signal, cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = json?.error?.message || json?.error || `HTTP ${res.status}`
+        const errObj = json?.error;
+        const msg = (typeof errObj === 'string' ? errObj : errObj?.message || errObj?.code) || `HTTP ${res.status}`;
         throw new Error(msg)
       }
       const data = json.data !== undefined ? json.data : json
@@ -171,7 +172,8 @@ export function useApiMutation() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const msg = json?.error?.message || json?.error || `HTTP ${res.status}`
+        const errObj = json?.error;
+        const msg = (typeof errObj === 'string' ? errObj : errObj?.message || errObj?.code) || `HTTP ${res.status}`;
         return { error: msg, data: null }
       }
       return { error: null, data: json.data !== undefined ? json.data : json }
