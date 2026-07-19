@@ -20,12 +20,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الخزينة مطلوب' } }, { status: 400 });
     }
 
+    // لو الرصيد الافتتاحي اتعدّل، نعكس نفس الفرق على الرصيد الحالي
+    let currentBalanceDelta: number | undefined;
+    if (body.opening_balance !== undefined) {
+      const oldOpening = Number(existing.opening_balance);
+      const newOpening = Number(body.opening_balance);
+      currentBalanceDelta = Number(existing.current_balance) + (newOpening - oldOpening);
+    }
+
     const updated = await prisma.treasuries.update({
       where: { id },
       data: {
         ...(body.name !== undefined && { name: String(body.name).trim() }),
         ...(body.type !== undefined && { type: body.type }),
         ...(body.opening_balance !== undefined && { opening_balance: Number(body.opening_balance) }),
+        ...(currentBalanceDelta !== undefined && { current_balance: currentBalanceDelta }),
         ...(body.notes !== undefined && { notes: body.notes || null }),
         ...(body.is_active !== undefined && { is_active: !!body.is_active }),
         updated_at: new Date(),

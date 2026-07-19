@@ -129,12 +129,13 @@ function TreasuryForm({ treasury, onClose, onSaved }: { treasury: Treasury | nul
             {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        {!treasury && (
-          <div>
-            <label className="text-sm font-medium block mb-1">الرصيد الافتتاحي</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} />
-          </div>
-        )}
+        <div>
+          <label className="text-sm font-medium block mb-1">الرصيد الافتتاحي</label>
+          <input type="number" step="0.01" min={0} className="input-field" value={f.opening_balance} onChange={(e) => setF({ ...f, opening_balance: parseFloat(e.target.value) || 0 })} />
+          {treasury && (
+            <div className="text-xs text-amber-600 mt-1">⚠️ تعديل الرصيد الافتتاحي سينعكس بنفس الفرق على الرصيد الحالي</div>
+          )}
+        </div>
         <div>
           <label className="text-sm font-medium block mb-1">ملاحظات</label>
           <input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
