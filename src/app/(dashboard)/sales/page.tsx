@@ -141,7 +141,7 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
                   </div>
                 </div>
                 <div className="flex gap-2 mt-2 pt-2 border-t">
-                  <button onClick={() => window.open(`/print/invoice/${inv.id}`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">🖨️ طباعة</button>
+                  <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">🖨️ طباعة</button>
                   <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">📄 PDF</button>
                 </div>
               </div>
@@ -174,8 +174,8 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
                     <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
                     <td className="p-3" onClick={e => e.stopPropagation()}>
                       <div className="flex gap-1">
-                        <button onClick={() => window.open(`/print/invoice/${inv.id}`, "_blank")} className="text-xs px-2 py-1 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">🖨️</button>
-                        <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, "_blank")} className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">📄</button>
+                        <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="text-xs px-2 py-1 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200" title="طباعة مباشرة">🖨️</button>
+                        <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, "_blank")} className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200" title="PDF">📄</button>
                       </div>
                     </td>
                   </tr>
@@ -543,7 +543,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
         </div>
 
         <div className="flex flex-wrap gap-2 pt-3 border-t">
-          <button onClick={() => window.open(`/print/invoice/${invoiceId}`, "_blank")} className="btn-secondary text-sm">🖨️ طباعة</button>
+          <button onClick={() => window.open(`/print/invoice/${invoiceId}?autoprint=1`, "_blank")} className="btn-secondary text-sm">🖨️ طباعة</button>
           {!isCancelled && !isCompleted && (
             <>
               {!editing ? (

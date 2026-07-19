@@ -5,8 +5,10 @@ import PrintActions from './PrintActions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function InvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoicePrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ autoprint?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const autoprint = sp.autoprint === '1';
   const invoice = await prisma.sales_invoices.findUnique({
     where: { id },
     include: {
@@ -27,7 +29,7 @@ export default async function InvoicePrintPage({ params }: { params: Promise<{ i
 
   return (
     <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
-      <PrintActions />
+      <PrintActions autoprint={autoprint} />
 
       <div className="print-page max-w-[600px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
         {/* Header */}
