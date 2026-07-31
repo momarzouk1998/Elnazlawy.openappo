@@ -56,6 +56,7 @@ jobs:
             echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
 
             echo "=== [2/8] Pulling latest image from GHCR ==="
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull "$GHCR_IMAGE"
 
             echo "=== [3/8] Tagging local image ==="
