@@ -74,7 +74,7 @@ async function checkSubscription(): Promise<{ active: boolean; status?: string; 
     const systemName = process.env.SYSTEM_NAME || "elnazlawy-system";
 
     const res = await fetch(`${adminUrl}/api/subscription/verify?system=${systemName}`, {
-      next: { revalidate: 60 }, // Cache for 1 minute for faster updates
+      cache: "no-store", // Instant realtime checks on every refresh
     });
     
     if (!res.ok) return { active: true };
