@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { formatEGP } from "@/lib/format";
 import { useState } from "react";
+import Link from "next/link";
 
 interface Party {
   id: string; name: string; phone: string | null; balance: number; opening_balance: number; address?: string | null;
@@ -48,10 +49,6 @@ export function StatementsClient({ type: initialType, parties, selected, transac
     running: runningBalance,
   });
   for (const t of transactions) {
-    // الرصيد التراكمي = الرصيد السابق + المدين - الدائن
-    // للعميل: مدين = عليه (الفاتورة)، دائن = له (التحصيل)
-    // للمورد: عكس ذلك (مدين = سددنا للمورد، دائن = الفاتورة اللي عليه)
-    // مع ذلك في البيانات المرسلة: debit/credit محددة بالفعل بكل وضوح
     runningBalance = runningBalance + Number(t.debit) - Number(t.credit);
     rows.push({ ...t, running: runningBalance });
   }
@@ -64,11 +61,43 @@ export function StatementsClient({ type: initialType, parties, selected, transac
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">📋 كشوف الحسابات</h1>
-          <p className="text-sm text-gray-500">كشف حساب تفصيلي مع رصيد تراكمي</p>
+          <p className="text-sm text-gray-500">كشف حساب تفصيلي مع رصيد تراكمي + تحميل PDF</p>
         </div>
-        {selected && (
-          <button onClick={() => window.print()} className="btn-secondary no-print text-sm">🖨️ طباعة</button>
-        )}
+        <div className="flex gap-2 no-print flex-wrap">
+          {selected && (
+            <Link
+              href={`/print/statement/${type}/${selected.id}`}
+              target="_blank"
+              className="bg-button-orange text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity"
+            >
+              📄 كشف حساب PDF
+            </Link>
+          )}
+          {selected && (
+            <button onClick={() => window.print()} className="btn-secondary text-sm">🖨️ طباعة</button>
+          )}
+        </div>
+      </div>
+
+      {/* أزرار الكشوف المجمعة */}
+      <div className="card p-3 no-print">
+        <div className="text-xs text-gray-500 mb-2 font-semibold">كشوف مجمعة:</div>
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/print/statement/all-customers"
+            target="_blank"
+            className="bg-nazlawy-50 text-nazlawy-700 border border-nazlawy-200 px-4 py-2 rounded-lg font-bold text-sm hover:bg-nazlawy-100 transition-colors flex items-center gap-1.5"
+          >
+            👥 كل العملاء
+          </Link>
+          <Link
+            href="/print/statement/all-suppliers"
+            target="_blank"
+            className="bg-gray-50 text-gray-700 border border-gray-200 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors flex items-center gap-1.5"
+          >
+            🏭 كل الموردين
+          </Link>
+        </div>
       </div>
 
       {/* اختيار النوع والطرف */}

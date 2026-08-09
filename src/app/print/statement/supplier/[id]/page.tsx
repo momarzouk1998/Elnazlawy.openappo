@@ -5,6 +5,20 @@ import PrintActions from '@/app/print/invoice/[id]/PrintActions';
 
 export const dynamic = 'force-dynamic';
 
+const C = {
+  orange: '#f56226',
+  darkOrange: '#d9531e',
+  gray: '#677077',
+  darkGray: '#5c646b',
+  text: '#343a40',
+  lightBg: '#f8f9fa',
+  border: '#dee2e6',
+  success: '#28a745',
+  danger: '#dc3545',
+  white: '#ffffff',
+  muted: '#6c757d',
+} as const;
+
 export default async function SupplierStatementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -42,17 +56,14 @@ export default async function SupplierStatementPage({ params }: { params: Promis
 
   if (!supplier || !supplier.is_active) notFound();
 
-  // ── بناء الحركات المرتبة ──────────────────────────────
-  type EventItem = { product_name: string; quantity: number; unit_cost: number; line_total: number };
   type Entry = {
     date: Date;
     type: 'opening' | 'invoice' | 'payment' | 'return';
     label: string;
     ref: string;
-    debit: number;   // مستحق علينا للمورد
-    credit: number;  // دفعنا للمورد أو مرتجع
+    debit: number;
+    credit: number;
     balance: number;
-    items?: EventItem[];
   };
 
   let running = Number(supplier.opening_balance);
@@ -80,47 +91,24 @@ export default async function SupplierStatementPage({ params }: { params: Promis
     if (ev.type === 'invoice') {
       running += Number(ev.data.total_amount);
       entries.push({
-        date:    ev.date,
-        type:    'invoice',
-        label:   'فاتورة مشتريات',
-        ref:     `#${ev.data.purchase_number}`,
-        debit:   Number(ev.data.total_amount),
-        credit:  0,
-        balance: running,
-        items:   ev.data.items.map((it: any) => ({
-          product_name: it.product_name,
-          quantity:     Number(it.quantity),
-          unit_cost:    Number(it.unit_cost),
-          line_total:   Number(it.line_total),
-        })),
+        date: ev.date, type: 'invoice', label: 'فاتورة مشتريات',
+        ref: `#${ev.data.purchase_number}`,
+        debit: Number(ev.data.total_amount), credit: 0, balance: running,
       });
     } else if (ev.type === 'payment') {
       running -= Number(ev.data.amount);
       entries.push({
-        date:    ev.date,
-        type:    'payment',
-        label:   ev.data.notes || 'سداد للمورد',
-        ref:     ev.data.payment_method,
-        debit:   0,
-        credit:  Number(ev.data.amount),
-        balance: running,
+        date: ev.date, type: 'payment',
+        label: ev.data.notes || 'سداد للمورد',
+        ref: ev.data.payment_method,
+        debit: 0, credit: Number(ev.data.amount), balance: running,
       });
     } else {
       running -= Number(ev.data.total_amount);
       entries.push({
-        date:    ev.date,
-        type:    'return',
-        label:   'مرتجع للمورد',
-        ref:     `↩️ #${ev.data.return_number}`,
-        debit:   0,
-        credit:  Number(ev.data.total_amount),
-        balance: running,
-        items:   ev.data.items.map((it: any) => ({
-          product_name: it.product_name,
-          quantity:     Number(it.quantity),
-          unit_cost:    Number(it.unit_cost),
-          line_total:   Number(it.line_total),
-        })),
+        date: ev.date, type: 'return', label: 'مرتجع للمورد',
+        ref: `↩️ #${ev.data.return_number}`,
+        debit: 0, credit: Number(ev.data.total_amount), balance: running,
       });
     }
   }
@@ -128,173 +116,201 @@ export default async function SupplierStatementPage({ params }: { params: Promis
   const totalDebit   = entries.reduce((s, e) => s + e.debit,  0);
   const totalCredit  = entries.reduce((s, e) => s + e.credit, 0);
   const finalBalance = Number(supplier.balance);
+  const totalPurchases = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0);
+  const totalReturns = returns.reduce((s, r) => s + Number(r.total_amount), 0);
+  const totalPaymentsSum = payments.reduce((s, p) => s + Number(p.amount), 0);
+
+  const n = (v: number) => formatEGP(v);
 
   return (
-    <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
-      <PrintActions />
+    <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
+      <PrintActions
+        backLink="/reports/statements?type=supplier"
+        backLabel="↩️ العودة للكشوفات"
+        fileName={`كشف حساب - ${supplier.name}`}
+        targetId="statement"
+      />
 
-      <div className="print-page max-w-[800px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
+      <div id="statement" style={{
+        maxWidth: '800px', width: '800px', margin: '0 auto', background: C.white,
+        borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
+        overflow: 'hidden', border: `1px solid ${C.border}`, fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+        direction: 'rtl', textAlign: 'right', color: C.text,
+      }}>
 
-        {/* ── Header ── */}
-        <div className="bg-header-gradient text-white p-5 border-b-4 border-nazlawy-500 flex items-center gap-4">
-          <div className="w-[80px] h-[80px] bg-white rounded-xl p-0.5 border-2 border-nazlawy-500 shrink-0">
-            <img src="/elnazlawy-logo.png" alt="النزلاوي" className="w-full h-full object-contain rounded-lg" />
-          </div>
-          <div className="flex-1 text-center">
-            <h1 className="text-[1.7em] font-extrabold leading-tight">معرض النزلاوي</h1>
-            <div className="text-xs opacity-90">لتجارة وتوزيع الأجهزة الكهربائية والإضاءة الحديثة</div>
-          </div>
-        </div>
+        {/* Top accent bar */}
+        <div style={{ height: '4px', width: '100%', background: `linear-gradient(90deg, ${C.orange} 0%, ${C.darkOrange} 50%, ${C.gray} 100%)` }} />
 
-        {/* ── Title ── */}
-        <div className="bg-nazlawy-500 text-white text-center font-extrabold py-2 text-lg">
-          كشف حساب تفصيلي — مورد
-        </div>
-
-        {/* ── Supplier info ── */}
-        <div className="px-5 py-3 grid grid-cols-2 gap-y-1 text-sm border-b bg-gray-50">
-          <div><span className="text-gray-500">المورد:</span> <strong>{supplier.name}</strong></div>
-          <div><span className="text-gray-500">الهاتف:</span> <strong>{supplier.phone || '—'}</strong></div>
-          <div><span className="text-gray-500">تاريخ الكشف:</span> <strong>{formatDate(new Date())}</strong></div>
-          <div><span className="text-gray-500">الرصيد الافتتاحي:</span> <strong className="font-mono">{formatEGP(Number(supplier.opening_balance))} ج</strong></div>
-        </div>
-
-        {/* ── Ledger ── */}
-        <div className="divide-y divide-gray-100">
-          {entries.length === 0 && (
-            <p className="p-8 text-center text-gray-400">لا توجد حركات</p>
-          )}
-
-          {entries.map((e, i) => (
-            <div key={i} className={`${
-              e.type === 'invoice' ? 'bg-white' :
-              e.type === 'return'  ? 'bg-orange-50' :
-              e.type === 'payment' ? 'bg-green-50' : 'bg-gray-50'
-            }`}>
-
-              {/* ── Row header ── */}
-              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 items-center px-3 py-2 text-[0.83em]">
-                <div>
-                  <span className={`inline-block text-[0.78em] font-bold px-1.5 py-0.5 rounded mr-1 ${
-                    e.type === 'invoice' ? 'bg-blue-100 text-blue-800' :
-                    e.type === 'return'  ? 'bg-orange-100 text-orange-800' :
-                    e.type === 'payment' ? 'bg-green-100 text-green-800' :
-                    'bg-gray-200 text-gray-700'
-                  }`}>
-                    {e.type === 'invoice' ? '📥 شراء' : e.type === 'return' ? '↩️ مرتجع' : e.type === 'payment' ? '💸 سداد' : 'افتتاحي'}
-                  </span>
-                  <span className="font-semibold">{e.label}</span>
-                  <span className="text-gray-400 mx-1">•</span>
-                  <span className="font-mono text-gray-500">{e.ref}</span>
-                  <span className="text-gray-400 mx-1">•</span>
-                  <span className="text-gray-500">{e.date.getFullYear() === 1970 ? '—' : formatDate(e.date)}</span>
-                </div>
-
-                <div className="text-left w-[90px]">
-                  {e.debit > 0
-                    ? <span className="font-mono font-bold text-red-700">{formatEGP(e.debit)}</span>
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                <div className="text-left w-[90px]">
-                  {e.credit > 0
-                    ? <span className="font-mono font-bold text-green-700">{formatEGP(e.credit)}</span>
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                <div className={`text-left w-[90px] font-mono font-extrabold ${
-                  e.balance > 0.01 ? 'text-red-700' : e.balance < -0.01 ? 'text-green-700' : 'text-gray-500'
-                }`}>
-                  {formatEGP(e.balance)}
-                </div>
-              </div>
-
-              {/* ── Items sub-table ── */}
-              {e.items && e.items.length > 0 && (
-                <table className="w-full text-[0.78em] border-t border-dashed border-gray-200 mb-1">
-                  <thead>
-                    <tr className="bg-gray-100 text-gray-500">
-                      <th className="px-4 py-1 text-right font-medium">الصنف</th>
-                      <th className="px-2 py-1 text-center font-medium w-16">الكمية</th>
-                      <th className="px-2 py-1 text-left font-medium w-20">سعر الشراء</th>
-                      <th className="px-2 py-1 text-left font-medium w-24">الإجمالي</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {e.items.map((it, j) => (
-                      <tr key={j} className="border-t border-gray-100">
-                        <td className="px-4 py-1">{it.product_name}</td>
-                        <td className="px-2 py-1 text-center font-mono">{it.quantity}</td>
-                        <td className="px-2 py-1 text-left font-mono">{formatEGP(it.unit_cost)}</td>
-                        <td className="px-2 py-1 text-left font-mono font-bold">{formatEGP(it.line_total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+        {/* Header */}
+        <div style={{
+          padding: '1.2rem 1.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          backgroundColor: C.white, borderBottom: `2px solid ${C.gray}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              backgroundColor: C.white, borderRadius: '12px', padding: '4px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)', border: `2px solid ${C.orange}`,
+              width: '60px', height: '60px',
+            }}>
+              <img src="/elnazlawy-logo.png" alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
             </div>
-          ))}
-        </div>
-
-        {/* ── Column legend ── */}
-        <div className="grid grid-cols-[1fr_90px_90px_90px] gap-x-3 px-3 py-1.5 bg-nazlawy-500 text-white text-[0.78em] font-bold border-t-2 border-nazlawy-600 mt-1">
-          <div className="text-right">الحركة</div>
-          <div className="text-left">مستحق (علينا)</div>
-          <div className="text-left">مدفوع (له)</div>
-          <div className="text-left">الرصيد</div>
-        </div>
-
-        {/* ── Totals row ── */}
-        <div className="grid grid-cols-[1fr_90px_90px_90px] gap-x-3 px-3 py-2.5 bg-gray-100 text-sm font-bold border-t-2 border-nazlawy-400">
-          <div className="text-right text-gray-700">الإجمالي</div>
-          <div className="text-left font-mono text-red-700">{formatEGP(totalDebit)}</div>
-          <div className="text-left font-mono text-green-700">{formatEGP(totalCredit)}</div>
-          <div className={`text-left font-mono text-base ${finalBalance > 0.01 ? 'text-red-700' : finalBalance < -0.01 ? 'text-green-700' : 'text-gray-700'}`}>
-            {formatEGP(finalBalance)}
-          </div>
-        </div>
-
-        {/* ── Summary cards ── */}
-        <div className="mx-5 my-4 grid grid-cols-3 gap-3 text-sm text-center">
-          <div className="border rounded-lg p-3">
-            <div className="text-gray-500 text-xs mb-1">إجمالي المشتريات</div>
-            <div className="font-extrabold font-mono text-blue-700">
-              {formatEGP(invoices.reduce((s, inv) => s + Number(inv.total_amount), 0))} ج
+            <div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: C.gray, lineHeight: 1.2 }}>معرض النزلاوي</div>
+              <div style={{ fontSize: '0.75rem', color: C.muted, fontWeight: 400 }}>لتجارة وتوزيع الأجهزة الكهربائية والإضاءة الحديثة</div>
             </div>
           </div>
-          <div className="border rounded-lg p-3">
-            <div className="text-gray-500 text-xs mb-1">إجمالي المرتجعات</div>
-            <div className="font-extrabold font-mono text-orange-600">
-              {formatEGP(returns.reduce((s, r) => s + Number(r.total_amount), 0))} ج
+
+          <div style={{ textAlign: 'left' }}>
+            <div style={{
+              display: 'inline-block', background: `linear-gradient(90deg, ${C.gray} 0%, ${C.orange} 100%)`,
+              color: C.white, padding: '5px 18px', borderRadius: '20px',
+              fontSize: '0.85rem', fontWeight: 800, boxShadow: '0 2px 6px rgba(245,98,38,0.25)',
+            }}>
+              كشف حساب مورد
             </div>
-          </div>
-          <div className="border rounded-lg p-3">
-            <div className="text-gray-500 text-xs mb-1">إجمالي المدفوعات</div>
-            <div className="font-extrabold font-mono text-green-700">
-              {formatEGP(payments.reduce((s, p) => s + Number(p.amount), 0))} ج
-            </div>
-          </div>
-          <div className="border rounded-lg p-3 col-span-2">
-            <div className="text-gray-500 text-xs mb-1">صافي المشتريات (بعد المرتجعات)</div>
-            <div className="font-extrabold font-mono text-nazlawy-700">
-              {formatEGP(
-                invoices.reduce((s, inv) => s + Number(inv.total_amount), 0) -
-                returns.reduce((s, r) => s + Number(r.total_amount), 0)
-              )} ج
-            </div>
-          </div>
-          <div className="border-2 border-nazlawy-400 rounded-lg p-3 bg-nazlawy-50">
-            <div className="text-gray-500 text-xs mb-1">المتبقي للمورد</div>
-            <div className={`font-extrabold font-mono text-base ${finalBalance > 0.01 ? 'text-red-700' : finalBalance < -0.01 ? 'text-green-700' : 'text-gray-700'}`}>
-              {formatEGP(finalBalance)} ج
+            <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight: 700, marginTop: '6px' }}>
+              تاريخ الاستخراج: {formatDate(new Date())}
             </div>
           </div>
         </div>
 
-        {/* ── Footer ── */}
-        <div className="bg-[#f8f9fa] p-4 border-t text-center text-[#666] text-[0.82em]">
-          <p className="font-bold text-[#2c3e50] mb-1">معرض النزلاوي — الفيوم - دلة</p>
-          <p>📞 أ/محمود حسين: <span className="font-bold text-nazlawy-500">01006172668</span></p>
+        <div style={{ padding: '1.5rem 1.8rem' }}>
+          {/* Supplier info */}
+          <div style={{
+            backgroundColor: C.lightBg, border: `1px solid ${C.border}`, borderRadius: '8px',
+            padding: '0.8rem 1.2rem', marginBottom: '1.2rem',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <span style={{ color: C.muted, fontSize: '0.9rem', fontWeight: 600 }}>اسم المورد: </span>
+              <span style={{ color: C.text, fontWeight: 800, fontSize: '1.2rem' }}>{supplier.name}</span>
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              {supplier.phone && <span style={{ color: C.muted, fontSize: '0.85rem' }}>📞 {supplier.phone}</span>}
+            </div>
+          </div>
+
+          {/* Financial cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            <div style={{ background: `linear-gradient(135deg, ${C.white}, ${C.lightBg})`, border: `2px solid ${C.orange}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>رصيد افتتاحي</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: C.orange }}>{n(Number(supplier.opening_balance))}</div>
+            </div>
+            <div style={{ background: `linear-gradient(135deg, ${C.white}, ${C.lightBg})`, border: `2px solid ${C.danger}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>مستحق (علينا)</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: C.danger }}>{n(totalDebit)}</div>
+            </div>
+            <div style={{ background: `linear-gradient(135deg, ${C.white}, ${C.lightBg})`, border: `2px solid ${C.success}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>مدفوع (له)</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: C.success }}>{n(totalCredit)}</div>
+            </div>
+            <div style={{ background: `linear-gradient(135deg, ${C.white}, ${C.lightBg})`, border: `2px solid ${C.gray}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>عدد الحركات</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: C.gray }}>{entries.length}</div>
+            </div>
+          </div>
+
+          {/* Transactions table */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: C.gray, color: C.white }}>
+                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>التاريخ</th>
+                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>البيان</th>
+                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>المرجع</th>
+                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>مستحق (علينا)</th>
+                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>مدفوع (له)</th>
+                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>الرصيد</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e, i) => {
+                const bgColor = e.type === 'opening' ? '#f1f5f9' : i % 2 === 0 ? C.white : C.lightBg;
+                const balColor = e.balance > 0.01 ? C.danger : e.balance < -0.01 ? C.success : C.muted;
+                return (
+                  <tr key={i} style={{ backgroundColor: bgColor, fontWeight: e.type === 'opening' ? 700 : 400 }}>
+                    <td style={{ padding: '9px', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
+                      {e.date.getFullYear() === 1970 ? '—' : formatDate(e.date)}
+                    </td>
+                    <td style={{ padding: '9px', border: `1px solid ${C.border}` }}>
+                      <span style={{
+                        backgroundColor: e.type === 'invoice' ? '#dbeafe' : e.type === 'return' ? '#ffedd5' : e.type === 'payment' ? '#dcfce7' : '#f1f5f9',
+                        color: e.type === 'invoice' ? '#1e40af' : e.type === 'return' ? '#c2410c' : e.type === 'payment' ? '#166534' : C.gray,
+                        padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700,
+                      }}>
+                        {e.type === 'invoice' ? '📥 شراء' : e.type === 'return' ? '↩️ مرتجع' : e.type === 'payment' ? '💸 سداد' : '📂 افتتاحي'}
+                      </span>
+                      <span style={{ marginRight: '6px', fontWeight: 600 }}>{e.label}</span>
+                    </td>
+                    <td style={{ padding: '9px', border: `1px solid ${C.border}`, fontFamily: 'monospace', color: C.muted }}>{e.ref}</td>
+                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: e.debit > 0 ? C.danger : C.muted, border: `1px solid ${C.border}` }}>
+                      {e.debit > 0 ? n(e.debit) : '—'}
+                    </td>
+                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: e.credit > 0 ? C.success : C.muted, border: `1px solid ${C.border}` }}>
+                      {e.credit > 0 ? n(e.credit) : '—'}
+                    </td>
+                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 800, color: balColor, border: `1px solid ${C.border}`, fontFamily: 'monospace' }}>
+                      {n(e.balance)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ backgroundColor: C.orange, color: C.white, fontWeight: 700 }}>
+                <td colSpan={3} style={{ padding: '10px', border: `1px solid ${C.border}`, textAlign: 'center' }}>الإجماليات</td>
+                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(totalDebit)}</td>
+                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(totalCredit)}</td>
+                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}`, fontWeight: 800 }}>{n(finalBalance)}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          {/* Summary cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>إجمالي المشتريات</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e40af' }}>{n(totalPurchases)} ج</div>
+            </div>
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>إجمالي المرتجعات</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#c2410c' }}>{n(totalReturns)} ج</div>
+            </div>
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: '10px', padding: '0.8rem', textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, marginBottom: '0.3rem' }}>إجمالي المدفوعات</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: C.success }}>{n(totalPaymentsSum)} ج</div>
+            </div>
+          </div>
+
+          {/* Balance summary */}
+          <div style={{
+            background: `linear-gradient(135deg, ${C.orange}, ${C.darkOrange})`,
+            color: C.white, borderRadius: '12px', padding: '1.5rem', textAlign: 'center',
+            boxShadow: '0 6px 20px rgba(245, 98, 38, 0.3)',
+          }}>
+            <div style={{ fontSize: '1rem', opacity: 0.9, marginBottom: '0.4rem' }}>المتبقي للمورد</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, lineHeight: 1.2, marginBottom: '0.4rem' }}>
+              {n(finalBalance)} جنيه
+            </div>
+            <div>
+              <span style={{
+                fontSize: '1rem', fontWeight: 800,
+                color: finalBalance > 0 ? '#fecdd3' : finalBalance < 0 ? '#a7f3d0' : C.white,
+              }}>
+                {finalBalance > 0 ? 'مستحق علينا' : finalBalance < 0 ? 'رصيد لصالحنا' : 'خالص ✅'}
+              </span>
+            </div>
+          </div>
         </div>
 
+        {/* Footer */}
+        <div style={{
+          backgroundColor: C.lightBg, padding: '1rem', borderTop: `1px solid ${C.border}`,
+          textAlign: 'center', color: '#666', fontSize: '0.82rem',
+        }}>
+          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>معرض النزلاوي — الفيوم - دلة</p>
+          <p style={{ margin: 0 }}>📞 أ/محمود حسين: <span style={{ fontWeight: 700, color: C.orange }}>01006172668</span></p>
+        </div>
       </div>
     </div>
   );
