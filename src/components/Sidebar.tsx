@@ -40,11 +40,25 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
     router.refresh();
   }
 
+  function handleInstallApp() {
+    if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
+      // @ts-ignore
+      const deferredPrompt = window.deferredPrompt;
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+      } else {
+        alert('📱 التطبيق مثبّت بالفعل أو متاح للتثبيت من إعدادات المتصفح');
+      }
+    } else {
+      alert('📱 يمكنك تثبيت التطبيق من إعدادات المتصفح (المزيد > تثبيت التطبيق)');
+    }
+  }
+
   const visible = ALL_MODULES.filter(m => canSeeModule(profile, m.key));
 
   return (
     <>
-      {/* ====== Mobile top bar (يظهر على الشاشات الصغيرة فقط) ====== */}
+      {/* ====== Mobile top bar ====== */}
       <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-header-gradient text-white px-3 py-2.5 flex items-center justify-between shadow-lg safe-area-top">
         <button
           onClick={() => setOpen(!open)}
@@ -78,7 +92,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
                 </div>
                 <div className="min-w-0">
                   <div className="font-extrabold text-sm leading-tight truncate">معرض النزلاوي</div>
-                  <div className="text-[10px] text-nazlawy-300 font-medium">ElNazlawy</div>
+                  <div className="text-[10px] text-nazlawy-300 font-medium truncate">{profile.full_name} • {ROLE_LABELS[profile.role]}</div>
                 </div>
               </div>
               <button
@@ -90,69 +104,58 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
             <div className="flex-1 overflow-y-auto">
               <SidebarContent visible={visible} pathname={pathname} onNavigate={() => setOpen(false)} />
             </div>
-            <div className="p-3 border-t border-white/10">
-              <div className="text-xs text-white/60 mb-0.5">المستخدم:</div>
-              <div className="font-semibold text-sm truncate">{profile.full_name}</div>
-              <div className="text-xs text-nazlawy-300 mb-3">{ROLE_LABELS[profile.role]}</div>
-              <Link href="/profile" onClick={() => setOpen(false)} className="block w-full py-2.5 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm font-medium text-center mb-2">
-                👤 الملف الشخصي
-              </Link>
-              <button 
-                onClick={() => {
-                  if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
-                    // @ts-ignore
-                    const deferredPrompt = window.deferredPrompt;
-                    if (deferredPrompt) {
-                      deferredPrompt.prompt();
-                    } else {
-                      alert('📱 التطبيق مثبّت بالفعل أو متاح للتثبيت من إعدادات المتصفح');
-                    }
-                  } else {
-                    alert('📱 يمكنك تثبيت التطبيق من إعدادات المتصفح (المزيد > تثبيت التطبيق)');
-                  }
-                }}
-                className="block w-full py-2.5 rounded-lg bg-blue-500/20 text-blue-100 hover:bg-blue-500/30 text-sm font-medium text-center mb-2"
+            <div className="p-3 border-t border-white/10 flex items-center gap-2">
+              <Link
+                href="/profile"
+                onClick={() => setOpen(false)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1"
+                title="الملف الشخصي"
               >
-                📱 تثبيت التطبيق
+                <span>👤</span>
+              </Link>
+              <button
+                onClick={handleInstallApp}
+                className="flex-1 py-2 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-bold transition-all cursor-pointer truncate"
+                title="تثبيت التطبيق"
+              >
+                <span>📱 تثبيت</span>
               </button>
-              <button onClick={logout} className="w-full py-2.5 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm font-medium">
-                🚪 تسجيل خروج
+              <button
+                onClick={logout}
+                className="py-2 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 text-red-200 text-xs font-bold transition-all cursor-pointer shrink-0"
+                title="تسجيل الخروج"
+              >
+                <span>🚪 خروج</span>
               </button>
             </div>
           </aside>
         </div>
       )}
 
-      {/* ====== Desktop sidebar (يظهر على الشاشات الكبيرة فقط) ====== */}
+      {/* ====== Desktop sidebar ====== */}
       <aside className="hidden md:flex flex-col w-64 bg-header-gradient text-white h-screen sticky top-0 shadow-2xl shrink-0">
-        <SidebarContent visible={visible} pathname={pathname} onNavigate={() => {}} />
-        <div className="p-4 border-t border-white/10">
-          <div className="text-xs text-white/60 mb-1">المستخدم:</div>
-          <div className="font-semibold text-sm truncate">{profile.full_name}</div>
-          <div className="text-xs text-nazlawy-300 mb-3">{ROLE_LABELS[profile.role]}</div>
-          <Link href="/profile" className="block w-full py-2 rounded-lg bg-nazlawy-500/20 text-nazlawy-100 hover:bg-nazlawy-500/30 text-sm text-center mb-2">
-            👤 الملف الشخصي
-          </Link>
-          <button 
-            onClick={() => {
-              if ('serviceWorker' in navigator && 'BeforeInstallPromptEvent' in window) {
-                // @ts-ignore
-                const deferredPrompt = window.deferredPrompt;
-                if (deferredPrompt) {
-                  deferredPrompt.prompt();
-                } else {
-                  alert('📱 التطبيق مثبّت بالفعل أو متاح للتثبيت من إعدادات المتصفح');
-                }
-              } else {
-                alert('📱 يمكنك تثبيت التطبيق من إعدادات المتصفح (المزيد > تثبيت التطبيق)');
-              }
-            }}
-            className="block w-full py-2 rounded-lg bg-blue-500/20 text-blue-100 hover:bg-blue-500/30 text-sm text-center mb-2"
+        <SidebarContent visible={visible} pathname={pathname} onNavigate={() => {}} profile={profile} />
+        <div className="p-3 border-t border-white/10 flex items-center gap-2">
+          <Link
+            href="/profile"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all shrink-0 flex items-center gap-1"
+            title="الملف الشخصي"
           >
-            📱 تثبيت التطبيق
+            <span>👤</span>
+          </Link>
+          <button
+            onClick={handleInstallApp}
+            className="flex-1 py-2 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-400/30 text-blue-200 text-xs font-bold transition-all cursor-pointer truncate"
+            title="تثبيت التطبيق"
+          >
+            <span>📱 تثبيت</span>
           </button>
-          <button onClick={logout} className="w-full py-2 rounded-lg bg-red-500/20 text-red-100 hover:bg-red-500/30 text-sm">
-            🚪 تسجيل خروج
+          <button
+            onClick={logout}
+            className="py-2 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 text-red-200 text-xs font-bold transition-all cursor-pointer shrink-0"
+            title="تسجيل الخروج"
+          >
+            <span>🚪 خروج</span>
           </button>
         </div>
       </aside>
@@ -160,7 +163,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
   );
 }
 
-function SidebarContent({ visible, pathname, onNavigate }: { visible: any[]; pathname: string; onNavigate: () => void }) {
+function SidebarContent({ visible, pathname, onNavigate, profile }: { visible: any[]; pathname: string; onNavigate: () => void; profile?: CurrentProfile }) {
   const activeModule = visible.reduce<any | null>((best, module) => {
     if (!module.path) return best;
     if (pathname === module.path) return module;
@@ -176,9 +179,11 @@ function SidebarContent({ visible, pathname, onNavigate }: { visible: any[]; pat
         <div className="w-12 h-12 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
           <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={44} height={44} className="rounded" />
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="font-extrabold text-base leading-tight">معرض النزلاوي</div>
-          <div className="text-[10px] text-nazlawy-300 font-medium">ElNazlawy</div>
+          <div className="text-[11px] text-nazlawy-300 font-medium truncate">
+            {profile ? `${profile.full_name} • ${ROLE_LABELS[profile.role]}` : 'ElNazlawy'}
+          </div>
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto py-2">
