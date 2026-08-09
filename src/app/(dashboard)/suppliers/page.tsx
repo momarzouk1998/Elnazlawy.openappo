@@ -72,7 +72,12 @@ function SuppliersTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-gray-500">{data?.total ?? '...'} مورد</p>
-        <button onClick={() => setShow(true)} className="btn-primary">+ إضافة مورد</button>
+        <div className="flex gap-2">
+          <a href="/print/statement/all-suppliers" target="_blank" className="btn-secondary text-sm flex items-center gap-1">
+            📋 كشف حساب كل الموردين
+          </a>
+          <button onClick={() => setShow(true)} className="btn-primary">+ إضافة مورد</button>
+        </div>
       </div>
 
       <div className="card">

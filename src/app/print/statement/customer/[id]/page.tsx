@@ -136,8 +136,8 @@ export default async function CustomerStatementPage({ params }: { params: Promis
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
       <PrintActions
-        backLink="/reports/statements?type=customer"
-        backLabel="↩️ العودة للكشوفات"
+        backLink="/customers"
+        backLabel="↩️ العودة للعملاء"
         fileName={`كشف حساب - ${customer.name}`}
         targetId="statement"
       />

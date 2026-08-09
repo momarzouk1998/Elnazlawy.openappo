@@ -125,8 +125,8 @@ export default async function SupplierStatementPage({ params }: { params: Promis
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
       <PrintActions
-        backLink="/reports/statements?type=supplier"
-        backLabel="↩️ العودة للكشوفات"
+        backLink="/suppliers"
+        backLabel="↩️ العودة للموردين"
         fileName={`كشف حساب - ${supplier.name}`}
         targetId="statement"
       />

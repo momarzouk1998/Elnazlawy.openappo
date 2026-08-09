@@ -72,8 +72,8 @@ export default async function AllSuppliersStatementPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
       <PrintActions
-        backLink="/reports/statements?type=supplier"
-        backLabel="↩️ العودة للكشوفات"
+        backLink="/suppliers"
+        backLabel="↩️ العودة للموردين"
         fileName="كشف حساب مجمع - كل الموردين"
         targetId="statement"
       />
