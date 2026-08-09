@@ -71,6 +71,43 @@ export default async function AllSuppliersStatementPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm;
+          }
+          body {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            direction: rtl !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          #statement {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+          }
+          table {
+            width: 100% !important;
+            table-layout: fixed !important;
+          }
+          th, td {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       <PrintActions
         backLink="/suppliers"
         backLabel="↩️ العودة للموردين"
@@ -79,10 +116,10 @@ export default async function AllSuppliersStatementPage() {
       />
 
       <div id="statement" style={{
-        maxWidth: '800px', width: '800px', margin: '0 auto', background: C.white,
+        maxWidth: '800px', width: '100%', margin: '0 auto', background: C.white,
         borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
         overflow: 'hidden', border: `1px solid ${C.border}`, fontFamily: "'Cairo', 'Segoe UI', sans-serif",
-        direction: 'rtl', textAlign: 'right', color: C.text,
+        direction: 'rtl', textAlign: 'right', color: C.text, boxSizing: 'border-box',
       }}>
 
         {/* Top accent bar */}
@@ -144,15 +181,15 @@ export default async function AllSuppliersStatementPage() {
           </div>
 
           {/* Suppliers table */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ backgroundColor: C.gray, color: C.white }}>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}`, width: '30px' }}>#</th>
-                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>اسم المورد</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>حالة الحساب</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>إجمالي المشتريات</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>إجمالي المدفوعات</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>صافي الرصيد</th>
+                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '6%' }}>#</th>
+                <th style={{ padding: '8px 6px', textAlign: 'right', border: `1px solid ${C.border}`, width: '38%' }}>اسم المورد</th>
+                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>حالة الحساب</th>
+                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>إجمالي المشتريات</th>
+                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>إجمالي المدفوعات</th>
+                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>صافي الرصيد</th>
               </tr>
             </thead>
             <tbody>
@@ -160,20 +197,20 @@ export default async function AllSuppliersStatementPage() {
                 const textColor = r.netBalance > 0 ? C.danger : r.netBalance < 0 ? C.success : C.muted;
                 return (
                   <tr key={r.id} style={{ backgroundColor: i % 2 === 0 ? C.white : C.lightBg }}>
-                    <td style={{ padding: '9px', textAlign: 'center', border: `1px solid ${C.border}` }}>{i + 1}</td>
-                    <td style={{ padding: '9px', fontWeight: 700, border: `1px solid ${C.border}` }}>{r.name}</td>
-                    <td style={{ padding: '9px', textAlign: 'center', border: `1px solid ${C.border}` }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: textColor }}>
+                    <td style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>{i + 1}</td>
+                    <td style={{ padding: '7px 6px', fontWeight: 700, border: `1px solid ${C.border}`, wordBreak: 'break-word' }}>{r.name}</td>
+                    <td style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: textColor }}>
                         {r.statusLabel}
                       </span>
                     </td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: C.danger, border: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '7px 4px', textAlign: 'center', fontWeight: 700, color: C.danger, border: `1px solid ${C.border}` }}>
                       {n(r.totalInvoices)}
                     </td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: C.success, border: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '7px 4px', textAlign: 'center', fontWeight: 700, color: C.success, border: `1px solid ${C.border}` }}>
                       {n(r.totalPayments)}
                     </td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 800, color: C.orange, border: `1px solid ${C.border}`, fontFamily: 'monospace' }}>
+                    <td style={{ padding: '7px 4px', textAlign: 'center', fontWeight: 800, color: C.orange, border: `1px solid ${C.border}`, fontFamily: 'monospace' }}>
                       {n(r.netBalance)}
                     </td>
                   </tr>
@@ -182,10 +219,10 @@ export default async function AllSuppliersStatementPage() {
             </tbody>
             <tfoot>
               <tr style={{ backgroundColor: C.orange, color: C.white, fontWeight: 700 }}>
-                <td colSpan={3} style={{ padding: '10px', border: `1px solid ${C.border}`, textAlign: 'center' }}>الإجماليات</td>
-                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(grandTotalInvoices)}</td>
-                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(grandTotalPayments)}</td>
-                <td style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}`, fontWeight: 800 }}>{n(grandBalance)}</td>
+                <td colSpan={3} style={{ padding: '9px 6px', border: `1px solid ${C.border}`, textAlign: 'center' }}>الإجماليات</td>
+                <td style={{ padding: '9px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(grandTotalInvoices)}</td>
+                <td style={{ padding: '9px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>{n(grandTotalPayments)}</td>
+                <td style={{ padding: '9px 4px', textAlign: 'center', border: `1px solid ${C.border}`, fontWeight: 800 }}>{n(grandBalance)}</td>
               </tr>
             </tfoot>
           </table>

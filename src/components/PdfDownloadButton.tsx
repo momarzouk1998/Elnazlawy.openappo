@@ -51,25 +51,58 @@ export function PdfDownloadButton({
       const imgData = canvas.toDataURL("image/jpeg", 0.90);
       const pdf = new jsPDF(orientation === "landscape" ? "l" : "p", "mm", "a4");
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
+      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
+      const margin = 8; // 8mm margin
+      const printableWidth = pdfWidth - (margin * 2); // 194mm
+      const printableHeight = pdfHeight - (margin * 2); // 281mm
 
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
+      const imgWidth = printableWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      let imgWidth = pdfWidth - 12;
-      let imgHeight = imgWidth / ratio;
+      if (imgHeight <= printableHeight) {
+        // Single page
+        const x = (pdfWidth - imgWidth) / 2;
+        const y = margin;
+        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+      } else {
+        // Multi-page paginated export by slicing canvas into page-height blocks
+        const pageCanvasHeight = (canvas.width * printableHeight) / printableWidth;
+        let positionY = 0;
+        let pageCount = 0;
 
-      if (imgHeight > pdfHeight - 12) {
-        imgHeight = pdfHeight - 12;
-        imgWidth = imgHeight * ratio;
+        while (positionY < canvas.height) {
+          const sliceHeight = Math.min(pageCanvasHeight, canvas.height - positionY);
+
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sliceHeight;
+
+          const ctx = pageCanvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+            ctx.drawImage(
+              canvas,
+              0, positionY, canvas.width, sliceHeight,
+              0, 0, canvas.width, sliceHeight
+            );
+          }
+
+          const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.92);
+          const pageImgHeight = (sliceHeight * printableWidth) / canvas.width;
+
+          if (pageCount > 0) {
+            pdf.addPage();
+          }
+
+          pdf.addImage(pageImgData, "JPEG", margin, margin, printableWidth, pageImgHeight);
+
+          positionY += sliceHeight;
+          pageCount++;
+        }
       }
 
-      const x = (pdfWidth - imgWidth) / 2;
-      const y = (pdfHeight - imgHeight) / 2;
-
-      pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
       console.error("PDF generation failed:", error);

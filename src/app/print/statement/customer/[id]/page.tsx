@@ -135,6 +135,43 @@ export default async function CustomerStatementPage({ params }: { params: Promis
 
   return (
     <div style={{ minHeight: '100vh', background: '#f0f2f5', padding: '1rem', fontFamily: "'Cairo', 'Segoe UI', sans-serif", direction: 'rtl' }}>
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm;
+          }
+          body {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            direction: rtl !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          #statement {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+          }
+          table {
+            width: 100% !important;
+            table-layout: fixed !important;
+          }
+          th, td {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       <PrintActions
         backLink="/customers"
         backLabel="↩️ العودة للعملاء"
@@ -143,10 +180,10 @@ export default async function CustomerStatementPage({ params }: { params: Promis
       />
 
       <div id="statement" style={{
-        maxWidth: '800px', width: '800px', margin: '0 auto', background: C.white,
+        maxWidth: '800px', width: '100%', margin: '0 auto', background: C.white,
         borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
         overflow: 'hidden', border: `1px solid ${C.border}`, fontFamily: "'Cairo', 'Segoe UI', sans-serif",
-        direction: 'rtl', textAlign: 'right', color: C.text,
+        direction: 'rtl', textAlign: 'right', color: C.text, boxSizing: 'border-box',
       }}>
 
         {/* Top accent bar */}
