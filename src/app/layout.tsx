@@ -119,12 +119,12 @@ export default async function RootLayout({
       </head>
       <body className="min-h-screen font-[var(--font-cairo)] flex flex-col">
         {subStatus.status === "expiring_soon" && (
-          <div className="bg-yellow-500 text-black px-4 py-2 text-center text-sm font-bold w-full shadow-sm">
+          <div className="no-print print:hidden bg-yellow-500 text-black px-4 py-2 text-center text-sm font-bold w-full shadow-sm">
             {subStatus.message}
           </div>
         )}
         {subStatus.status === "grace_period" && (
-          <div className="bg-red-500 text-white px-4 py-2 text-center text-sm font-bold w-full shadow-sm">
+          <div className="no-print print:hidden bg-red-500 text-white px-4 py-2 text-center text-sm font-bold w-full shadow-sm">
             {subStatus.message}
           </div>
         )}
