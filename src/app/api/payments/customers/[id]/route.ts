@@ -171,9 +171,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
         const treasury = await tx.treasuries.findUnique({ where: { id: payment.treasury_id } });
         if (!treasury) throw new Error("الخزينة غير موجودة");
         
-        if (Number(treasury.current_balance) < amount) {
-          throw new Error("رصيد الخزينة غير كافي لإلغاء هذا التحصيل");
-        }
+        // السماح بالسالب: تمت إزالة شرط رصيد الخزينة لإلغاء التحصيل
 
         await tx.treasuries.update({
           where: { id: payment.treasury_id },

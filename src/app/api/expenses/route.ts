@@ -78,10 +78,9 @@ export async function POST(request: NextRequest) {
 
     // Transaction: مصروف + خصم الخزينة + سجل حركة
     const expense = await prisma.$transaction(async (tx) => {
-      // 1. تأكد إن الخزينة موجودة وبها رصيد كافي
+      // 1. تأكد إن الخزينة موجودة
       const treasury = await tx.treasuries.findUnique({ where: { id: treasury_id } });
       if (!treasury) throw new Error("الخزينة غير موجودة");
-      if (Number(treasury.current_balance) < amt) throw new Error("رصيد الخزينة غير كافي");
 
       // 2. إنشاء المصروف
       const e = await tx.expenses.create({

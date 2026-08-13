@@ -85,8 +85,7 @@ export async function POST(request: NextRequest) {
       // 2. تأكد إن الخزينة موجودة وبها رصيد كافي
       const treasury = await tx.treasuries.findUnique({ where: { id: treasury_id } });
       if (!treasury) throw new Error("الخزينة غير موجودة");
-      if (Number(treasury.current_balance) < amt) throw new Error("رصيد الخزينة غير كافي");
-
+      // السماح بالسالب: تمت إزالة شرط رصيد الخزينة
       // 3. إنشاء السداد
       const sp = await tx.supplier_payments.create({
         data: {

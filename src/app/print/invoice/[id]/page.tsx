@@ -132,10 +132,16 @@ export default async function InvoicePrintPage({ params, searchParams }: { param
 
         {/* Footer */}
         <div className="bg-[#f8f9fa] p-4 border-t text-center text-[#666] text-[0.85em]">
-          <p className="font-bold text-[#2c3e50] text-[1.1em] mb-2">شكراً لتعاملكم معنا في فرع النزلاوي</p>
-          <p className="mb-2 text-[#555]">📍 الفيوم - دلة - أمام مدرسة الزراعة بجوار كافيه الغابة</p>
-          <div className="flex justify-center font-bold text-[#444]">
-            <span>أ/محمود حسين: <span className="text-nazlawy-500">01006172668</span></span>
+          <p className="font-bold text-[#2c3e50] text-[1.1em] mb-2">شكراً لتعاملكم معنا في معرض النزلاوي</p>
+          <p className="mb-2 text-[#555]">📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة</p>
+          <div className="flex flex-col gap-1 justify-center font-bold text-[#444]">
+            <div className="flex justify-center gap-4">
+              <span>رقم الحاج: <span className="text-nazlawy-500">01006172668</span></span>
+              <span>رقم المخزن: <span className="text-nazlawy-500">01119209017</span></span>
+            </div>
+            <div>
+              <span>المحاسب: <span className="text-nazlawy-500">01095463383</span></span>
+            </div>
           </div>
           {isTax && (
             <p className="mt-2 text-[#444] border-t border-dashed pt-2">

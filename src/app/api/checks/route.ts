@@ -80,10 +80,7 @@ export async function PATCH(request: NextRequest) {
         const direction = existing.direction === 'incoming' ? 'in' : 'out';
         const operation = direction === 'in' ? 'increment' : 'decrement';
 
-        // للشيكات الصادرة للموردين: تأكد من رصيد الخزينة قبل الخصم
-        if (direction === 'out' && Number(treasury.current_balance) < amount) {
-          throw new Error('INSUFFICIENT_FUNDS');
-        }
+        // السماح بالسالب: تمت إزالة شرط رصيد الخزينة للشيكات الصادرة
 
         await tx.treasuries.update({
           where: { id: effectiveTreasuryId },

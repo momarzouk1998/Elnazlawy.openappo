@@ -163,6 +163,24 @@ function StockTab({ profile }: { profile: any }) {
     }
   }
 
+  // حذف العنصر من المخزن
+  async function deleteItem(item: InvItem) {
+    if (!confirm(`هل أنت متأكد من حذف الصنف "${item.product?.name}" من المخزن؟`)) return;
+    
+    try {
+      const response = await fetch(`/api/inventory/${item.id}`, { method: 'DELETE' });
+      const json = await response.json();
+      if (!response.ok) {
+        alert('❌ ' + (json?.error?.message || 'حدث خطأ أثناء الحذف'));
+        return;
+      }
+      alert('✅ تم الحذف بنجاح');
+      refetch();
+    } catch (err: any) {
+      alert('❌ خطأ: ' + err.message);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Cards Section */}
@@ -388,13 +406,22 @@ function StockTab({ profile }: { profile: any }) {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => startEdit(i)}
-                            className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                            title="تعديل الكمية"
-                          >
-                            ✏️ تعديل
-                          </button>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => startEdit(i)}
+                              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              title="تعديل الكمية"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => deleteItem(i)}
+                              className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                              title="حذف من المخزن"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

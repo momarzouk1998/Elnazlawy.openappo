@@ -78,9 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // تأكد من رصيد الخزينة الجديدة
         const newTreasury = await tx.treasuries.findUnique({ where: { id: body.treasury_id } });
         if (!newTreasury) throw new Error("الخزينة الجديدة غير موجودة");
-        if (Number(newTreasury.current_balance) < newAmount) {
-          throw new Error("رصيد الخزينة الجديدة غير كافي");
-        }
+        // السماح بالسالب: تمت إزالة شرط رصيد الخزينة الجديدة
 
         await tx.treasuries.update({
           where: { id: body.treasury_id },
@@ -91,10 +89,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const treasury = existing.treasury;
         if (!treasury) throw new Error("الخزينة غير موجودة");
 
-        // إذا كان amountDiff موجب (زيادة المبلغ) تأكد من الرصيد
-        if (amountDiff > 0 && Number(treasury.current_balance) < amountDiff) {
-          throw new Error("رصيد الخزينة غير كافي لزيادة المبلغ");
-        }
+        // السماح بالسالب: تمت إزالة شرط الرصيد لزيادة المبلغ
 
         await tx.treasuries.update({
           where: { id: existing.treasury_id },

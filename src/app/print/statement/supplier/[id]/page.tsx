@@ -345,8 +345,13 @@ export default async function SupplierStatementPage({ params }: { params: Promis
           backgroundColor: C.lightBg, padding: '1rem', borderTop: `1px solid ${C.border}`,
           textAlign: 'center', color: '#666', fontSize: '0.82rem',
         }}>
-          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>معرض النزلاوي — الفيوم - دلة</p>
-          <p style={{ margin: 0 }}>📞 أ/محمود حسين: <span style={{ fontWeight: 700, color: C.orange }}>01006172668</span></p>
+          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>شكراً لتعاملكم معنا في معرض النزلاوي</p>
+          <p style={{ marginBottom: '4px' }}>📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة</p>
+          <p style={{ margin: 0, display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
+            <span>رقم الحاج: <span style={{ fontWeight: 700, color: C.orange }}>01006172668</span></span>
+            <span>رقم المخزن: <span style={{ fontWeight: 700, color: C.orange }}>01119209017</span></span>
+            <span>المحاسب: <span style={{ fontWeight: 700, color: C.orange }}>01095463383</span></span>
+          </p>
         </div>
       </div>
     </div>

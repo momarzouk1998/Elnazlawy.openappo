@@ -134,8 +134,8 @@ export default function ProductsPage() {
                   </td>
                   <td className="p-3">
                     <div className="flex gap-1">
-                      <button onClick={() => setEditProduct(p)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200">✏️ تعديل</button>
-                      <button onClick={() => deleteProduct(p)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200">🗑️ حذف</button>
+                      <button onClick={() => setEditProduct(p)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" title="تعديل">✏️</button>
+                      <button onClick={() => deleteProduct(p)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200" title="حذف">🗑️</button>
                     </div>
                   </td>
                 </tr>

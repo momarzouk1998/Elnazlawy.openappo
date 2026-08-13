@@ -74,10 +74,7 @@ export async function POST(request: NextRequest) {
 
       if (!fromTreasury) throw new Error("الخزينة المصدر غير موجودة");
       if (!toTreasury) throw new Error("خزينة الوجهة غير موجودة");
-      
-      if (Number(fromTreasury.current_balance) < amt) {
-        throw new Error(`رصيد الخزينة المصدر غير كافي (متاح: ${Number(fromTreasury.current_balance)})`);
-      }
+      // 1. السماح بالسالب: تمت إزالة شرط رصيد الخزينة المصدر
 
       // 2. خصم من الخزينة المصدر
       await tx.treasuries.update({
