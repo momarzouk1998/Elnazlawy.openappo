@@ -17,8 +17,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const profile = await getCurrentUser();
-  if (!profile || profile.role !== 'admin') {
-    return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'هذه العملية للأدمن فقط' } }, { status: 403 });
+  if (!profile || profile.role === 'rep') {
+    return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'غير مصرح لك بإضافة خزينة' } }, { status: 403 });
   }
   try {
     const body = await request.json();
