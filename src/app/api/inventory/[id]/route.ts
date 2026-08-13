@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth-server';
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || profile.role === 'rep') {
     return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'غير مصرح لك بحذف الصنف من المخزن' } }, { status: 403 });
   }
 
