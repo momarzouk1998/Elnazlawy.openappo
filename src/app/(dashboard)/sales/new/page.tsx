@@ -19,7 +19,7 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
-  // لم نعد نحتاج لاختيار "المخزن الأساسي" — يحدد أوتوماتيكياً من أول صنف مضاف
+  const [primaryStoreId, setPrimaryStoreId] = useState("");
   const [invoiceType, setInvoiceType] = useState("عادية");
   const [status, setStatus] = useState("قيد التنفيذ");
   const [discount, setDiscount] = useState(0);
@@ -30,6 +30,12 @@ export default function POSPage() {
   const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
+
+  useEffect(() => {
+    if (stores?.items && stores.items.length > 0 && !primaryStoreId) {
+      setPrimaryStoreId(stores.items[0].id);
+    }
+  }, [stores, primaryStoreId]);
 
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
   const total = Math.max(0, subtotal - discount);
@@ -53,37 +59,19 @@ export default function POSPage() {
   }
 
   function addToCart(p: Product) {
-    const breakdown = storeBreakdown(p);
-    if (breakdown.length === 0) {
-      // لا يوجد مخزون في أي مخزن
-      if (p.total_stock <= 0) { alert(`❌ الصنف "${p.name}" غير متوفر في أي مخزن`); return; }
-      // صفر في كل المخازن بالرغم من أن الإجمالي > 0 (حالة نادرة) — أضف من أول مخزن
-      if (!stores?.items?.length) { alert('❌ لا يوجد مخازن معرفة'); return; }
+    if (!stores?.items?.length) {
+      alert('❌ لا يوجد مخازن معرفة في السيستم');
+      return;
     }
     
-    const targetStore = breakdown[0] || (stores?.items?.[0] ? { id: stores.items[0].id, name: stores.items[0].name, available: 0 } : null);
-    if (!targetStore) { alert('❌ لا يوجد مخازن'); return; }
-    const available = targetStore.available;
+    // المخزن المستهدف: المخزن المختار بالرئيسي، أو أول مخزن
+    const chosenStoreId = primaryStoreId || stores.items[0].id;
+    const targetStore = stores.items.find(s => s.id === chosenStoreId) || stores.items[0];
+    const available = stockFor(p, targetStore.id);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === targetStore.id);
-    const currentQty = existing ? existing.quantity : 0;
-    
-    if (available <= 0) {
-      alert(`❌ الصنف "${p.name}" غير متوفر في المخزن "${targetStore.name}"`);
-      return;
-    }
-    
-    if (currentQty + 1 > available) {
-      // هل الإجمالي الكلي يكفي؟
-      if (p.total_stock >= currentQty + 1) {
-        setSmartSplitItem({ product: p, requestedQty: currentQty + 1, currentStoreId: targetStore.id });
-      } else {
-        alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح (${p.total_stock})`);
-      }
-      return;
-    }
     
     if (existing) {
-      setCart(cart.map(c => c.product_id === p.id && c.store_id === targetStore.id ? { ...c, quantity: c.quantity + 1 } : c));
+      setCart(cart.map(c => (c.product_id === p.id && c.store_id === targetStore.id) ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
       setCart([...cart, {
         product_id: p.id,
@@ -91,7 +79,7 @@ export default function POSPage() {
         store_id: targetStore.id,
         store_name: targetStore.name,
         quantity: 1,
-        unit_price: Number(p.default_sale_price),
+        unit_price: Number(p.default_sale_price || 0),
         available,
         product_ref: p
       }]);
@@ -190,12 +178,11 @@ export default function POSPage() {
     }
     
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
-    // المخزن الأساسي للفاتورة: أول مخزن من الأصناف (تلقائي)
-    const primaryStoreId = validItems[0]?.store_id || null;
+    const storeIdToSave = primaryStoreId || validItems[0]?.store_id || null;
 
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
-      store_id: primaryStoreId,
+      store_id: storeIdToSave,
       invoice_type: invoiceType,
       status: finalStatus,
       items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price })),
@@ -239,38 +226,25 @@ export default function POSPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[600px] overflow-y-auto">
           {productsData?.items.map(p => {
-            // إخفاء الصنف تماماً لو سعره صفر (سعر البيع غير مهيأ)
-            if (Number(p.default_sale_price) <= 0) return null;
             const breakdown = storeBreakdown(p);
-            const topStore = breakdown[0];
+            const selectedStoreStock = stockFor(p, primaryStoreId);
             return (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
-                disabled={breakdown.length === 0}
-                className={`card text-right transition-all p-3 ${breakdown.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-nazlawy-500 hover:shadow-lg'}`}
+                className="card text-right transition-all p-3 hover:border-nazlawy-500 hover:shadow-lg"
               >
                 <div className="font-semibold text-sm line-clamp-2">{p.name}</div>
                 <div className="mt-2 space-y-0.5">
-                  <div className="text-xs">
-                    <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price)} ج</span>
+                  <div className="text-xs flex justify-between items-center">
+                    <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price || 0)} ج</span>
+                    <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${selectedStoreStock > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      المتاح: {formatQty(selectedStoreStock)}
+                    </span>
                   </div>
-                  {breakdown.length === 0 ? (
-                    <div className="text-xs text-red-500 font-mono">غير متوفر</div>
-                  ) : breakdown.length === 1 ? (
-                    <div className="text-xs font-mono text-gray-600">
-                      {topStore.name}: {formatQty(topStore.available)}
-                    </div>
-                  ) : (
-                    <div className="text-[10px] text-gray-600 space-y-0.5">
-                      {breakdown.slice(0, 2).map(s => (
-                        <div key={s.id} className="font-mono truncate">
-                          {s.name}: {formatQty(s.available)}
-                        </div>
-                      ))}
-                      {breakdown.length > 2 && (
-                        <div className="text-gray-400">+ {breakdown.length - 2} مخازن</div>
-                      )}
+                  {breakdown.length > 0 && (
+                    <div className="text-[10px] text-gray-500 font-mono truncate">
+                      {breakdown.map(s => `${s.name}: ${formatQty(s.available)}`).join(' • ')}
                     </div>
                   )}
                 </div>
@@ -297,6 +271,18 @@ export default function POSPage() {
       <div className="space-y-3">
         <div className="card space-y-2">
           <h2 className="font-bold text-lg">🛍️ السلة ({cart.length})</h2>
+          <div>
+            <label className="text-xs font-bold text-gray-700 block mb-1">🏢 مخزن الصرف / البيع الأساسي *</label>
+            <select
+              className="input-field text-sm font-bold border-nazlawy-500 bg-orange-50/40"
+              value={primaryStoreId}
+              onChange={(e) => setPrimaryStoreId(e.target.value)}
+            >
+              {(stores?.items || []).map(s => (
+                <option key={s.id} value={s.id}>🏢 {s.name} ({s.type})</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="text-xs text-gray-600 block mb-1">العميل</label>
             <SearchableSelect
