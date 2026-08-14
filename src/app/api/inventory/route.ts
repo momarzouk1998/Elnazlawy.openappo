@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       store: { select: { id: true, name: true, type: true } },
     },
     orderBy: { product: { name: 'asc' } },
-    take: 500,
+    take: 10000,
   });
 
   const filtered = lowStock

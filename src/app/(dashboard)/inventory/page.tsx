@@ -42,8 +42,16 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-4">
-      <div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">📦 المخازن</h1>
+        <a
+          href="/print/inventory"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold flex items-center gap-2 shadow px-4 py-2 rounded-xl"
+        >
+          🖨️ طباعة تقرير المخازن (PDF)
+        </a>
       </div>
 
       {/* شريط التبويبات */}
