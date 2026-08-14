@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate } from "@/lib/format";
+import Pagination from "@/components/Pagination";
 
 /* ============================================
    أنواع مشتركة
@@ -61,8 +62,17 @@ function CustomersTab() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [show, setShow] = useState(false);
+  const [page, setPage] = useState(1);
   const router = useRouter();
-  const { data, loading, refetch } = useApi<{ items: Customer[]; total: number }>(`/api/customers?search=${encodeURIComponent(search)}&limit=200`);
+  const searchParams = useSearchParams();
+  const { data, loading, refetch } = useApi<{ items: Customer[]; total: number; limit: number; page: number }>(
+    `/api/customers?search=${encodeURIComponent(search)}&limit=50&page=${page}`
+  );
+
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
 
   const visibleCustomers = (data?.items ?? []).filter((c) => {
     const status = c.balance > 0.01 ? 'unpaid' : c.balance < -0.01 ? 'overpaid' : 'cleared';
@@ -175,6 +185,15 @@ function CustomersTab() {
             </table>
           </div>
         </>
+      )}
+
+      {data && data.total > 0 && (
+        <Pagination
+          total={data.total}
+          page={data.page}
+          pageSize={data.limit}
+          baseUrl="/customers"
+        />
       )}
 
       {show && <CustomerForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}

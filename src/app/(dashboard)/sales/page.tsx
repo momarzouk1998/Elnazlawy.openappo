@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
+import Pagination from "@/components/Pagination";
 
 // ─── Types ────────────────────────────────────────────────
 interface Invoice {
@@ -78,15 +79,23 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
   const [status, setStatus] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [openInvoice, setOpenInvoice] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const params = new URLSearchParams();
   if (type) params.set("type", type);
   if (status) params.set("status", status);
   if (customerId) params.set("customer_id", customerId);
-  const { data, loading, refetch } = useApi<{ items: Invoice[]; total: number }>(
-    `/api/sales/invoices?${params.toString()}&limit=100`
+  params.set("page", page.toString());
+  const { data, loading, refetch } = useApi<{ items: Invoice[]; total: number; limit: number; page: number }>(
+    `/api/sales/invoices?${params.toString()}&limit=50`
   );
+
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
   const { data: customers } = useApi<{ items: { id: string; name: string; phone: string | null; balance: number }[] }>(
     "/api/customers?limit=200"
   );
@@ -185,6 +194,15 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
             </table>
           </div>
         </>
+      )}
+
+      {data && data.total > 0 && (
+        <Pagination
+          total={data.total}
+          page={data.page}
+          pageSize={data.limit}
+          baseUrl="/sales"
+        />
       )}
 
       {openInvoice && (

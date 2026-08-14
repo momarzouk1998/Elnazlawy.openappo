@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get('from') || '';
   const to = searchParams.get('to') || '';
   const limit = parseInt(searchParams.get('limit') || '50');
-  const offset = parseInt(searchParams.get('offset') || '0');
+  const page = parseInt(searchParams.get('page') || '1');
+  const offset = (page - 1) * limit;
 
   const where: Prisma.sales_invoicesWhereInput = {};
   if (customerId) where.customer_id = customerId;
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json(
-    { ok: true, data: { items, total, limit, offset } },
+    { ok: true, data: { items, total, limit, page } },
     { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=60' } }
   );
 }

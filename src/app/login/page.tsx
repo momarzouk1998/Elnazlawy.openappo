@@ -57,7 +57,7 @@ function LoginForm() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-white shadow-lg mb-4 border-2 border-nazlawy-500 p-2">
-            <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={88} height={88} className="rounded-xl" priority />
+            <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={88} height={88} className="rounded-xl" priority />
           </div>
           <h1 className="text-3xl font-extrabold text-slate-650">معرض النزلاوي</h1>
           <p className="text-sm text-nazlawy-600 font-medium mt-1">ElNazlawy Showroom</p>

@@ -9,8 +9,9 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search')?.trim() || '';
-  const limit = parseInt(searchParams.get('limit') || '100');
-  const offset = parseInt(searchParams.get('offset') || '0');
+  const limit = parseInt(searchParams.get('limit') || '50');
+  const page = parseInt(searchParams.get('page') || '1');
+  const offset = (page - 1) * limit;
 
   const where: Prisma.customersWhereInput = { is_active: true };
   if (search) where.name = { contains: search, mode: 'insensitive' };
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
     prisma.customers.count({ where }),
   ]);
   return NextResponse.json(
-    { ok: true, data: { items, total, limit, offset } },
+    { ok: true, data: { items, total, limit, page } },
     { headers: { 'Cache-Control': 'private, max-age=10, must-revalidate' } }
   );
 }

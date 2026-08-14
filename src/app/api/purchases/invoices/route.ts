@@ -8,13 +8,17 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const supplierId = searchParams.get('supplier_id') || '';
+  const limit = parseInt(searchParams.get('limit') || '50');
+  const page = parseInt(searchParams.get('page') || '1');
+  const offset = (page - 1) * limit;
   const where = supplierId ? { supplier_id: supplierId } : {};
 
   const [items, total] = await Promise.all([
     prisma.purchase_invoices.findMany({
       where,
       orderBy: { purchase_number: 'desc' },
-      take: 200,
+      take: limit,
+      skip: offset,
       include: {
         supplier: { select: { name: true } },
         _count: { select: { items: true } },
@@ -22,7 +26,7 @@ export async function GET(request: NextRequest) {
     }),
     prisma.purchase_invoices.count({ where }),
   ]);
-  return NextResponse.json({ ok: true, data: { items, total } });
+  return NextResponse.json({ ok: true, data: { items, total, limit, page } });
 }
 
 export async function POST(request: NextRequest) {

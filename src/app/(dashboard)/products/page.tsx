@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
+import Pagination from "@/components/Pagination";
 
 interface Product {
   id: string;
@@ -24,8 +26,10 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [profile, setProfile] = useState<any>(null);
-  const { data, loading, refetch } = useApi<{ items: Product[]; total: number }>(
-    `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=200`
+  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
+  const { data, loading, refetch } = useApi<{ items: Product[]; total: number; limit: number; page: number }>(
+    `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=50&page=${page}`
   );
   const { mutate } = useApiMutation();
 
@@ -39,6 +43,10 @@ export default function ProductsPage() {
   }, [search]);
 
   useEffect(() => { getCurrentUserClient().then(setProfile); }, []);
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
 
   const showCost = profile?.can_see_cost;
   const items = data?.items ?? [];
@@ -146,6 +154,15 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {data && data.total > 0 && (
+        <Pagination
+          total={data.total}
+          page={data.page}
+          pageSize={data.limit}
+          baseUrl="/products"
+        />
       )}
 
       {showForm && (

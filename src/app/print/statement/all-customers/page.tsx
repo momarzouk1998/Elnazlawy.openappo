@@ -137,7 +137,7 @@ export default async function AllCustomersStatementPage() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)', border: `2px solid ${C.orange}`,
               width: '60px', height: '60px',
             }}>
-              <img src="/elnazlawy-logo.png" alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+              <img src="/elnazlawy-logo.webp" alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
             </div>
             <div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: C.gray, lineHeight: 1.2 }}>معرض النزلاوي</div>

@@ -69,7 +69,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
         </button>
         <div className="flex items-center gap-2 min-w-0 order-2">
           <div className="w-9 h-9 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
-            <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={32} height={32} className="rounded" />
+            <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={32} height={32} className="rounded" />
           </div>
           <div className="font-bold text-sm truncate">معرض النزلاوي</div>
         </div>
@@ -88,7 +88,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
             <div className="flex items-center justify-between p-3 border-b border-white/10">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
-                  <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={36} height={36} className="rounded" />
+                  <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={36} height={36} className="rounded" />
                 </div>
                 <div className="min-w-0">
                   <div className="font-extrabold text-sm leading-tight truncate">معرض النزلاوي</div>
@@ -177,7 +177,7 @@ function SidebarContent({ visible, pathname, onNavigate, profile }: { visible: a
     <>
       <div className="p-4 border-b-4 border-nazlawy-500 flex items-center gap-3 hidden md:flex">
         <div className="w-12 h-12 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
-          <Image src="/elnazlawy-logo.png" alt="النزلاوي" width={44} height={44} className="rounded" />
+          <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={44} height={44} className="rounded" />
         </div>
         <div className="min-w-0">
           <div className="font-extrabold text-base leading-tight">معرض النزلاوي</div>

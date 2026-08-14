@@ -9,7 +9,7 @@ import "./globals.css";
 // خط Cairo محمّل ذاتياً بواسطة Next (يستخدم display: swap فلا يحجب الرسم)
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "600", "700"],
   display: "swap",
   variable: "--font-cairo",
   preload: true,
@@ -139,6 +139,17 @@ export default async function RootLayout({
                   deferredPrompt = e;
                   window.deferredPrompt = deferredPrompt;
                 });
+
+                // Register Service Worker
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').then((registration) => {
+                      console.log('SW registered: ', registration);
+                    }).catch((registrationError) => {
+                      console.log('SW registration failed: ', registrationError);
+                    });
+                  });
+                }
               }
             `,
           }}

@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty, formatDate } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
+import Pagination from "@/components/Pagination";
 
 /* ============================================
    أنواع مشتركة
@@ -89,21 +91,30 @@ function StockTab({ profile }: { profile: any }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
 
   const params = new URLSearchParams();
   if (storeId) params.set('store_id', storeId);
   if (category) params.set('category', category);
   if (lowOnly) params.set('low_stock', '1');
   if (search) params.set('search', search);
+  params.set('page', page.toString());
 
   const { data: summaryData, loading: summaryLoading } = useApi<any>('/api/inventory/summary');
-  const { data, loading, refetch } = useApi<InvItem[]>(`/api/inventory?${params.toString()}`);
+  const { data, loading, refetch } = useApi<{ items: InvItem[]; total: number; limit: number; page: number }>(`/api/inventory?${params.toString()}`);
   const stores = summaryData?.stores || [];
   const overall = summaryData?.overall;
   const showCost = profile?.can_see_cost;
 
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
+
   // استخراج الفئات المتاحة
-  const categories = Array.from(new Set(data?.map(i => i.product.category).filter(Boolean))) as string[];
+  const categories = Array.from(new Set(data?.items?.map(i => i.product.category).filter(Boolean))) as string[];
+  const items = data?.items || [];
 
   // بدء التعديل
   function startEdit(item: InvItem) {
@@ -269,7 +280,7 @@ function StockTab({ profile }: { profile: any }) {
         <>
           {/* Mobile: كاردات */}
           <div className="space-y-2 md:hidden">
-            {data?.map(i => {
+            {items.map(i => {
               const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
               const isEditing = editingId === i.id;
               
@@ -341,7 +352,7 @@ function StockTab({ profile }: { profile: any }) {
                 </div>
               );
             })}
-            {data?.length === 0 && (
+            {items.length === 0 && (
               <div className="card text-center py-12 text-gray-400">لا توجد بيانات</div>
             )}
           </div>
@@ -361,7 +372,7 @@ function StockTab({ profile }: { profile: any }) {
                 </tr>
               </thead>
               <tbody>
-                {data?.map(i => {
+                {items.map(i => {
                   const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
                   const isEditing = editingId === i.id;
                   
@@ -435,11 +446,20 @@ function StockTab({ profile }: { profile: any }) {
                     </tr>
                   );
                 })}
-                {data?.length === 0 && <tr><td colSpan={showCost ? 7 : 6} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
+                {items.length === 0 && <tr><td colSpan={showCost ? 7 : 6} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {data && data.total > 0 && (
+        <Pagination
+          total={data.total}
+          page={data.page}
+          pageSize={data.limit}
+          baseUrl="/inventory"
+        />
       )}
 
       {/* Bulk Add Modal */}
@@ -1206,7 +1226,7 @@ function TransfersTab() {
 function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({ product_id: '', from_store_id: '', to_store_id: '', quantity: 0, notes: '', transfer_date: '' });
   const { mutate, loading } = useApiMutation();
-  const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+  const [products, setProducts] = useState<{ id: string; name: string; current_stock: number }[]>([]);
   const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
   const [search, setSearch] = useState("");
 
@@ -1214,9 +1234,29 @@ function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     fetch('/api/stores').then(r => r.json()).then(j => setStores(j.data?.items || j.data || [])).catch(() => {});
   }, []);
 
+  // جلب الأصناف الموجودة في المخزن المختار فقط
   useEffect(() => {
-    fetch(`/api/products?search=${encodeURIComponent(search)}&limit=50`).then(r => r.json()).then(j => setProducts(j.data?.items || [])).catch(() => {});
-  }, [search]);
+    if (!f.from_store_id)return;
+    fetch(`/api/inventory?store_id=${f.from_store_id}&limit=1000`)
+      .then(r => r.json())
+      .then(j => {
+        const items = j.data?.items || [];
+        setProducts(items.map((i: any) => ({
+          id: i.product.id,
+          name: i.product.name,
+          current_stock: i.current_stock
+        })));
+      })
+      .catch(() => {});
+  }, [f.from_store_id]);
+
+  // تصفية الأصناف بالبحث
+  const filteredProducts = products.filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // المخازن المتاحة للتحويل إليها (باستثناء المخزن المصدر)
+  const availableToStores = stores.filter(s => s.id !== f.from_store_id);
 
   async function save() {
     if (!f.product_id || !f.from_store_id || !f.to_store_id || f.quantity <= 0) { alert('❌ أكمل البيانات'); return; }
@@ -1230,31 +1270,67 @@ function TransferForm({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
         <h2 className="text-xl font-bold">+ تحويل مخزني</h2>
-        <div>
-          <label className="text-sm font-medium block mb-1">المنتج *</label>
-          <input className="input-field" placeholder="🔍 ابحث عن منتج..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <select className="input-field mt-1" value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value })} size={3}>
-            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">من مخزن *</label>
-            <select className="input-field" value={f.from_store_id} onChange={(e) => setF({ ...f, from_store_id: e.target.value })}>
+            <select className="input-field" value={f.from_store_id} onChange={(e) => setF({ ...f, from_store_id: e.target.value, product_id: '', to_store_id: '' })}>
               <option value="">اختر...</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">إلى مخزن *</label>
-            <select className="input-field" value={f.to_store_id} onChange={(e) => setF({ ...f, to_store_id: e.target.value })}>
+            <select className="input-field" value={f.to_store_id} onChange={(e) => setF({ ...f, to_store_id: e.target.value })} disabled={!f.from_store_id}>
               <option value="">اختر...</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {availableToStores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
         </div>
+        {f.from_store_id && (
+          <div>
+            <label className="text-sm font-medium block mb-1">المنتج *</label>
+            <input 
+              className="input-field" 
+              placeholder="🔍 ابحث عن منتج..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              disabled={!f.from_store_id}
+            />
+            <select 
+              className="input-field mt-1" 
+              value={f.product_id} 
+              onChange={(e) => setF({ ...f, product_id: e.target.value })} 
+              size={5}
+              disabled={!f.from_store_id}
+            >
+              {filteredProducts.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.name} - {p.current_stock} قطعة
+                </option>
+              ))}
+            </select>
+            {filteredProducts.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">لا توجد أصناف في هذا المخزن</p>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">الكمية *</label><input type="number" step="0.01" className="input-field" value={f.quantity} onChange={(e) => setF({ ...f, quantity: parseFloat(e.target.value) || 0 })} /></div>
+          <div>
+            <label className="text-sm font-medium block mb-1">الكمية *</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              className="input-field" 
+              value={f.quantity} 
+              onChange={(e) => setF({ ...f, quantity: parseFloat(e.target.value) || 0 })} 
+              disabled={!f.product_id}
+            />
+            {f.product_id && (
+              <p className="text-xs text-gray-500 mt-1">
+                المتاح: {products.find(p => p.id === f.product_id)?.current_stock || 0} قطعة
+              </p>
+            )}
+          </div>
           <div><label className="text-sm font-medium block mb-1">التاريخ</label><input type="date" className="input-field" value={f.transfer_date} onChange={(e) => setF({ ...f, transfer_date: e.target.value })} /></div>
         </div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>

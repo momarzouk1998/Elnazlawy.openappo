@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatDate } from "@/lib/format";
+import Pagination from "@/components/Pagination";
 
 /* ============================================
    أنواع مشتركة
@@ -65,8 +66,17 @@ export default function SuppliersPage() {
 function SuppliersTab() {
   const [search, setSearch] = useState("");
   const [show, setShow] = useState(false);
+  const [page, setPage] = useState(1);
   const router = useRouter();
-  const { data, loading, refetch } = useApi<{ items: Supplier[]; total: number }>(`/api/suppliers?search=${encodeURIComponent(search)}&limit=200`);
+  const searchParams = useSearchParams();
+  const { data, loading, refetch } = useApi<{ items: Supplier[]; total: number; limit: number; page: number }>(
+    `/api/suppliers?search=${encodeURIComponent(search)}&limit=50&page=${page}`
+  );
+
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
 
   return (
     <div className="space-y-4">
@@ -150,6 +160,15 @@ function SuppliersTab() {
             </table>
           </div>
         </>
+      )}
+
+      {data && data.total > 0 && (
+        <Pagination
+          total={data.total}
+          page={data.page}
+          pageSize={data.limit}
+          baseUrl="/suppliers"
+        />
       )}
 
       {show && <SupplierForm onClose={() => setShow(false)} onSaved={() => { setShow(false); refetch(); }} />}

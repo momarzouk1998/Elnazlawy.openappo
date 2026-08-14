@@ -35,7 +35,7 @@ export default async function InvoicePrintPage({ params, searchParams }: { param
         {/* Header */}
         <div className="bg-header-gradient text-white p-5 border-b-4 border-nazlawy-500 flex items-center gap-4">
           <div className="w-[90px] h-[90px] bg-white rounded-xl p-0.5 border-2 border-nazlawy-500 shrink-0">
-            <img src="/elnazlawy-logo.png" alt="النزلاوي" className="w-full h-full object-contain rounded-lg" />
+            <img src="/elnazlawy-logo.webp" alt="النزلاوي" className="w-full h-full object-contain rounded-lg" />
           </div>
           <div className="flex-1 text-center">
             <h1 className="text-[1.9em] font-extrabold leading-tight" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>معرض النزلاوي</h1>

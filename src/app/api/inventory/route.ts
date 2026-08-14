@@ -11,6 +11,9 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get('category') || '';
   const lowStock = searchParams.get('low_stock') === '1';
   const search = searchParams.get('search')?.trim() || '';
+  const limit = parseInt(searchParams.get('limit') || '50');
+  const page = parseInt(searchParams.get('page') || '1');
+  const offset = (page - 1) * limit;
 
   const where: any = {};
   if (storeId) where.store_id = storeId;
@@ -25,15 +28,19 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const items = await prisma.inventory.findMany({
-    where,
-    include: {
-      product: { select: { id: true, name: true, category: true, unit: true, reorder_level: true, last_purchase_price: true } },
-      store: { select: { id: true, name: true, type: true } },
-    },
-    orderBy: { product: { name: 'asc' } },
-    take: 10000,
-  });
+  const [items, total] = await Promise.all([
+    prisma.inventory.findMany({
+      where,
+      include: {
+        product: { select: { id: true, name: true, category: true, unit: true, reorder_level: true, last_purchase_price: true } },
+        store: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { product: { name: 'asc' } },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.inventory.count({ where }),
+  ]);
 
   const filtered = lowStock
     ? items.filter((item) => Number(item.current_stock) <= Number(item.product.reorder_level))
@@ -50,7 +57,7 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json(
-    { ok: true, data: augmented },
+    { ok: true, data: { items: augmented, total, limit, page } },
     { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } }
   );
 }
