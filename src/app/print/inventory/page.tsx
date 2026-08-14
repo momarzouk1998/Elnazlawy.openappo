@@ -75,6 +75,23 @@ export default async function PrintInventoryReportPage() {
       color: C.text,
       direction: 'rtl',
     }}>
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          body { background: #ffffff !important; padding: 0 !important; }
+          #inventory-report {
+            max-width: 100% !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+          }
+          .table-container { overflow: visible !important; }
+          table { width: 100% !important; font-size: 11px !important; }
+          th, td { padding: 5px 6px !important; }
+        }
+      `}</style>
       <PrintActions
         backLink="/inventory"
         backLabel="↩️ العودة للمخازن"
@@ -153,7 +170,7 @@ export default async function PrintInventoryReportPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexWrap: 'wrap',
-                gap: '0.5rem',
+                gap: '0.75rem',
               }}>
                 <div style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span>🏪 {store.name}</span>
@@ -161,96 +178,100 @@ export default async function PrintInventoryReportPage() {
                     {store.type}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.85rem', display: 'flex', gap: '15px' }}>
+                <div style={{ fontSize: '0.85rem', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>الأصناف: <strong>{totalItems}</strong></span>
                   <span>إجمالي الكمية: <strong>{formatQty(totalQty)}</strong></span>
-                  <span>التكلفة: <strong style={{ color: '#4ade80' }}>{formatEGP(totalValue)} ج</strong></span>
+                  <span style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: '3px 10px', borderRadius: '6px' }}>
+                    التكلفة: <strong style={{ color: '#4ade80' }}>{formatEGP(totalValue)} ج</strong>
+                  </span>
                 </div>
               </div>
 
-              {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ backgroundColor: C.lightBg, color: C.muted, fontWeight: 700, borderBottom: `2px solid ${C.border}` }}>
-                    <th style={{ padding: '8px 10px', textAlign: 'center', width: '40px' }}>#</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>اسم الصنف</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>الفئة</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>الوحدة</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>الكمية الحالية</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>الحد الأدنى</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>سعر الشراء</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>إجمالي التكلفة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} style={{ padding: '1.5rem', textAlign: 'center', color: C.muted }}>
-                        لا توجد أصناف مسجلة في هذا المخزن حالياً
-                      </td>
+              {/* Items Table Container */}
+              <div className="table-container" style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: C.lightBg, color: C.muted, fontWeight: 700, borderBottom: `2px solid ${C.border}` }}>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '35px' }}>#</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>اسم الصنف</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '90px' }}>الفئة</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '60px' }}>الوحدة</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '100px' }}>الكمية الحالية</th>
+                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '75px' }}>الحد الأدنى</th>
+                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '85px' }}>سعر الشراء</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '120px' }}>إجمالي التكلفة</th>
                     </tr>
-                  ) : (
-                    items.map((item, idx) => {
-                      const qty = Number(item.current_stock || 0);
-                      const reorder = Number(item.product?.reorder_level || 0);
-                      const isLow = qty <= reorder;
-                      const price = Number(item.product?.last_purchase_price || 0);
-                      const itemValue = qty > 0 ? qty * price : 0;
-                      const unitLabel = item.product?.unit === 'piece' ? 'قطعة' : item.product?.unit === 'box' ? 'علبة' : 'كرتونة';
+                  </thead>
+                  <tbody>
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ padding: '1.5rem', textAlign: 'center', color: C.muted }}>
+                          لا توجد أصناف مسجلة في هذا المخزن حالياً
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item, idx) => {
+                        const qty = Number(item.current_stock || 0);
+                        const reorder = Number(item.product?.reorder_level || 0);
+                        const isLow = qty <= reorder;
+                        const price = Number(item.product?.last_purchase_price || 0);
+                        const itemValue = qty > 0 ? qty * price : 0;
+                        const unitLabel = item.product?.unit === 'piece' ? 'قطعة' : item.product?.unit === 'box' ? 'علبة' : 'كرتونة';
 
-                      return (
-                        <tr key={item.id} style={{
-                          borderBottom: `1px solid ${C.border}`,
-                          backgroundColor: isLow ? '#fff5f5' : idx % 2 === 0 ? C.white : '#fdfdfd',
-                        }}>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', color: C.muted }}>{idx + 1}</td>
-                          <td style={{ padding: '8px 12px', fontWeight: 700, color: '#1e293b' }}>
-                            {item.product?.name || '—'}
-                            {isLow && (
-                              <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', marginRight: '6px', fontWeight: 700 }}>
-                                ⚠️ منخفض
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', color: C.muted }}>{item.product?.category || '—'}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', color: C.muted }}>{unitLabel}</td>
-                          <td style={{
-                            padding: '8px 10px',
-                            textAlign: 'center',
-                            fontWeight: 800,
-                            fontFamily: 'monospace',
-                            fontSize: '0.95rem',
-                            color: qty < 0 ? C.danger : isLow ? '#d97706' : C.orange,
+                        return (
+                          <tr key={item.id} style={{
+                            borderBottom: `1px solid ${C.border}`,
+                            backgroundColor: isLow ? '#fff5f5' : idx % 2 === 0 ? C.white : '#fdfdfd',
                           }}>
-                            {formatQty(qty)}
-                          </td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', color: C.muted }}>{reorder}</td>
-                          <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace', color: C.muted }}>{formatEGP(price)}</td>
-                          <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontFamily: 'monospace', color: C.success }}>
-                            {formatEGP(itemValue)}
-                          </td>
-                        </tr>
-                      );
-                    })
+                            <td style={{ padding: '8px 6px', textAlign: 'center', color: C.muted }}>{idx + 1}</td>
+                            <td style={{ padding: '8px 10px', fontWeight: 700, color: '#1e293b' }}>
+                              {item.product?.name || '—'}
+                              {isLow && (
+                                <span style={{ fontSize: '0.7rem', backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', marginRight: '6px', fontWeight: 700 }}>
+                                  ⚠️ منخفض
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '8px 8px', textAlign: 'center', color: C.muted }}>{item.product?.category || '—'}</td>
+                            <td style={{ padding: '8px 6px', textAlign: 'center', color: C.muted }}>{unitLabel}</td>
+                            <td style={{
+                              padding: '8px 8px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontFamily: 'monospace',
+                              fontSize: '0.95rem',
+                              color: qty < 0 ? C.danger : isLow ? '#d97706' : C.orange,
+                            }}>
+                              {formatQty(qty)}
+                            </td>
+                            <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'monospace', color: C.muted }}>{reorder}</td>
+                            <td style={{ padding: '8px 8px', textAlign: 'center', fontFamily: 'monospace', color: C.muted }}>{formatEGP(price)}</td>
+                            <td style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', color: C.success, whiteSpace: 'nowrap' }}>
+                              {formatEGP(itemValue)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {items.length > 0 && (
+                    <tfoot>
+                      <tr style={{ backgroundColor: '#f8fafc', fontWeight: 800, borderTop: `2px solid ${C.border}` }}>
+                        <td colSpan={4} style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
+                          إجمالي {store.name} ({totalItems} صنف)
+                        </td>
+                        <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', color: C.orange, fontSize: '1rem' }}>
+                          {formatQty(totalQty)}
+                        </td>
+                        <td colSpan={2}></td>
+                        <td style={{ padding: '10px 10px', textAlign: 'center', fontFamily: 'monospace', color: C.success, fontSize: '1rem', whiteSpace: 'nowrap' }}>
+                          {formatEGP(totalValue)}
+                        </td>
+                      </tr>
+                    </tfoot>
                   )}
-                </tbody>
-                {items.length > 0 && (
-                  <tfoot>
-                    <tr style={{ backgroundColor: '#f8fafc', fontWeight: 800, borderTop: `2px solid ${C.border}` }}>
-                      <td colSpan={4} style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
-                        إجمالي {store.name} ({totalItems} صنف)
-                      </td>
-                      <td style={{ padding: '10px 10px', textAlign: 'center', fontFamily: 'monospace', color: C.orange, fontSize: '1rem' }}>
-                        {formatQty(totalQty)}
-                      </td>
-                      <td colSpan={2}></td>
-                      <td style={{ padding: '10px 12px', textAlign: 'left', fontFamily: 'monospace', color: C.success, fontSize: '1rem' }}>
-                        {formatEGP(totalValue)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+                </table>
+              </div>
             </div>
           ))}
         </div>
