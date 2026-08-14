@@ -123,10 +123,8 @@ export default async function PrintInventoryReportPage() {
           }}>
             <div style={{ backgroundColor: C.white, padding: '1rem', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
               <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight: 700 }}>إجمالي الأصناف بالمخازن</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: C.orange, marginTop: '2px' }}>{overallItems} صنف</div>
-            </div>
-            <div style={{ backgroundColor: C.white, padding: '1rem', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight 700 }}>إجمالي عدد القطع والكميات</div>
+              <div styl            <div style={{ backgroundColor: C.white, padding: '1rem', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
+              <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight: 700 }}>إجمالي عدد القطع والكميات</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginTop: '2px' }}>{formatQty(overallQty)} قطعة</div>
             </div>
             <div style={{ backgroundColor: C.white, padding: '1rem', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
@@ -134,7 +132,9 @@ export default async function PrintInventoryReportPage() {
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: C.success, marginTop: '2px' }}>{formatEGP(overallValue)} ج</div>
             </div>
             <div style={{ backgroundColor: C.white, padding: '1rem', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight 700 }}>أصناف تحت الحد الأدنى</div>
+              <div style={{ fontSize: '0.8rem', color: C.muted, fontWeight: 700 }}>أصناف تحت الحد الأدنى</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: overallLowStock > 0 ? C.danger : C.success, marginTop: '2px' }}>{overallLowStock} صنف</div>
+            </div>�دنى</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: overallLowStock > 0 ? C.danger : C.success, marginTop: '2px' }}>{overallLowStock} صنف</div>
             </div>
           </div>
