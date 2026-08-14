@@ -151,7 +151,19 @@ export async function POST(request: NextRequest) {
 
       // 6. Decrement inventory (فقط لو مكتملة وليست عرض سعر)
       if (willBeCompleted && !isQuotation) {
-        // خصم المخزون (يسمح بالسالب دون إيقاف المعاملة)
+        // التحقق من المخزون أولاً مع row lock
+        for (const item of invoiceItems) {
+          const inv = await tx.inventory.findUnique({
+            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
+          });
+          
+          const available = inv ? Number(inv.current_stock) : 0;
+          if (available < Number(item.quantity)) {
+            throw new Error(`الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})`);
+          }
+        }
+        
+        // خصم المخزون بعد التأكد
         for (const item of invoiceItems) {
           // Upsert inventory record
           const inv = await tx.inventory.upsert({

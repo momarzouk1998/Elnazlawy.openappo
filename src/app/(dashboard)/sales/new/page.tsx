@@ -27,7 +27,7 @@ export default function POSPage() {
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
+  const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
 
@@ -225,44 +225,49 @@ export default function POSPage() {
           />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[600px] overflow-y-auto">
-          {productsData?.items.map(p => {
-            const breakdown = storeBreakdown(p);
-            const selectedStoreStock = stockFor(p, primaryStoreId);
-            return (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="card text-right transition-all p-3 hover:border-nazlawy-500 hover:shadow-lg"
-              >
-                <div className="font-semibold text-sm line-clamp-2">{p.name}</div>
-                <div className="mt-2 space-y-0.5">
-                  <div className="text-xs flex justify-between items-center">
-                    <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price || 0)} ج</span>
-                    <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${selectedStoreStock > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                      المتاح: {formatQty(selectedStoreStock)}
-                    </span>
-                  </div>
-                  {breakdown.length > 0 && (
-                    <div className="text-[10px] text-gray-500 font-mono truncate">
-                      {breakdown.map(s => `${s.name}: ${formatQty(s.available)}`).join(' • ')}
+          {loadingProducts ? (
+            <div className="col-span-full card text-center py-12 text-gray-500 font-bold">
+              ⏳ جاري تحميل قائمة الأصناف...
+            </div>
+          ) : (productsData?.items || []).length > 0 ? (
+            productsData?.items.map(p => {
+              const breakdown = storeBreakdown(p);
+              const selectedStoreStock = stockFor(p, primaryStoreId);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => addToCart(p)}
+                  className="card text-right transition-all p-3 hover:border-nazlawy-500 hover:shadow-lg bg-white border border-gray-100"
+                >
+                  <div className="font-bold text-sm text-gray-800 line-clamp-2">{p.name}</div>
+                  <div className="mt-2 space-y-0.5">
+                    <div className="text-xs flex justify-between items-center">
+                      <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price || 0)} ج</span>
+                      <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${selectedStoreStock > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        المتاح: {formatQty(selectedStoreStock)}
+                      </span>
                     </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-          {search.trim() !== "" && productsData?.items.length === 0 && (
-            <div className="col-span-full card p-4 text-center">
-              <p className="text-gray-500 mb-2">لا توجد نتائج لـ "{search}"</p>
+                    {breakdown.length > 0 && (
+                      <div className="text-[10px] text-gray-500 font-mono truncate">
+                        {breakdown.map(s => `${s.name}: ${formatQty(s.available)}`).join(' • ')}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="col-span-full card p-6 text-center">
+              <p className="text-gray-500 mb-3 font-semibold">
+                {search.trim() ? `لا توجد نتائج لـ "${search}"` : 'لا توجد أصناف مسجلة بالنظام'}
+              </p>
               <button
                 type="button"
                 onClick={() => setShowNewProduct(true)}
                 className="btn-primary text-sm"
-              >+ إضافة صنف جديد بهذا الاسم</button>
+              >+ إضافة صنف جديد</button>
             </div>
-          )}
-          {search.trim() === "" && productsData?.items.length === 0 && (
-            <div className="card text-center text-gray-400 py-12 col-span-full">ابدأ بكتابة اسم الصنف للبحث</div>
           )}
         </div>
       </div>
@@ -272,14 +277,14 @@ export default function POSPage() {
         <div className="card space-y-2">
           <h2 className="font-bold text-lg">🛍️ السلة ({cart.length})</h2>
           <div>
-            <label className="text-xs font-bold text-gray-700 block mb-1">🏢 مخزن الصرف / البيع الأساسي *</label>
+            <label className="text-xs font-bold text-gray-700 block mb-1">🏢 مخزن البيع *</label>
             <select
               className="input-field text-sm font-bold border-nazlawy-500 bg-orange-50/40"
               value={primaryStoreId}
               onChange={(e) => setPrimaryStoreId(e.target.value)}
             >
               {(stores?.items || []).map(s => (
-                <option key={s.id} value={s.id}>🏢 {s.name} ({s.type})</option>
+                <option key={s.id} value={s.id}>🏢 {s.name}</option>
               ))}
             </select>
           </div>
