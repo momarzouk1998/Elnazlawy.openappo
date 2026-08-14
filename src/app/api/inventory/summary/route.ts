@@ -33,7 +33,9 @@ export async function GET() {
       const s = summaryMap.get(item.store_id);
       if (s) {
         const qty = Number(item.current_stock || 0);
-        s.total_items += 1;
+        if (qty > 0) {
+          s.total_items += 1;
+        }
         s.total_qty += qty;
         if (profile.can_see_cost && qty > 0) {
           s.total_value += qty * Number(item.product?.last_purchase_price || 0);

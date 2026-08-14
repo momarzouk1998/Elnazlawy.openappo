@@ -20,12 +20,10 @@ export async function GET(req: NextRequest) {
 
     // 2. استعلام حركات التحويل المسجلة باسم عربية كبيرة -> المخزن الرئيسي
     const transfers = await prisma.stock_transfers.findMany({
-      where: { from_store_id: vehicleStore.id, to_store_id: mainStore.id },
-      include: { product: true }
+      where: { from_store_id: vehicleStore.id, to_store_id: mainStore.id }
     });
 
     const totalTransferredQty = transfers.reduce((sum, t) => sum + Number(t.quantity), 0);
-    const totalTransferredValue = transfers.reduce((sum, t) => sum + (Number(t.quantity) * Number(t.product?.last_purchase_price || 0)), 0);
 
     // 3. فحص كم صنف من الـ 72 صنف المكررين كان موجوداً أصلاً في المخزن الرئيسي قبل التحويل
     const transferredProductIds = transfers.map(t => t.product_id);
@@ -49,7 +47,6 @@ export async function GET(req: NextRequest) {
         vehicle_store_name: vehicleStore.name,
         recorded_transfers_count: transfers.length,
         total_transferred_quantity_pieces: totalTransferredQty,
-        total_transferred_cost_value_egp: totalTransferredValue,
         matching_products_already_in_main_before: existingInMainBefore.length,
       }
     });

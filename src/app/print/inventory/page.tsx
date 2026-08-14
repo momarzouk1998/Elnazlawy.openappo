@@ -45,17 +45,19 @@ export default async function PrintInventoryReportPage() {
     }, 0);
     const lowStockCount = items.filter(item => Number(item.current_stock || 0) <= Number(item.product?.reorder_level || 0)).length;
 
+    const positiveItems = items.filter(i => Number(i.current_stock || 0) > 0);
+
     return {
       store,
       items,
-      totalItems: items.length,
+      totalItems: positiveItems.length,
       totalQty,
       totalValue,
       lowStockCount,
     };
   });
 
-  const overallItems = inventoryItems.length;
+  const overallItems = inventoryItems.filter(i => Number(i.current_stock || 0) > 0).length;
   const overallQty = inventoryItems.reduce((sum, i) => sum + Number(i.current_stock || 0), 0);
   const overallValue = inventoryItems.reduce((sum, i) => {
     const qty = Number(i.current_stock || 0);
