@@ -30,7 +30,11 @@ export default async function InvoicePrintPage({ params, searchParams }: { param
 
   return (
     <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
-      <PrintActions autoprint={autoprint} />
+      <PrintActions
+        autoprint={autoprint}
+        fileName={`فاتورة ${invoice.invoice_type} - ${invoice.invoice_number}`}
+        targetId="statement"
+      />
 
       <div id="statement" className="print-page max-w-[600px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
         {/* Header */}
