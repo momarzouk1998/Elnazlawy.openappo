@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma-direct';
 import { notFound } from 'next/navigation';
 import { formatEGP, formatDate } from '@/lib/format';
 import PrintActions from '@/app/print/invoice/[id]/PrintActions';
+import { LOGO_BASE64 } from '@/lib/logo-base64';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,7 +202,7 @@ export default async function CustomerStatementPage({ params }: { params: Promis
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)', border: `2px solid ${C.orange}`,
               width: '60px', height: '60px',
             }}>
-              <img src="/elnazlawy-logo.webp" alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+              <img src={LOGO_BASE64} alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
             </div>
             <div>
               <div style={{ fontSize: '1.35rem', fontWeight: 900, color: C.gray, lineHeight: 1.2 }}>
