@@ -242,8 +242,7 @@ export default function POSPage() {
                 >
                   <div className="font-bold text-sm text-gray-800 line-clamp-2">{p.name}</div>
                   <div className="mt-2 space-y-0.5">
-                    <div className="text-xs flex justify-between items-center">
-                      <span className="text-nazlawy-600 font-bold text-sm">{formatEGP(p.default_sale_price || 0)} ج</span>
+                    <div className="text-xs flex justify-end items-center">
                       <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${selectedStoreStock > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                         المتاح: {formatQty(selectedStoreStock)}
                       </span>

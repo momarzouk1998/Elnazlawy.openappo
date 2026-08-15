@@ -5,15 +5,15 @@ import { getCurrentUser } from '@/lib/auth-server';
 /**
  * GET /api/inventory/adjustments
  * سجل تعديلات المخزون (الجرد)
- * 
+ *
  * Query params:
  * - store_id?: string
  * - product_id?: string
  * - adjustment_type?: string
  * - from_date?: string (ISO date)
  * - to_date?: string (ISO date)
- * - limit?: number (default: 100)
- * - offset?: number (default: 0)
+ * - page?: number (default: 1)
+ * - limit?: number (default: 50)
  */
 export async function GET(request: NextRequest) {
   const profile = await getCurrentUser();
@@ -31,8 +31,9 @@ export async function GET(request: NextRequest) {
     const adjustmentType = searchParams.get('adjustment_type') || '';
     const fromDate = searchParams.get('from_date') || '';
     const toDate = searchParams.get('to_date') || '';
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
 
     const where: any = {};
 
@@ -92,8 +93,8 @@ export async function GET(request: NextRequest) {
         data: {
           items: sanitized,
           total,
-          limit,
-          offset
+          page,
+          limit
         }
       },
       { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' } }

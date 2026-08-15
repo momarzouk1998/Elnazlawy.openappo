@@ -928,15 +928,24 @@ function AdjustmentsTab({ profile }: { profile: any }) {
   const [adjustmentType, setAdjustmentType] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [page, setPage] = useState(1);
+  const searchParams = useSearchParams();
 
   const params = new URLSearchParams();
   if (storeId) params.set('store_id', storeId);
   if (adjustmentType) params.set('adjustment_type', adjustmentType);
   if (fromDate) params.set('from_date', fromDate);
   if (toDate) params.set('to_date', toDate);
-  params.set('limit', '200');
+  params.set('page', page.toString());
+  params.set('limit', '50');
 
-  const { data, loading } = useApi<{ items: Adjustment[]; total: number }>(`/api/inventory/adjustments?${params.toString()}`);
+  // Update page from URL params
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    if (pageParam) setPage(parseInt(pageParam));
+  }, [searchParams]);
+
+  const { data, loading } = useApi<{ items: Adjustment[]; total: number; page: number; limit: number }>(`/api/inventory/adjustments?${params.toString()}`);
   const { data: summaryData } = useApi<any>('/api/inventory/summary');
   const stores = summaryData?.stores || [];
   const showCost = profile?.can_see_cost;
@@ -1147,9 +1156,17 @@ function AdjustmentsTab({ profile }: { profile: any }) {
       )}
 
       {data && data.total > 0 && (
-        <div className="text-sm text-gray-500 text-center">
-          عرض {data.items.length} من أصل {data.total} تعديل
-        </div>
+        <>
+          <div className="text-sm text-gray-500 text-center">
+            عرض {data.items.length} من أصل {data.total} تعديل
+          </div>
+          <Pagination
+            total={data.total}
+            page={data.page}
+            pageSize={data.limit}
+            baseUrl="/inventory"
+          />
+        </>
       )}
     </div>
   );
