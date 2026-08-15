@@ -28,7 +28,7 @@ export default function POSPage() {
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
-  const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=200');
+  const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
 
   useEffect(() => {

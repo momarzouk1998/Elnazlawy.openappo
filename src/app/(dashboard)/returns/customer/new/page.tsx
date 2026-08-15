@@ -34,7 +34,7 @@ export default function NewCustomerReturnPage() {
 
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
-  const { data: customersData } = useApi<{ items: Customer[] }>("/api/customers?limit=200");
+  const { data: customersData } = useApi<{ items: Customer[] }>("/api/customers?limit=5000");
   const { data: storesData } = useApi<{ items: Store[] }>("/api/stores");
 
   const stores = storesData?.items || [];

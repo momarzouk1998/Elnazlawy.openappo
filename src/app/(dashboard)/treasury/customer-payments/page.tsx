@@ -71,7 +71,7 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
 
   useState(() => {
     fetch('/api/treasury').then(r => r.json()).then(j => setTreasuries(j.data?.items || [])).catch(() => {});
-    fetch('/api/customers?limit=200').then(r => r.json()).then(j => setCustomers(j.data?.items || [])).catch(() => {});
+    fetch('/api/customers?limit=5000').then(r => r.json()).then(j => setCustomers(j.data?.items || [])).catch(() => {});
   });
 
   const filtered = customers.filter(c => c.name.includes(custSearch)).slice(0, 50);

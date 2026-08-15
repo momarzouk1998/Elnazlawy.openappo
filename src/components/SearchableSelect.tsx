@@ -69,15 +69,26 @@ export default function SearchableSelect({
     return () => document.removeEventListener("mousedown", handler);
   }, [value, options]);
 
+function normalizeArabic(text: string): string {
+  if (!text) return "";
+  return text
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[\u064B-\u0652]/g, "")
+    .trim();
+}
+
   const filtered = query.trim() === "" && !open
     ? options
     : options.filter(o => {
-        const q = query.trim().toLowerCase();
+        const q = normalizeArabic(query);
         if (!q) return true;
         return (
-          (o.name || "").toLowerCase().includes(q) ||
-          (o.sub || "").toLowerCase().includes(q) ||
-          (o.extra || "").toLowerCase().includes(q)
+          normalizeArabic(o.name).includes(q) ||
+          normalizeArabic(o.sub || "").includes(q) ||
+          normalizeArabic(o.extra || "").includes(q)
         );
       });
 
