@@ -31,7 +31,7 @@ export default async function InvoicePrintPage({ params, searchParams }: { param
     <div className="min-h-screen bg-[#f0f2f5] p-4 print:p-0 print:bg-white">
       <PrintActions autoprint={autoprint} />
 
-      <div className="print-page max-w-[600px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
+      <div id="statement" className="print-page max-w-[600px] mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
         {/* Header */}
         <div className="bg-header-gradient text-white p-5 border-b-4 border-nazlawy-500 flex items-center gap-4">
           <div className="w-[90px] h-[90px] bg-white rounded-xl p-0.5 border-2 border-nazlawy-500 shrink-0">

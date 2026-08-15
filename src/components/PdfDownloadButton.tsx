@@ -19,9 +19,12 @@ export function PdfDownloadButton({
 
     try {
       const statementElement = (
-        document.getElementById(targetId) ||
+        (targetId ? document.getElementById(targetId) : null) ||
         document.getElementById("statement") ||
-        document.querySelector(".printable-statement-content")
+        document.getElementById("inventory-report") ||
+        document.querySelector(".print-page") ||
+        document.querySelector(".printable-statement-content") ||
+        document.querySelector("[id*='statement']")
       ) as HTMLElement | null;
 
       if (!statementElement) {
