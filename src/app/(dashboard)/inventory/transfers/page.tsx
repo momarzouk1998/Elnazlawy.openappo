@@ -38,8 +38,7 @@ interface InventoryItem {
 }
 
 export default function TransfersPage() {
-  const [showSingle, setShowSingle] = useState(false);
-  const [showBulk, setShowBulk] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
   const { data, loading, refetch } = useApi<ApiResponse>("/api/transfers?limit=200");
 
   return (
@@ -49,20 +48,12 @@ export default function TransfersPage() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">🚛 تحويلات المخازن</h1>
           <p className="text-sm text-gray-500">{data?.total ?? "..."} تحويل</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setShowBulk(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            📦🔄 تحويل جماعي (كل الأصناف)
-          </button>
-          <button
-            onClick={() => setShowSingle(true)}
-            className="btn-primary flex items-center gap-1.5"
-          >
-            + تحويل صنف واحد
-          </button>
-        </div>
+        <button
+          onClick={() => setShowTransfer(true)}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          🔄 تحويل بين المخازن
+        </button>
       </div>
 
       {loading ? (
@@ -107,21 +98,11 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {showSingle && (
-        <SingleTransferModal
-          onClose={() => setShowSingle(false)}
-          onSaved={() => {
-            setShowSingle(false);
-            refetch();
-          }}
-        />
-      )}
-
-      {showBulk && (
+      {showTransfer && (
         <BulkTransferModal
-          onClose={() => setShowBulk(false)}
+          onClose={() => setShowTransfer(false)}
           onSaved={() => {
-            setShowBulk(false);
+            setShowTransfer(false);
             refetch();
           }}
         />
@@ -130,7 +111,7 @@ export default function TransfersPage() {
   );
 }
 
-// 📦 مودال التحويل الجماعي (تحويل كل الأصناف أو أصناف محددة)
+// 📦 مودال التحويل بين المخازن (تحويل صنف واحد أو عدة أصناف أو كل الأصناف)
 function BulkTransferModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [fromStoreId, setFromStoreId] = useState("");
   const [toStoreId, setToStoreId] = useState("");
@@ -319,10 +300,10 @@ function BulkTransferModal({ onClose, onSaved }: { onClose: () => void; onSaved:
         <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black flex items-center gap-2">
-              📦🔄 تحويل مخزني جماعي (كل الأصناف)
+              🔄 تحويل بين المخازن
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              نقل كامل أصناف المخزن أو أصناف محددة دفعة واحدة إلى مخزن آخر
+              تحويل صنف واحد أو عدة أصناف أو كامل المخزون بنقرة واحدة
             </p>
           </div>
           <button
@@ -631,174 +612,6 @@ function BulkTransferModal({ onClose, onSaved }: { onClose: () => void; onSaved:
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// مودال التحويل الفردي السريع
-function SingleTransferModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({
-    product_id: "",
-    from_store_id: "",
-    to_store_id: "",
-    quantity: 0,
-    notes: "",
-    transfer_date: "",
-  });
-  const { mutate, loading } = useApiMutation();
-  const [products, setProducts] = useState<
-    { id: string; name: string; inventory_items?: { store_id: string; current_stock: number }[] }[]
-  >([]);
-  const [stores, setStores] = useState<{ id: string; name: string }[]>([]);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    fetch("/api/stores")
-      .then((r) => r.json())
-      .then((j) => setStores(j.data?.items || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    fetch(`/api/products?search=${encodeURIComponent(search)}&limit=50`)
-      .then((r) => r.json())
-      .then((j) => setProducts(j.data?.items || []))
-      .catch(() => {});
-  }, [search]);
-
-  const selectedProduct = products.find((p) => p.id === f.product_id);
-  const availableStores = selectedProduct?.inventory_items?.filter((inv) => Number(inv.current_stock) > 0) || [];
-  const availableStoreIds = availableStores.map((inv) => inv.store_id);
-
-  async function save() {
-    if (!f.product_id || !f.from_store_id || !f.to_store_id || f.quantity <= 0) {
-      alert("❌ أكمل البيانات");
-      return;
-    }
-    if (f.from_store_id === f.to_store_id) {
-      alert("❌ لا يمكن التحويل لنفس المخزن");
-      return;
-    }
-    const { error } = await mutate("POST", "/api/transfers", f);
-    if (error) {
-      alert("❌ " + error);
-      return;
-    }
-    onSaved();
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3"
-      >
-        <h2 className="text-xl font-bold">+ تحويل صنف واحد</h2>
-        <div>
-          <label className="text-sm font-medium block mb-1">المنتج *</label>
-          <input
-            className="input-field"
-            placeholder="🔍 ابحث عن منتج..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            autoFocus
-          />
-          <select
-            className="input-field mt-1"
-            value={f.product_id}
-            onChange={(e) =>
-              setF({ ...f, product_id: e.target.value, from_store_id: "", to_store_id: "" })
-            }
-            size={3}
-          >
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">من مخزن *</label>
-            <select
-              className="input-field"
-              value={f.from_store_id}
-              onChange={(e) => setF({ ...f, from_store_id: e.target.value })}
-              disabled={!f.product_id}
-            >
-              <option value="">اختر...</option>
-              {stores
-                .filter((s) => availableStoreIds.includes(s.id))
-                .map((s) => {
-                  const inv = availableStores.find((i) => i.store_id === s.id);
-                  return (
-                    <option key={s.id} value={s.id}>
-                      {s.name} (متاح: {inv?.current_stock || 0})
-                    </option>
-                  );
-                })}
-            </select>
-            {f.product_id && availableStores.length === 0 && (
-              <p className="text-xs text-red-600 mt-1">⚠️ لا يوجد مخزون لهذا المنتج</p>
-            )}
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">إلى مخزن *</label>
-            <select
-              className="input-field"
-              value={f.to_store_id}
-              onChange={(e) => setF({ ...f, to_store_id: e.target.value })}
-            >
-              <option value="">اختر...</option>
-              {stores
-                .filter((s) => s.id !== f.from_store_id)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">الكمية *</label>
-            <input
-              type="number"
-              step="any"
-              className="input-field"
-              value={f.quantity}
-              onChange={(e) => setF({ ...f, quantity: parseFloat(e.target.value) || 0 })}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">التاريخ</label>
-            <input
-              type="date"
-              className="input-field"
-              value={f.transfer_date}
-              onChange={(e) => setF({ ...f, transfer_date: e.target.value })}
-            />
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-medium block mb-1">ملاحظات</label>
-          <input
-            className="input-field"
-            value={f.notes}
-            onChange={(e) => setF({ ...f, notes: e.target.value })}
-          />
-        </div>
-        <div className="flex gap-2 pt-3">
-          <button onClick={save} disabled={loading} className="btn-primary flex-1">
-            {loading ? "جاري الحفظ..." : "حفظ"}
-          </button>
-          <button onClick={onClose} className="btn-secondary">
-            إلغاء
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
