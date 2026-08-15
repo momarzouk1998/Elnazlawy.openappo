@@ -22,6 +22,8 @@ export async function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/health') ||
+    pathname.startsWith('/api/customers/search-debug') ||
+    pathname.startsWith('/api/inventory/transfer-vehicle-to-main') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/icons') ||
     pathname === '/favicon.ico' ||
