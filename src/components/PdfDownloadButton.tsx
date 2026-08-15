@@ -142,15 +142,13 @@ export function PdfDownloadButton({
       const imgWidth = printableWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      // ملاءمة ذكية لصفحة A4 واحدة
-      if (imgHeight <= printableHeight * 1.08) {
-        const finalWidth = imgHeight > printableHeight ? (printableHeight / imgHeight) * imgWidth : imgWidth;
-        const finalHeight = imgHeight > printableHeight ? printableHeight : imgHeight;
-        const x = (pdfWidth - finalWidth) / 2;
+      // إذا كان المحتوى يتسع في صفحة واحدة
+      if (imgHeight <= printableHeight) {
+        const x = (pdfWidth - imgWidth) / 2;
         const y = margin;
-        pdf.addImage(imgData, "JPEG", x, y, finalWidth, finalHeight);
+        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
       } else {
-        // كشوفات الحساب والتقارير الطويلة المتعددة الصفحات
+        // الفواتير الطويلة وكشوفات الحساب الكبيرة تتوزع تلقائياً على صفحات متعددة A4
         const pageCanvasHeight = (canvas.width * printableHeight) / printableWidth;
         let positionY = 0;
         let pageCount = 0;
