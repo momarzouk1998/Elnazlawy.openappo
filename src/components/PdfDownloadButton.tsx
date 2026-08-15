@@ -2,6 +2,33 @@
 
 import { useState } from "react";
 
+// تحويل الصور للـ base64 عبر canvas لتجنب مشاكل CORS
+async function inlineImages(element: HTMLElement): Promise<void> {
+  const images = Array.from(element.querySelectorAll("img")) as HTMLImageElement[];
+  await Promise.all(images.map((img) => new Promise<void>((resolve) => {
+    if (!img.src || img.src.startsWith("data:")) { resolve(); return; }
+    const tempImg = new Image();
+    tempImg.crossOrigin = "anonymous";
+    tempImg.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = tempImg.naturalWidth || tempImg.width || 80;
+        c.height = tempImg.naturalHeight || tempImg.height || 80;
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(tempImg, 0, 0);
+          img.src = c.toDataURL("image/png");
+        }
+      } catch {
+        img.style.visibility = "hidden";
+      }
+      resolve();
+    };
+    tempImg.onerror = () => { img.style.visibility = "hidden"; resolve(); };
+    tempImg.src = img.src + (img.src.includes("?") ? "&" : "?") + "_nocache=" + Date.now();
+  })));
+}
+
 export function PdfDownloadButton({
   targetId = "statement",
   fileName = "كشف حساب",
@@ -32,86 +59,117 @@ export function PdfDownloadButton({
         return;
       }
 
-      const html2canvas = (await import("html2canvas")).default;
-      const { jsPDF } = await import("jspdf");
+      // استنساخ العنصر لتعديله دون التأثير على الصفحة
+      const cloned = statementElement.cloneNode(true) as HTMLElement;
+      cloned.style.position = "absolute";
+      cloned.style.left = "-9999px";
+      cloned.style.top = "0";
+      cloned.style.width = statementElement.scrollWidth + "px";
+      document.body.appendChild(cloned);
 
-      const canvas = await html2canvas(statementElement, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        logging: false,
-        backgroundColor: "#ffffff",
-        width: statementElement.scrollWidth,
-        height: statementElement.scrollHeight,
-        scrollX: 0,
-        scrollY: 0,
-      });
+      try {
+        // تحويل جميع الصور لـ base64
+        await inlineImages(cloned);
 
-      if (!canvas || canvas.width === 0 || canvas.height === 0) {
-        alert("❌ حدث خطأ أثناء تجهيز صور الصفحات للتحميل");
-        return;
-      }
+        const html2canvas = (await import("html2canvas")).default;
+        const { jsPDF } = await import("jspdf");
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.90);
-      const pdf = new jsPDF(orientation === "landscape" ? "l" : "p", "mm", "a4");
+        const canvas = await html2canvas(cloned, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          logging: false,
+          backgroundColor: "#ffffff",
+          width: cloned.scrollWidth,
+          height: cloned.scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+        });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
-      const margin = 8; // 8mm margin
-      const printableWidth = pdfWidth - (margin * 2); // 194mm
-      const printableHeight = pdfHeight - (margin * 2); // 281mm
-
-      const imgWidth = printableWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      if (imgHeight <= printableHeight) {
-        // Single page
-        const x = (pdfWidth - imgWidth) / 2;
-        const y = margin;
-        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
-      } else {
-        // Multi-page paginated export by slicing canvas into page-height blocks
-        const pageCanvasHeight = (canvas.width * printableHeight) / printableWidth;
-        let positionY = 0;
-        let pageCount = 0;
-
-        while (positionY < canvas.height) {
-          const sliceHeight = Math.min(pageCanvasHeight, canvas.height - positionY);
-
-          const pageCanvas = document.createElement("canvas");
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = sliceHeight;
-
-          const ctx = pageCanvas.getContext("2d");
-          if (ctx) {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-            ctx.drawImage(
-              canvas,
-              0, positionY, canvas.width, sliceHeight,
-              0, 0, canvas.width, sliceHeight
-            );
-          }
-
-          const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.92);
-          const pageImgHeight = (sliceHeight * printableWidth) / canvas.width;
-
-          if (pageCount > 0) {
-            pdf.addPage();
-          }
-
-          pdf.addImage(pageImgData, "JPEG", margin, margin, printableWidth, pageImgHeight);
-
-          positionY += sliceHeight;
-          pageCount++;
+        if (!canvas || canvas.width === 0 || canvas.height === 0) {
+          alert("❌ حدث خطأ أثناء تجهيز الصفحات للتحميل");
+          return;
         }
-      }
 
-      pdf.save(`${fileName}.pdf`);
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        const pdf = new jsPDF(orientation === "landscape" ? "l" : "p", "mm", "a4");
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const margin = 8;
+        const printableWidth = pdfWidth - margin * 2;
+        const printableHeight = pdfHeight - margin * 2;
+
+        const imgWidth = printableWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (imgHeight <= printableHeight) {
+          pdf.addImage(imgData, "JPEG", margin, margin, imgWidth, imgHeight);
+        } else {
+          const pageCanvasHeight = (canvas.width * printableHeight) / printableWidth;
+          let positionY = 0;
+          let pageCount = 0;
+
+          while (positionY < canvas.height) {
+            const sliceHeight = Math.min(pageCanvasHeight, canvas.height - positionY);
+            const pageCanvas = document.createElement("canvas");
+            pageCanvas.width = canvas.width;
+            pageCanvas.height = sliceHeight;
+
+            const ctx = pageCanvas.getContext("2d");
+            if (ctx) {
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+              ctx.drawImage(canvas, 0, positionY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+            }
+
+            const pageImgData = pageCanvas.toDataURL("image/jpeg", 0.92);
+            const pageImgHeight = (sliceHeight * printableWidth) / canvas.width;
+
+            if (pageCount > 0) pdf.addPage();
+            pdf.addImage(pageImgData, "JPEG", margin, margin, printableWidth, pageImgHeight);
+
+            positionY += sliceHeight;
+            pageCount++;
+          }
+        }
+
+        pdf.save(`${fileName}.pdf`);
+      } finally {
+        document.body.removeChild(cloned);
+      }
     } catch (error) {
       console.error("PDF generation failed:", error);
-      alert("⚠️ تعذر التحميل المباشر لملف PDF بسبب حماية الصور/الخطوط، جاري فتح طباعة المتصفح لحفظ الملف كـ PDF...");
-      window.print();
+      // محاولة أخيرة بدون الصور
+      try {
+        const el = (
+          (targetId ? document.getElementById(targetId) : null) ||
+          document.getElementById("statement") ||
+          document.getElementById("inventory-report") ||
+          document.querySelector(".print-page")
+        ) as HTMLElement | null;
+
+        if (el) {
+          const html2canvas = (await import("html2canvas")).default;
+          const { jsPDF } = await import("jspdf");
+          const canvas = await html2canvas(el, {
+            scale: 2,
+            logging: false,
+            backgroundColor: "#ffffff",
+            useCORS: false,
+            allowTaint: true,
+            ignoreElements: (el) => el.tagName === "IMG",
+          });
+          const pdf = new jsPDF(orientation === "landscape" ? "l" : "p", "mm", "a4");
+          const margin = 8;
+          const printableWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+          const imgHeight = (canvas.height * printableWidth) / canvas.width;
+          pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", margin, margin, printableWidth, imgHeight);
+          pdf.save(`${fileName}.pdf`);
+        }
+      } catch {
+        window.print();
+      }
     } finally {
       setLoading(false);
     }
