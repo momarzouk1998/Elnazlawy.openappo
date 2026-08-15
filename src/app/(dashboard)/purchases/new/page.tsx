@@ -15,7 +15,7 @@ export default function NewPurchasePage() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [supplierId, setSupplierId] = useState("");
-  // المخزن لكل سطر يحدد منفصلاً (يمكن استلام البضاعة في أكثر من مخزن)
+  const [primaryStoreId, setPrimaryStoreId] = useState("");
   const [status, setStatus] = useState("قيد التنفيذ");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
@@ -25,22 +25,29 @@ export default function NewPurchasePage() {
   const { data: storesData } = useApi<{ items: Store[] }>('/api/stores');
 
   const stores = storesData?.items;
-  const defaultStoreId = stores && stores.length > 0 ? stores[0].id : '';
+
+  useEffect(() => {
+    if (stores && stores.length > 0 && !primaryStoreId) {
+      setPrimaryStoreId(stores[0].id);
+    }
+  }, [stores, primaryStoreId]);
+
+  const defaultStoreId = primaryStoreId || (stores && stores.length > 0 ? stores[0].id : '');
 
   const total = cart.reduce((s, i) => s + i.quantity * i.unit_cost, 0);
 
   function addToCart(p: Product) {
-    if (!defaultStoreId) { alert('لا يوجد مخازن معرفة في النظام'); return; }
+    if (!defaultStoreId) { alert('❌ لا يوجد مخازن معرفة في النظام'); return; }
+    const chosenStore = stores?.find(s => s.id === defaultStoreId);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === defaultStoreId);
     if (existing) {
-      setCart(cart.map(c => c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c));
+      setCart(cart.map(c => (c.product_id === p.id && c.store_id === defaultStoreId) ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
-      const store = stores?.find(s => s.id === defaultStoreId);
       setCart([...cart, {
         product_id: p.id,
         product_name: p.name,
         store_id: defaultStoreId,
-        store_name: store?.name || '',
+        store_name: chosenStore?.name || '',
         quantity: 1,
         unit_cost: Number(p.last_purchase_price) || 0,
       }]);
@@ -165,6 +172,27 @@ export default function NewPurchasePage() {
               placeholder="🔍 ابحث عن مورد بالاسم أو الهاتف..."
               emptyLabel="— بدون مورد —"
             />
+          </div>
+          <div>
+            <label className="text-xs text-gray-600 block mb-1">المخزن الافتراضي للاستلام</label>
+            <select
+              className="input-field text-sm"
+              value={primaryStoreId}
+              onChange={(e) => {
+                const newId = e.target.value;
+                setPrimaryStoreId(newId);
+                const targetStore = stores?.find(s => s.id === newId);
+                if (targetStore && cart.length > 0) {
+                  setCart(cart.map(item => ({ ...item, store_id: newId, store_name: targetStore.name })));
+                }
+              }}
+            >
+              {stores?.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-gray-600 block mb-1">الحالة</label>
