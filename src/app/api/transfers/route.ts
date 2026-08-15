@@ -38,77 +38,105 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ ok: true, data: { items, total, limit, offset } });
 }
 
-// POST /api/transfers — تحويل مخزني (transaction: خصم من مخزن + إضافة لآخر)
+// POST /api/transfers — تحويل مخزني فردي أو جماعي (transaction: خصم من مخزن + إضافة لآخر)
 export async function POST(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
 
   try {
     const body = await request.json();
-    const { product_id, from_store_id, to_store_id, quantity, notes, transfer_date } = body;
+    const { from_store_id, to_store_id, notes, transfer_date } = body;
 
-    if (!product_id || !from_store_id || !to_store_id || !quantity) {
+    if (!from_store_id || !to_store_id) {
       return NextResponse.json(
-        { ok: false, error: { code: "VALIDATION_ERROR", message: "المنتج والمخزنين والكمية مطلوبة" } },
+        { ok: false, error: { code: "VALIDATION_ERROR", message: "المخزن المصدر والمخزن الوجهة مطلوبان" } },
         { status: 400 }
       );
     }
     if (from_store_id === to_store_id) {
-      return NextResponse.json({ ok: false, error: { code: "VALIDATION_ERROR", message: "لا يمكن التحويل لنفس المخزن" } }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: { code: "VALIDATION_ERROR", message: "لا يمكن التحويل لنفس المخزن" } },
+        { status: 400 }
+      );
     }
-    const qty = Number(quantity);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      return NextResponse.json({ ok: false, error: { code: "VALIDATION_ERROR", message: "الكمية يجب أن تكون رقم موجب" } }, { status: 400 });
+
+    // تجهيز قائمة الأصناف (تحويل جماعي أو فردي)
+    const rawItems: { product_id: string; quantity: number }[] = Array.isArray(body.items) && body.items.length > 0
+      ? body.items
+      : (body.product_id && body.quantity ? [{ product_id: body.product_id, quantity: Number(body.quantity) }] : []);
+
+    if (rawItems.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: { code: "VALIDATION_ERROR", message: "يجب اختيار صنف واحد على الأقل للتحويل" } },
+        { status: 400 }
+      );
+    }
+
+    const itemsToTransfer = rawItems.filter(i => i.product_id && Number.isFinite(Number(i.quantity)) && Number(i.quantity) > 0);
+    if (itemsToTransfer.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: { code: "VALIDATION_ERROR", message: "كميات الأصناف يجب أن تكون أكبر من الصفر" } },
+        { status: 400 }
+      );
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. تحقق من توفر الكمية في المخزن المصدر
-      const sourceInv = await tx.inventory.findUnique({
-        where: { product_id_store_id: { product_id, store_id: from_store_id } },
-      });
-      if (!sourceInv || Number(sourceInv.current_stock) < qty) {
+      const createdTransfers = [];
+      const tDate = transfer_date ? new Date(transfer_date) : new Date();
+
+      for (const item of itemsToTransfer) {
+        const qty = Number(item.quantity);
+
+        // 1. تحقق من توفر الكمية في المخزن المصدر
+        const sourceInv = await tx.inventory.findUnique({
+          where: { product_id_store_id: { product_id: item.product_id, store_id: from_store_id } },
+        });
         const available = sourceInv ? Number(sourceInv.current_stock) : 0;
-        throw new Error(`الكمية غير متوفرة في المخزن المصدر (متاح: ${available})`);
+        if (!sourceInv || available < qty) {
+          const product = await tx.products.findUnique({ where: { id: item.product_id }, select: { name: true } });
+          throw new Error(`الكمية غير متوفرة للصنف "${product?.name || item.product_id}" في المخزن المصدر (متاح: ${available})`);
+        }
+
+        // 2. اسم المنتج
+        const product = await tx.products.findUnique({ where: { id: item.product_id }, select: { name: true } });
+        if (!product) throw new Error(`المنتج غير موجود (${item.product_id})`);
+
+        // 3. خصم من المخزن المصدر
+        await tx.inventory.update({
+          where: { product_id_store_id: { product_id: item.product_id, store_id: from_store_id } },
+          data: { current_stock: { decrement: qty } },
+        });
+
+        // 4. إضافة للمخزن الوجهة
+        await tx.inventory.upsert({
+          where: { product_id_store_id: { product_id: item.product_id, store_id: to_store_id } },
+          update: { current_stock: { increment: qty } },
+          create: { product_id: item.product_id, store_id: to_store_id, current_stock: qty, opening_balance: 0 },
+        });
+
+        // 5. سجل التحويل
+        const transfer = await tx.stock_transfers.create({
+          data: {
+            product_id: item.product_id,
+            product_name: product.name,
+            from_store_id,
+            to_store_id,
+            quantity: qty,
+            status: "مكتملة",
+            notes: notes || (itemsToTransfer.length > 1 ? `تحويل جماعي (${itemsToTransfer.length} صنف)` : null),
+            by_user_id: profile.id,
+            transfer_date: tDate,
+          },
+        });
+        createdTransfers.push(transfer);
       }
 
-      // 2. اسم المنتج (snapshot)
-      const product = await tx.products.findUnique({ where: { id: product_id }, select: { name: true } });
-      if (!product) throw new Error("المنتج غير موجود");
-
-      // 3. خصم من المخزن المصدر
-      await tx.inventory.update({
-        where: { product_id_store_id: { product_id, store_id: from_store_id } },
-        data: { current_stock: { decrement: qty } },
-      });
-
-      // 4. إضافة للمخزن الوجهة (upsert لأنه ممكن يكون أول مرة)
-      await tx.inventory.upsert({
-        where: { product_id_store_id: { product_id, store_id: to_store_id } },
-        update: { current_stock: { increment: qty } },
-        create: { product_id, store_id: to_store_id, current_stock: qty, opening_balance: 0 },
-      });
-
-      // 5. سجل التحويل
-      const transfer = await tx.stock_transfers.create({
-        data: {
-          product_id,
-          product_name: product.name,
-          from_store_id,
-          to_store_id,
-          quantity: qty,
-          status: "مكتملة",
-          notes: notes || null,
-          by_user_id: profile.id,
-          transfer_date: transfer_date ? new Date(transfer_date) : new Date(),
-        },
-      });
-
-      return transfer;
+      return createdTransfers;
     });
 
-    return NextResponse.json({ ok: true, data: result });
+    return NextResponse.json({ ok: true, data: { transfers: result, count: result.length } });
   } catch (e: any) {
     const status = e?.message?.includes("غير متوفرة") ? 400 : 500;
-    return NextResponse.json({ ok: false, error: { code: "DB_ERROR", message: e?.message || "حدث خطأ" } }, { status });
+    return NextResponse.json({ ok: false, error: { code: "DB_ERROR", message: e?.message || "حدث خطأ أثناء التحويل" } }, { status });
   }
 }
