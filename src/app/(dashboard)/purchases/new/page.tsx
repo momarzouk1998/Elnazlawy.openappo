@@ -256,6 +256,7 @@ export default function NewPurchasePage() {
 function NewProductModal({ initialName, onClose, onAdded }: { initialName: string; onClose: () => void; onAdded: (p: Product) => void }) {
   const [f, setF] = useState({
     name: initialName,
+    default_sale_price: 0,
     last_purchase_price: 0,
     category: "",
     unit: "piece",

@@ -25,7 +25,7 @@ export function PdfDownloadButton({
       ) as HTMLElement | null;
 
       if (!statementElement) {
-        window.print();
+        alert("❌ تعذر العثور على محتوى المستند للتحميل");
         return;
       }
 
@@ -34,7 +34,8 @@ export function PdfDownloadButton({
 
       const canvas = await html2canvas(statementElement, {
         useCORS: true,
-        scale: 1.8,
+        allowTaint: true,
+        scale: 2,
         logging: false,
         backgroundColor: "#ffffff",
         width: statementElement.scrollWidth,
@@ -44,7 +45,7 @@ export function PdfDownloadButton({
       });
 
       if (!canvas || canvas.width === 0 || canvas.height === 0) {
-        window.print();
+        alert("❌ حدث خطأ أثناء تجهيز صور الصفحات للتحميل");
         return;
       }
 
@@ -106,6 +107,7 @@ export function PdfDownloadButton({
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
       console.error("PDF generation failed:", error);
+      alert("⚠️ تعذر التحميل المباشر لملف PDF بسبب حماية الصور/الخطوط، جاري فتح طباعة المتصفح لحفظ الملف كـ PDF...");
       window.print();
     } finally {
       setLoading(false);

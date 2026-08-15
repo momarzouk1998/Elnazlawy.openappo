@@ -57,8 +57,12 @@ export async function POST(request: NextRequest) {
     if (!body.name || !String(body.name).trim()) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'اسم الصنف مطلوب' } }, { status: 400 });
     }
-    const salePrice = Number(body.default_sale_price);
-    const purchasePrice = Number(body.last_purchase_price);
+    const salePrice = body.default_sale_price !== undefined && body.default_sale_price !== null && body.default_sale_price !== ''
+      ? Number(body.default_sale_price)
+      : 0;
+    const purchasePrice = body.last_purchase_price !== undefined && body.last_purchase_price !== null && body.last_purchase_price !== ''
+      ? Number(body.last_purchase_price)
+      : 0;
     if (!Number.isFinite(salePrice) || salePrice < 0) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'سعر البيع غير صالح' } }, { status: 400 });
     }
