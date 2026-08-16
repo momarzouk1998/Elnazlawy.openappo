@@ -109,13 +109,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // Batch create items
         await tx.sales_invoice_items.createMany({ data: itemsToCreate });
 
+        // حساب تكلفة البنود وصافي الربح
+        const totalCost = itemsToCreate.reduce((s, it) => s + Number(it.line_cost || 0), 0);
         const discount = Number(body.discount ?? existing.discount ?? 0);
         const total = Math.max(0, subtotal - discount);
+        const net_profit = total - totalCost;
 
         // حساب الإجماليات
         await tx.sales_invoices.update({
           where: { id },
-          data: { subtotal, discount, total },
+          data: { subtotal, discount, total, net_profit },
         });
 
         // أعد تحميل البنود المحدّثة
@@ -123,21 +126,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         existing.subtotal = subtotal as any;
         existing.discount = discount as any;
         existing.total = total as any;
+        existing.net_profit = net_profit as any;
       } else if (body.discount !== undefined) {
-        // تعديل الخصم فقط
+        // تعديل الخصم فقط - إعادة احتساب صافي الربح
+        const totalCost = existing.items.reduce((s, it) => s + Number(it.line_cost || 0), 0);
         const discount = Number(body.discount);
         const total = Math.max(0, Number(existing.subtotal) - discount);
+        const net_profit = total - totalCost;
         await tx.sales_invoices.update({
           where: { id },
-          data: { discount, total },
+          data: { discount, total, net_profit },
         });
         existing.discount = discount as any;
         existing.total = total as any;
+        existing.net_profit = net_profit as any;
       }
 
       // 2) التعامل مع تغيير الحالة
+      let finalPaidAmount = Number(existing.paid_amount || 0);
+
       if (!wasCompleted && isCompletedNow && !isQuotation) {
-        // من مسودة/قيد التنفيذ → مكتملة: تحقق من المخزون وخصمه + رصيد العميل
+        // من مسودة/قيد التنفيذ → مكتملة: تحقق من المخزون وخصمه + تسجيل المدفوعات ورصيد العميل
         
         // التحقق من المخزون أولاً (قبل أي تعديل)
         for (const it of existing.items) {
@@ -168,11 +177,44 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             data: { current_stock: { decrement: it.quantity } },
           });
         }
+
+        // التعامل مع المدفوعات إن وجدت
+        const requestedPaid = body.paid_amount !== undefined ? Math.max(0, parseFloat(body.paid_amount) || 0) : finalPaidAmount;
+        if (requestedPaid > 0) {
+          finalPaidAmount = Math.min(Number(existing.total), requestedPaid);
+          let targetTreasuryId = body.treasury_id;
+          if (!targetTreasuryId) {
+            const firstTreasury = await tx.treasuries.findFirst({
+              where: { is_active: true },
+              orderBy: { created_at: 'asc' },
+            });
+            targetTreasuryId = firstTreasury?.id;
+          }
+
+          if (targetTreasuryId) {
+            await tx.customer_payments.create({
+              data: {
+                customer_id: existing.customer_id || null,
+                invoice_id: id,
+                amount: finalPaidAmount,
+                payment_method: body.payment_method || 'نقدي',
+                treasury_id: targetTreasuryId,
+                payment_date: existing.invoice_date,
+                notes: `تحصيل نقدي مع إكمال فاتورة مبيعات #${existing.invoice_number}`,
+                created_by: profile.id,
+              },
+            });
+
+            await tx.treasuries.update({
+              where: { id: targetTreasuryId },
+              data: { current_balance: { increment: finalPaidAmount } },
+            });
+          }
+        }
         
-        // رصيد العميل (صافي بعد خصم أي مدفوعات)
+        // رصيد العميل (صافي الزيادة = الإجمالي - المدفوع)
         if (existing.customer_id) {
-          const paid = Number(existing.paid_amount || 0);
-          const netDebt = Number(existing.total) - paid;
+          const netDebt = Number(existing.total) - finalPaidAmount;
           if (netDebt !== 0) {
             await tx.customers.update({
               where: { id: existing.customer_id },
@@ -182,12 +224,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       }
 
-      // 3) تحديث الحالة/النوع/الملاحظات
+      // 3) تحديث الحالة/النوع/الملاحظات/المدفوع
       const updated = await tx.sales_invoices.update({
         where: { id },
         data: {
           status: newStatus,
           invoice_type: body.invoice_type ?? existing.invoice_type,
+          paid_amount: isCompletedNow && !isQuotation ? finalPaidAmount : 0,
           notes: body.notes ?? existing.notes,
           updated_at: new Date(),
         },
@@ -203,7 +246,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// DELETE /api/sales/invoices/[id] - إلغاء الفاتورة (إرجاع المخزون) أو حذف نهائي للأدمن
+// DELETE /api/sales/invoices/[id] - إلغاء الفاتورة (إرجاع المخزون وعكس الخزينة) أو حذف نهائي للأدمن
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
@@ -219,7 +262,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'الحذف النهائي للأدمن فقط' } }, { status: 403 });
       }
 
-      // حذف نهائي بدون إرجاع مخزون (الأدمن مسؤول)
+      // حذف نهائي
       await prisma.$transaction(async (tx) => {
         await tx.sales_invoice_items.deleteMany({ where: { invoice_id: id } });
         await tx.customer_payments.deleteMany({ where: { invoice_id: id } });
@@ -229,10 +272,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ ok: true, data: { message: 'تم حذف الفاتورة نهائياً' } });
     }
 
-    // الإلغاء العادي (إرجاع المخزون)
+    // الإلغاء العادي (إرجاع المخزون وعكس المدفوعات والخزينة)
     const invoice = await prisma.sales_invoices.findUnique({
       where: { id },
-      include: { items: true },
+      include: { items: true, payments: true },
     });
     if (!invoice) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
 
@@ -255,28 +298,43 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
             update: { current_stock: { increment: it.quantity } },
           });
         }
+
+        // عكس المدفوعات والخزينة
+        for (const payment of invoice.payments) {
+          if (payment.treasury_id && Number(payment.amount) > 0) {
+            await tx.treasuries.update({
+              where: { id: payment.treasury_id },
+              data: { current_balance: { decrement: Number(payment.amount) } },
+            });
+          }
+          await tx.customer_payments.delete({ where: { id: payment.id } });
+        }
+
+        // إرجاع رصيد العميل بالصافي الفعلي الذي أضيف لحسابه سابقاً (الإجمالي - المدفوع)
+        if (invoice.customer_id) {
+          const netDebt = Number(invoice.total) - Number(invoice.paid_amount || 0);
+          if (netDebt !== 0) {
+            await tx.customers.update({
+              where: { id: invoice.customer_id },
+              data: { balance: { decrement: netDebt } },
+            });
+          }
+        }
       }
 
-      // إرجاع رصيد العميل
-      if (invoice.customer_id && invoice.invoice_type !== 'عرض سعر') {
-        await tx.customers.update({
-          where: { id: invoice.customer_id },
-          data: { balance: { decrement: Number(invoice.total) } },
-        });
-      }
-
-      // تعليم الفاتورة كملغاة
+      // تعليم الفاتورة كملغاة وتصفير المدفوع
       await tx.sales_invoices.update({
         where: { id },
         data: {
           status: 'ملغاة',
+          paid_amount: 0,
           void_reason: 'إلغاء يدوي',
           updated_at: new Date(),
         },
       });
     });
 
-    return NextResponse.json({ ok: true, data: { message: 'تم إلغاء الفاتورة وإرجاع المخزون' } });
+    return NextResponse.json({ ok: true, data: { message: 'تم إلغاء الفاتورة وإرجاع المخزون والمدفوعات' } });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }

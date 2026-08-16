@@ -314,7 +314,15 @@ export default function POSPage() {
           </div>
           <div>
             <label className="text-xs text-gray-600 block mb-1">النوع</label>
-            <select className="input-field text-sm" value={invoiceType} onChange={(e) => setInvoiceType(e.target.value)}>
+            <select
+              className="input-field text-sm"
+              value={invoiceType}
+              onChange={(e) => {
+                const newType = e.target.value;
+                setInvoiceType(newType);
+                if (newType === "عرض سعر") setPaidAmount(0);
+              }}
+            >
               <option value="عادية">عادية</option>
               <option value="ضريبية">ضريبية</option>
               <option value="عرض سعر">عرض سعر</option>
@@ -323,7 +331,15 @@ export default function POSPage() {
           {invoiceType !== 'عرض سعر' && (
             <div>
               <label className="text-xs text-gray-600 block mb-1">حالة الفاتورة</label>
-              <select className="input-field text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <select
+                className="input-field text-sm"
+                value={status}
+                onChange={(e) => {
+                  const newStatus = e.target.value;
+                  setStatus(newStatus);
+                  if (newStatus !== "مكتملة") setPaidAmount(0);
+                }}
+              >
                 <option value="قيد التنفيذ">قيد التنفيذ (مسودة — قابلة للتعديل)</option>
                 <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
               </select>
@@ -413,7 +429,7 @@ export default function POSPage() {
           </div>
 
           {/* 💵 قسم المدفوعات والتحصيل */}
-          {invoiceType !== 'عرض سعر' && (
+          {invoiceType !== 'عرض سعر' && status === 'مكتملة' && (
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-emerald-900 flex items-center gap-1">

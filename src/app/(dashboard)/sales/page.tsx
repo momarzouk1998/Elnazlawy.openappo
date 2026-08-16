@@ -406,13 +406,15 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
   const [invoiceType, setInvoiceType] = useState("");
   const [notes, setNotes] = useState("");
 
-  if (inv && items.length === 0 && !editing) {
-    setItems(inv.items || []);
-    setDiscount(Number(inv.discount || 0));
-    setStatus(inv.status);
-    setInvoiceType(inv.invoice_type);
-    setNotes(inv.notes || "");
-  }
+  useEffect(() => {
+    if (inv && !editing) {
+      setItems(inv.items || []);
+      setDiscount(Number(inv.discount || 0));
+      setStatus(inv.status);
+      setInvoiceType(inv.invoice_type);
+      setNotes(inv.notes || "");
+    }
+  }, [inv, editing]);
 
   if (loading) return <ModalShell onClose={onClose}><p>⏳ جاري التحميل...</p></ModalShell>;
   if (!inv)    return <ModalShell onClose={onClose}><p>❌ لم يتم العثور على الفاتورة</p></ModalShell>;
@@ -463,9 +465,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     alert("✅ تم الحذف النهائي"); onClose(); onChanged();
   }
 
-  const filteredProducts = (searchProductsData?.items || []).filter((p: any) =>
-    matchesArabicSearch(p.name, productSearch)
-  );
+  const filteredProducts = searchProductsData?.items || [];
 
   return (
     <ModalShell onClose={onClose} wide>
