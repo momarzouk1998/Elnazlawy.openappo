@@ -53,7 +53,7 @@ export async function GET() {
 
     return NextResponse.json(
       { ok: true, data: { stores: summary, overall } },
-      { headers: { 'Cache-Control': 'private, max-age=20, stale-while-revalidate=120' } }
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });

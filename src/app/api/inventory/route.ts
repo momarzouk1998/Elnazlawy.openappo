@@ -58,6 +58,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { ok: true, data: { items: augmented, total, limit, page } },
-    { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } }
+    { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
   );
 }
