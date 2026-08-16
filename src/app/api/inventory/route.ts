@@ -32,7 +32,17 @@ export async function GET(request: NextRequest) {
     prisma.inventory.findMany({
       where,
       include: {
-        product: { select: { id: true, name: true, category: true, unit: true, reorder_level: true, last_purchase_price: true } },
+        product: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            unit: true,
+            units_per_carton: true,
+            reorder_level: true,
+            last_purchase_price: true,
+          },
+        },
         store: { select: { id: true, name: true, type: true } },
       },
       orderBy: { product: { name: 'asc' } },

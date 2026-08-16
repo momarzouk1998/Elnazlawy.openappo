@@ -13,7 +13,14 @@ interface InvItem {
   id: string;
   current_stock: number;
   reorder_level: number;
-  product: { id: string; name: string; category: string | null; unit: string; last_purchase_price: number | null };
+  product: {
+    id: string;
+    name: string;
+    category: string | null;
+    unit: string;
+    units_per_carton: number;
+    last_purchase_price: number | null;
+  };
   store: { id: string; name: string; type: string };
   value: number | null;
 }
@@ -88,6 +95,7 @@ function StockTab({ profile }: { profile: any }) {
   const [lowOnly, setLowOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [editItem, setEditItem] = useState<InvItem | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
   const [saving, setSaving] = useState(false);
@@ -101,7 +109,7 @@ function StockTab({ profile }: { profile: any }) {
   if (search) params.set('search', search);
   params.set('page', page.toString());
 
-  const { data: summaryData, loading: summaryLoading } = useApi<any>('/api/inventory/summary');
+  const { data: summaryData, loading: summaryLoading, refetch: refetchSummary } = useApi<any>('/api/inventory/summary');
   const { data, loading, refetch } = useApi<{ items: InvItem[]; total: number; limit: number; page: number }>(`/api/inventory?${params.toString()}`);
   const stores = summaryData?.stores || [];
   const overall = summaryData?.overall;
@@ -116,7 +124,12 @@ function StockTab({ profile }: { profile: any }) {
   const categories = Array.from(new Set(data?.items?.map(i => i.product.category).filter(Boolean))) as string[];
   const items = data?.items || [];
 
-  // بدء التعديل
+  function refreshAll() {
+    refetch();
+    refetchSummary();
+  }
+
+  // بدء التعديل السريع للكمية
   function startEdit(item: InvItem) {
     setEditingId(item.id);
     setEditValue(Number(item.current_stock));
@@ -128,7 +141,7 @@ function StockTab({ profile }: { profile: any }) {
     setEditValue(0);
   }
 
-  // حفظ التعديل
+  // حفظ التعديل السريع للكمية
   async function saveEdit(item: InvItem) {
     if (editValue < 0) {
       alert('❌ الكمية لا يمكن أن تكون سالبة');
@@ -159,7 +172,7 @@ function StockTab({ profile }: { profile: any }) {
         body: JSON.stringify({
           inventory_id: item.id,
           new_quantity: editValue,
-          reason: 'تعديل من صفحة المخزون'
+          reason: 'تعديل سريع من صفحة المخزون'
         })
       });
 
@@ -173,7 +186,7 @@ function StockTab({ profile }: { profile: any }) {
 
       alert(json.message || '✅ تم التعديل بنجاح');
       cancelEdit();
-      refetch();
+      refreshAll();
       setSaving(false);
 
     } catch (err: any) {
@@ -194,11 +207,19 @@ function StockTab({ profile }: { profile: any }) {
         return;
       }
       alert('✅ تم الحذف بنجاح');
-      refetch();
+      refreshAll();
     } catch (err: any) {
       alert('❌ خطأ: ' + err.message);
     }
   }
+
+  const getUnitLabel = (unit: string) => {
+    switch (unit) {
+      case 'carton': return { label: 'كرتونة', color: 'bg-amber-100 text-amber-800 border-amber-200' };
+      case 'box': return { label: 'علبة', color: 'bg-purple-100 text-purple-800 border-purple-200' };
+      default: return { label: 'قطعة', color: 'bg-blue-100 text-blue-800 border-blue-200' };
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -283,47 +304,59 @@ function StockTab({ profile }: { profile: any }) {
             {items.map(i => {
               const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
               const isEditing = editingId === i.id;
+              const unitInfo = getUnitLabel(i.product.unit);
               
               return (
-                <div key={i.id} className={`card p-3 ${lowStock ? 'ring-2 ring-red-300' : ''}`}>
-                  <div className="flex items-start justify-between mb-1.5">
+                <div key={i.id} className={`card p-3.5 space-y-2 ${lowStock ? 'ring-2 ring-red-300' : ''}`}>
+                  <div className="flex items-start justify-between">
                     <div>
-                      <div className="font-bold text-sm truncate">{i.product.name}</div>
-                      {i.product.category && (
-                        <div className="text-xs text-gray-500 mt-0.5">📂 {i.product.category}</div>
-                      )}
+                      <div className="font-bold text-sm text-slate-800">{i.product.name}</div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {i.product.category && (
+                          <span className="text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                            📂 {i.product.category}
+                          </span>
+                        )}
+                        <span className={`text-[11px] px-2 py-0.5 rounded font-semibold border ${unitInfo.color}`}>
+                          {unitInfo.label}
+                        </span>
+                        {i.product.unit !== 'piece' && (
+                          <span className="text-[11px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 font-mono">
+                            📦 {i.product.units_per_carton} ق/كرتونة
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="shrink-0 mr-2">
+                    <div className="shrink-0 text-left">
                       {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="w-20 px-2 py-1 border-2 border-nazlawy-500 rounded text-center font-mono font-bold text-sm"
-                            value={editValue}
-                            onChange={(e) => setEditValue(parseFloat(e.target.value) || 0)}
-                            disabled={saving}
-                          />
-                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          className="w-20 px-2 py-1 border-2 border-nazlawy-500 rounded text-center font-mono font-bold text-sm"
+                          value={editValue}
+                          onChange={(e) => setEditValue(parseFloat(e.target.value) || 0)}
+                          disabled={saving}
+                        />
                       ) : (
                         <div 
-                          className={`font-mono font-bold text-lg cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}
+                          className={`font-mono font-bold text-lg cursor-pointer hover:bg-yellow-100 px-2 py-0.5 rounded ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}
                           onClick={() => startEdit(i)}
+                          title="انقر لتعديل سريع للكمية"
                         >
                           {formatQty(i.current_stock)}
                         </div>
                       )}
                     </div>
                   </div>
-                  
-                  {isEditing && (
-                    <div className="flex gap-2 mt-2 pt-2 border-t">
+
+                  {isEditing ? (
+                    <div className="flex gap-2 pt-2 border-t">
                       <button
                         onClick={() => saveEdit(i)}
                         disabled={saving}
                         className="flex-1 text-xs px-3 py-2 rounded bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
                       >
-                        {saving ? '⏳ جاري الحفظ...' : '✓ حفظ'}
+                        {saving ? '⏳ جاري الحفظ...' : '✓ حفظ الكمية'}
                       </button>
                       <button
                         onClick={cancelEdit}
@@ -333,21 +366,37 @@ function StockTab({ profile }: { profile: any }) {
                         ✕ إلغاء
                       </button>
                     </div>
-                  )}
-                  
-                  {!isEditing && (
-                    <>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>🏢 {i.store.name}</span>
-                        <span>الحد الأدنى: <span className="font-mono">{i.reorder_level}</span></span>
+                  ) : (
+                    <div className="border-t pt-2 space-y-1.5 text-xs text-gray-600">
+                      <div className="flex justify-between items-center">
+                        <span>🏢 المخزن: <b>{i.store.name}</b></span>
+                        <span>الحد الأدنى: <b className="font-mono">{i.reorder_level}</b></span>
                       </div>
-                      {showCost && i.value !== null && (
-                        <div className="text-xs text-green-700 mt-1 font-mono">💰 {formatEGP(i.value)} ج</div>
+                      {showCost && (
+                        <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded font-mono text-[11px]">
+                          <span>سعر الشراء: <b className="text-slate-800">{formatEGP(i.product.last_purchase_price)} ج</b></span>
+                          <span>القيمة: <b className="text-emerald-700">{formatEGP(i.value)} ج</b></span>
+                        </div>
                       )}
                       {lowStock && (
-                        <div className="text-xs text-red-600 font-bold mt-1">⚠️ تحت الحد الأدنى</div>
+                        <div className="text-xs text-red-600 font-bold">⚠️ تحت الحد الأدنى</div>
                       )}
-                    </>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => setEditItem(i)}
+                          className="flex-1 text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200 hover:bg-blue-100 flex items-center justify-center gap-1"
+                        >
+                          <span>✏️</span> تعديل كامل
+                        </button>
+                        <button
+                          onClick={() => deleteItem(i)}
+                          className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold border border-red-200 hover:bg-red-100"
+                          title="حذف من المخزن"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
@@ -357,35 +406,53 @@ function StockTab({ profile }: { profile: any }) {
             )}
           </div>
 
-          {/* Desktop: جدول */}
+          {/* Desktop: جدول تفصيلي كامل */}
           <div className="card overflow-x-auto p-0 hidden md:block">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+              <thead className="bg-slate-100/80 text-slate-700 text-xs font-bold uppercase tracking-wider">
                 <tr>
                   <th className="p-3 text-right">الصنف</th>
                   <th className="p-3 text-right">الفئة</th>
+                  <th className="p-3 text-right">الوحدة</th>
+                  <th className="p-3 text-right">القطع/الكرتونة</th>
                   <th className="p-3 text-right">المخزن</th>
-                  <th className="p-3 text-right">الكمية</th>
+                  <th className="p-3 text-right">الكمية بالمخزن</th>
                   <th className="p-3 text-right">الحد الأدنى</th>
-                  {showCost && <th className="p-3 text-right">القيمة</th>}
-                  <th className="p-3 text-right">إجراءات</th>
+                  {showCost && <th className="p-3 text-right">سعر الشراء</th>}
+                  {showCost && <th className="p-3 text-right">إجمالي القيمة</th>}
+                  <th className="p-3 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map(i => {
                   const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
                   const isEditing = editingId === i.id;
+                  const unitInfo = getUnitLabel(i.product.unit);
                   
                   return (
-                    <tr key={i.id} className={`border-t hover:bg-gray-50 ${lowStock ? 'bg-red-50' : ''}`}>
-                      <td className="p-3 font-semibold">{i.product.name}</td>
+                    <tr key={i.id} className={`border-t hover:bg-blue-50/40 transition-colors ${lowStock ? 'bg-red-50/50' : ''}`}>
+                      <td className="p-3 font-bold text-slate-900">{i.product.name}</td>
                       <td className="p-3 text-xs text-gray-600">{i.product.category || '—'}</td>
-                      <td className="p-3 text-xs">{i.store.name}</td>
-                      <td className={`p-3 font-mono font-bold ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>
+                      <td className="p-3">
+                        <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-bold border ${unitInfo.color}`}>
+                          {unitInfo.label}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-xs text-slate-700 font-semibold">
+                        {i.product.unit !== 'piece' ? (
+                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">
+                            {i.product.units_per_carton} قطعة
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 font-normal">—</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs font-semibold text-slate-700">🏢 {i.store.name}</td>
+                      <td className={`p-3 font-mono font-bold text-base ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>
                         {isEditing ? (
                           <input
                             type="number"
-                            step="0.01"
+                            step="any"
                             className="w-24 px-2 py-1 border-2 border-nazlawy-500 rounded text-center font-mono font-bold"
                             value={editValue}
                             onChange={(e) => setEditValue(parseFloat(e.target.value) || 0)}
@@ -397,45 +464,58 @@ function StockTab({ profile }: { profile: any }) {
                             disabled={saving}
                           />
                         ) : (
-                          <span className="cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded" onClick={() => startEdit(i)}>
+                          <span 
+                            className="cursor-pointer hover:bg-yellow-100 px-2 py-1 rounded transition-colors" 
+                            onClick={() => startEdit(i)}
+                            title="انقر لتعديل سريع للكمية"
+                          >
                             {formatQty(i.current_stock)}
                           </span>
                         )}
                       </td>
                       <td className="p-3 font-mono text-xs text-gray-500">{i.reorder_level}</td>
-                      {showCost && <td className="p-3 font-mono text-xs">{formatEGP(i.value)}</td>}
-                      <td className="p-3">
+                      {showCost && (
+                        <td className="p-3 font-mono text-xs font-bold text-slate-800">
+                          {formatEGP(i.product.last_purchase_price)} ج
+                        </td>
+                      )}
+                      {showCost && (
+                        <td className="p-3 font-mono text-xs font-bold text-emerald-700">
+                          {formatEGP(i.value)} ج
+                        </td>
+                      )}
+                      <td className="p-3 text-center">
                         {isEditing ? (
-                          <div className="flex gap-1">
+                          <div className="flex justify-center gap-1">
                             <button
                               onClick={() => saveEdit(i)}
                               disabled={saving}
-                              className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
-                              title="حفظ"
+                              className="text-xs px-2.5 py-1 rounded bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 font-bold shadow-sm"
+                              title="حفظ الكمية"
                             >
-                              {saving ? '⏳' : '✓'}
+                              {saving ? '⏳' : '✓ حفظ'}
                             </button>
                             <button
                               onClick={cancelEdit}
                               disabled={saving}
-                              className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+                              className="text-xs px-2.5 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
                               title="إلغاء"
                             >
                               ✕
                             </button>
                           </div>
                         ) : (
-                          <div className="flex gap-1">
+                          <div className="flex justify-center items-center gap-1.5">
                             <button
-                              onClick={() => startEdit(i)}
-                              className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              title="تعديل الكمية"
+                              onClick={() => setEditItem(i)}
+                              className="text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold flex items-center gap-1 transition-all"
+                              title="تعديل الصنف والمخزون وسعر الشراء بالكامل"
                             >
-                              ✏️
+                              <span>✏️</span> تعديل كامل
                             </button>
                             <button
                               onClick={() => deleteItem(i)}
-                              className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                              className="text-xs p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-all"
                               title="حذف من المخزن"
                             >
                               🗑️
@@ -446,11 +526,24 @@ function StockTab({ profile }: { profile: any }) {
                     </tr>
                   );
                 })}
-                {items.length === 0 && <tr><td colSpan={showCost ? 7 : 6} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
+                {items.length === 0 && <tr><td colSpan={showCost ? 10 : 8} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {/* نافذة التعديل الشامل للصنف والرصيد */}
+      {editItem && (
+        <InventoryItemEditModal
+          item={editItem}
+          profile={profile}
+          onClose={() => setEditItem(null)}
+          onSaved={() => {
+            setEditItem(null);
+            refreshAll();
+          }}
+        />
       )}
 
       {data && data.total > 0 && (
@@ -1996,6 +2089,223 @@ function BulkAddModal({ stores, onClose, onSaved }: { stores: any[]; onClose: ()
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+function InventoryItemEditModal({
+  item,
+  profile,
+  onClose,
+  onSaved,
+}: {
+  item: InvItem;
+  profile: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: item.product.name,
+    category: item.product.category || '',
+    unit: item.product.unit || 'piece',
+    units_per_carton: item.product.units_per_carton || 1,
+    reorder_level: item.reorder_level || 0,
+    last_purchase_price: Number(item.product.last_purchase_price || 0),
+    current_stock: Number(item.current_stock || 0),
+  });
+  const [saving, setSaving] = useState(false);
+
+  const showCost = profile?.can_see_cost;
+
+  async function handleSave() {
+    if (!form.name.trim()) {
+      alert('❌ اسم الصنف مطلوب');
+      return;
+    }
+    if (form.current_stock < 0) {
+      alert('❌ الكمية لا يمكن أن تكون سالبة');
+      return;
+    }
+    if (form.units_per_carton < 1) {
+      alert('❌ عدد القطع في الكرتونة يجب أن يكون 1 على الأقل');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. Update product info
+      const prodRes = await fetch(`/api/products/${item.product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          category: form.category.trim(),
+          unit: form.unit,
+          units_per_carton: form.units_per_carton,
+          reorder_level: form.reorder_level,
+          last_purchase_price: form.last_purchase_price,
+        }),
+      });
+      const prodJson = await prodRes.json();
+      if (!prodRes.ok) {
+        throw new Error(prodJson?.error?.message || prodJson?.error || 'فشل تحديث بيانات الصنف');
+      }
+
+      // 2. If stock changed, adjust inventory
+      const oldStock = Number(item.current_stock);
+      if (form.current_stock !== oldStock) {
+        const adjustRes = await fetch('/api/inventory/adjust', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inventory_id: item.id,
+            new_quantity: form.current_stock,
+            reason: `تعديل شامل لبيانات ورصيد الصنف في ${item.store.name}`,
+          }),
+        });
+        const adjustJson = await adjustRes.json();
+        if (!adjustRes.ok) {
+          throw new Error(adjustJson?.error?.message || adjustJson?.error || 'فشل تعديل رصيد المخزن');
+        }
+      }
+
+      alert('✅ تم حفظ تعديلات الصنف والمخزون بنجاح');
+      onSaved();
+    } catch (err: any) {
+      alert('❌ خطأ: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b pb-3">
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <span>✏️</span> تعديل بيانات الصنف والرصيد
+          </h2>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-nazlawy-50 text-nazlawy-700 font-semibold border border-nazlawy-200">
+            🏢 {item.store.name}
+          </span>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">اسم الصنف *</label>
+            <input
+              className="input-field"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">الفئة</label>
+              <input
+                className="input-field"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة الأساسية</label>
+              <select
+                className="input-field"
+                value={form.unit}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              >
+                <option value="piece">قطعة</option>
+                <option value="box">علبة</option>
+                <option value="carton">كرتونة</option>
+              </select>
+            </div>
+          </div>
+
+          {form.unit !== 'piece' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                عدد القطع في الكرتونة / العلبة
+                <span className="text-[11px] text-blue-600 font-normal mr-1 block">📦 كم قطعة داخل الكرتونة/العلبة الواحدة</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                className="input-field font-mono font-bold"
+                value={form.units_per_carton}
+                onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })}
+                placeholder="مثال: 12"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            {showCost && (
+              <div>
+                <label className="text-sm font-medium text-gray-700 block mb-1">آخر سعر شراء (ج)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  className="input-field font-mono"
+                  value={form.last_purchase_price}
+                  onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
+              <input
+                type="number"
+                min={0}
+                className="input-field font-mono"
+                value={form.reorder_level}
+                onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+
+          {/* تعديل رصيد المخزن الحالي */}
+          <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold text-amber-900 block">
+                📦 رصيد المخزن الحالي ({item.store.name})
+              </label>
+              <span className="text-[11px] text-amber-700">
+                الرصيد السابق: <b>{formatQty(item.current_stock)}</b>
+              </span>
+            </div>
+            <input
+              type="number"
+              step="any"
+              min={0}
+              className="input-field bg-white font-mono font-bold text-lg text-amber-950 border-amber-300"
+              value={form.current_stock}
+              onChange={(e) => setForm({ ...form, current_stock: parseFloat(e.target.value) || 0 })}
+            />
+            {Number(form.current_stock) !== Number(item.current_stock) && (
+              <p className="text-[11px] text-amber-800 leading-tight">
+                ⚠️ سيتم تسجيل حركة تسوية جرد بفرق ({Number(form.current_stock) - Number(item.current_stock) > 0 ? '+' : ''}{Number(form.current_stock) - Number(item.current_stock)}).
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t">
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.name.trim()}
+            className="btn-primary flex-1"
+          >
+            {saving ? 'جاري الحفظ...' : '✓ حفظ كل التعديلات'}
+          </button>
+          <button onClick={onClose} disabled={saving} className="btn-secondary">
+            إلغاء
+          </button>
+        </div>
       </div>
     </div>
   );
