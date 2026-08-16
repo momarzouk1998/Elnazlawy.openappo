@@ -184,13 +184,25 @@ export default function ProductsPage() {
 }
 
 function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: '', category: '', unit: 'piece', units_per_carton: 1, default_sale_price: 0, reorder_level: 5, last_purchase_price: 0, notes: '' });
+  const [form, setForm] = useState({
+    name: '',
+    category: '',
+    unit: 'piece',
+    units_per_carton: 1,
+    default_sale_price: 0,
+    reorder_level: 5,
+    last_purchase_price: 0,
+    initial_stock: 0,
+    store_id: '',
+    notes: '',
+  });
+  const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>('/api/stores');
   const { mutate, loading } = useApiMutation();
 
   async function save() {
     if (!form.name.trim()) { alert('❌ اسم المنتج مطلوب'); return; }
     if (form.last_purchase_price < 0) { alert('❌ سعر الشراء لا يمكن أن يكون سالباً'); return; }
-    if (form.units_per_carton < 1) { alert('❌ قطع/كرتونة يجب أن تكون 1 على الأقل'); return; }
+    if (form.units_per_carton < 1) { alert('❌ سعة الكرتونة يجب أن تكون 1 على الأقل'); return; }
     const { error } = await mutate('POST', '/api/products', form);
     if (error) { alert('❌ ' + error); return; }
     onSaved();
@@ -198,10 +210,10 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-2">+ إضافة صنف جديد</h2>
         <div>
-          <label className="text-sm font-medium text-gray-700 block mb-1">اسم المنتج *</label>
+          <label className="text-sm font-medium text-gray-700 block mb-1">اسم الصنف *</label>
           <input className="input-field" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -210,29 +222,64 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <input className="input-field" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة الأساسية</label>
             <select className="input-field" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
               <option value="piece">قطعة</option>
               <option value="box">علبة</option>
               <option value="carton">كرتونة</option>
             </select>
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">
-              سعة الكرتونة (قطع/كرتونة)
-              <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة الواحدة</span>
-            </label>
-            <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
-          </div>
+          {form.unit !== 'piece' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                سعة العبوة (قطع/كرتونة)
+                <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة/العلبة</span>
+              </label>
+              <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
-            <input type="number" step="0.01" className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
             <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
           </div>
         </div>
+
+        {/* 📦 قسم رصيد أول المدة */}
+        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2">
+          <label className="text-xs font-bold text-emerald-900 block">📦 رصيد أول المدة (الكمية الموجودة حالياً بالمخزن)</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] text-emerald-800 block mb-0.5">الكمية الافتتاحية</label>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                className="input-field text-sm font-bold font-mono bg-white border-emerald-300"
+                value={form.initial_stock}
+                onChange={(e) => setForm({ ...form, initial_stock: Math.max(0, parseFloat(e.target.value) || 0) })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] text-emerald-800 block mb-0.5">المخزن المودع به</label>
+              <select
+                className="input-field text-sm bg-white border-emerald-300"
+                value={form.store_id}
+                onChange={(e) => setForm({ ...form, store_id: e.target.value })}
+              >
+                <option value="">🏢 المخزن الرئيسي الافتراضي</option>
+                {(storesData?.items || []).map(s => (
+                  <option key={s.id} value={s.id}>🏢 {s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">ملاحظات</label>
           <textarea className="input-field" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -262,7 +309,7 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
   async function save() {
     if (!form.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
     if (form.last_purchase_price < 0) { alert('❌ سعر الشراء لا يمكن أن يكون سالباً'); return; }
-    if (form.units_per_carton < 1) { alert('❌ قطع/كرتونة يجب أن تكون 1 على الأقل'); return; }
+    if (form.units_per_carton < 1) { alert('❌ سعة الكرتونة يجب أن تكون 1 على الأقل'); return; }
     const { error } = await mutate('PATCH', `/api/products/${product.id}`, form);
     if (error) { alert('❌ ' + error); return; }
     onSaved();
@@ -270,7 +317,7 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-2">✏️ تعديل صنف</h2>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1">اسم الصنف *</label>
@@ -289,13 +336,15 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
               <option value="carton">كرتونة</option>
             </select>
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">
-              سعة الكرتونة (قطع/كرتونة)
-              <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة الواحدة</span>
-            </label>
-            <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
-          </div>
+          {form.unit !== 'piece' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                سعة العبوة (قطع/كرتونة)
+                <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة/العلبة</span>
+              </label>
+              <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
             <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />

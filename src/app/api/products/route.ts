@@ -104,20 +104,74 @@ export async function POST(request: NextRequest) {
     if (unitsPerCarton < 1) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'قطع/كرتونة يجب أن تكون 1 على الأقل' } }, { status: 400 });
     }
-    const product = await prisma.products.create({
-      data: {
-        name: String(body.name).trim(),
-        description: body.description || null,
-        category: body.category || null,
-        unit: body.unit || 'piece',
-        units_per_carton: unitsPerCarton,
-        barcode: body.barcode || null,
-        default_sale_price: salePrice,
-        reorder_level: Number(body.reorder_level) || 5,
-        notes: body.notes || null,
-        last_purchase_price: purchasePrice,
-      },
+    const initialStock = Number(body.initial_stock) || 0;
+    const storeId = body.store_id;
+
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.products.create({
+        data: {
+          name: String(body.name).trim(),
+          description: body.description || null,
+          category: body.category || null,
+          unit: body.unit || 'piece',
+          units_per_carton: unitsPerCarton,
+          barcode: body.barcode || null,
+          default_sale_price: salePrice,
+          reorder_level: Number(body.reorder_level) || 5,
+          notes: body.notes || null,
+          last_purchase_price: purchasePrice,
+        },
+      });
+
+      if (initialStock > 0) {
+        let targetStoreId = storeId;
+        let targetStoreName = 'المخزن الرئيسي';
+        if (!targetStoreId) {
+          const firstStore = await tx.stores.findFirst({
+            where: { is_active: true },
+            orderBy: { created_at: 'asc' },
+          });
+          if (firstStore) {
+            targetStoreId = firstStore.id;
+            targetStoreName = firstStore.name;
+          }
+        } else {
+          const storeRec = await tx.stores.findUnique({ where: { id: targetStoreId } });
+          if (storeRec) targetStoreName = storeRec.name;
+        }
+
+        if (targetStoreId) {
+          const inv = await tx.inventory.create({
+            data: {
+              product_id: created.id,
+              store_id: targetStoreId,
+              current_stock: initialStock,
+            },
+          });
+
+          await tx.inventory_adjustments.create({
+            data: {
+              inventory_id: inv.id,
+              product_id: created.id,
+              product_name: created.name,
+              store_id: targetStoreId,
+              store_name: targetStoreName,
+              old_quantity: 0,
+              new_quantity: initialStock,
+              difference: initialStock,
+              adjustment_type: 'إضافة أولية',
+              unit_cost: purchasePrice,
+              financial_impact: initialStock * purchasePrice,
+              reason: 'رصيد أول المدة عند إنشاء الصنف',
+              adjusted_by: profile?.id,
+            },
+          });
+        }
+      }
+
+      return created;
     });
+
     return NextResponse.json({ ok: true, data: product });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
