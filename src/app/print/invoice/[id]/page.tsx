@@ -47,15 +47,71 @@ export default async function InvoicePrintPage({
   if (!invoice) notFound();
 
   const isTax = invoice.invoice_type === 'ضريبية';
-
-  // الرصيد السابق = الرصيد الحالي - صافي الزيادة (الإجمالي - المدفوع)
+  const isCancelled = invoice.status === 'ملغاة';
   const hasCustomer = !!invoice.customer;
   const paid = Number(invoice.paid_amount || 0);
-  const netAdded = Number(invoice.total) - paid;
-  const prevBalance = hasCustomer
-    ? Number(invoice.customer!.balance) - netAdded
-    : null;
-  const newBalance = hasCustomer ? Number(invoice.customer!.balance) : null;
+
+  let prevBalance: number | null = null;
+  let newBalance: number | null = null;
+
+  if (hasCustomer && invoice.customer) {
+    const custId = invoice.customer.id;
+    const invDate = invoice.created_at || invoice.invoice_date;
+
+    // 1. الرصيد الافتتاحي
+    const opening = Number(invoice.customer.opening_balance || 0);
+
+    // 2. الفواتير السابقة المكتملة التي سبقت هذه الفاتورة
+    const priorInvoices = await prisma.sales_invoices.findMany({
+      where: {
+        customer_id: custId,
+        status: 'مكتملة',
+        created_at: { lt: invDate },
+        id: { not: invoice.id },
+      },
+      select: { total: true, paid_amount: true },
+    });
+    const priorInvoicesNet = priorInvoices.reduce(
+      (sum, inv) => sum + (Number(inv.total) - Number(inv.paid_amount || 0)),
+      0
+    );
+
+    // 3. المدفوعات المستقلة السابقة (التي ليست مرتبطة بفاتورة)
+    const priorPayments = await prisma.customer_payments.findMany({
+      where: {
+        customer_id: custId,
+        created_at: { lt: invDate },
+        invoice_id: null,
+      },
+      select: { amount: true },
+    });
+    const priorPaymentsTotal = priorPayments.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0
+    );
+
+    // 4. المرتجعات السابقة
+    const priorReturns = await prisma.customer_return_invoices.findMany({
+      where: {
+        customer_id: custId,
+        status: { not: 'ملغاة' },
+        created_at: { lt: invDate },
+      },
+      select: { total_amount: true },
+    });
+    const priorReturnsTotal = priorReturns.reduce(
+      (sum, r) => sum + Number(r.total_amount),
+      0
+    );
+
+    prevBalance = opening + priorInvoicesNet - priorPaymentsTotal - priorReturnsTotal;
+
+    if (isCancelled) {
+      newBalance = prevBalance;
+    } else {
+      newBalance = prevBalance + (Number(invoice.total) - paid);
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '0.75rem', fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif" }}>
@@ -133,7 +189,7 @@ export default async function InvoicePrintPage({
             <div
               style={{
                 display: 'inline-block',
-                background: C.orange,
+                background: isCancelled ? C.red : C.orange,
                 color: C.white,
                 padding: '3px 12px',
                 borderRadius: '20px',
@@ -141,7 +197,7 @@ export default async function InvoicePrintPage({
                 fontWeight: 800,
               }}
             >
-              فاتورة {invoice.invoice_type}
+              {isCancelled ? 'فاتورة ملغاة 🚫' : `فاتورة ${invoice.invoice_type}`}
             </div>
             <div style={{ fontSize: '0.75rem', marginTop: '4px', color: C.text }}>
               <span style={{ color: C.muted }}>رقم: </span>
@@ -319,33 +375,38 @@ export default async function InvoicePrintPage({
             style={{
               margin: '0 1rem 0.6rem 1rem',
               borderRadius: '8px',
-              border: `1px solid ${C.border}`,
-              backgroundColor: '#f8fafc',
+              border: `1px solid ${isCancelled ? '#fca5a5' : C.border}`,
+              backgroundColor: isCancelled ? '#fff1f2' : '#f8fafc',
               fontSize: '0.78rem',
               overflow: 'hidden',
             }}
           >
+            {isCancelled && (
+              <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center', borderBottom: '1px solid #fca5a5' }}>
+                🚫 تنبيه: هذه الفاتورة ملغاة ولا تؤثر على حساب العميل
+              </div>
+            )}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
+                gridTemplateColumns: isCancelled ? '1fr 1fr' : paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
-                borderBottom: `1px solid ${C.border}`,
-                backgroundColor: '#f1f5f9',
+                borderBottom: `1px solid ${isCancelled ? '#fecdd3' : C.border}`,
+                backgroundColor: isCancelled ? '#ffe4e6' : '#f1f5f9',
                 padding: '4px 0',
                 fontWeight: 700,
-                color: C.muted,
+                color: isCancelled ? '#9f1239' : C.muted,
               }}
             >
-              <div>الحساب السابق</div>
-              <div>الفاتورة</div>
-              {paid > 0 && <div>المدفوع منها</div>}
-              <div style={{ color: C.dark }}>الرصيد النهائي</div>
+              <div>الحساب قبل الفاتورة</div>
+              {!isCancelled && <div>الفاتورة</div>}
+              {!isCancelled && paid > 0 && <div>المدفوع منها</div>}
+              <div style={{ color: C.dark }}>{isCancelled ? 'رصيد العميل' : 'الرصيد النهائي'}</div>
             </div>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
+                gridTemplateColumns: isCancelled ? '1fr 1fr' : paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
                 padding: '5px 0',
                 fontFamily: 'monospace',
@@ -355,10 +416,12 @@ export default async function InvoicePrintPage({
               <div style={{ color: prevBalance > 0.01 ? C.red : prevBalance < -0.01 ? C.green : C.muted }}>
                 {formatEGP(prevBalance)} ج
               </div>
-              <div style={{ color: C.darkOrange }}>
-                +{formatEGP(Number(invoice.total))} ج
-              </div>
-              {paid > 0 && (
+              {!isCancelled && (
+                <div style={{ color: C.darkOrange }}>
+                  +{formatEGP(Number(invoice.total))} ج
+                </div>
+              )}
+              {!isCancelled && paid > 0 && (
                 <div style={{ color: C.green }}>
                   -{formatEGP(paid)} ج
                 </div>
