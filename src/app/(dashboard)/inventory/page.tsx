@@ -5,6 +5,7 @@ import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty, formatDate } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import Pagination from "@/components/Pagination";
+import CategoryCombobox from "@/components/CategoryCombobox";
 
 /* ============================================
    أنواع مشتركة
@@ -135,8 +136,11 @@ function StockTab({ profile }: { profile: any }) {
     if (pageParam) setPage(parseInt(pageParam));
   }, [searchParams]);
 
-  // استخراج الفئات المتاحة
-  const categories = Array.from(new Set(data?.items?.map(i => i.product.category).filter(Boolean))) as string[];
+  // استخراج الفئات المتاحة (منظفة وبدون أي تكرار ناتج عن مسافات زائدة)
+  const categories = (
+    summaryData?.categories ||
+    Array.from(new Set((data?.items || []).map(i => i.product.category?.trim()).filter(Boolean)))
+  ) as string[];
   const items = data?.items || [];
 
   function refreshAll() {
@@ -144,12 +148,49 @@ function StockTab({ profile }: { profile: any }) {
     refetchSummary();
   }
 
+  // تمييز العربيات عن المخازن الرئيسية بالأيقونة واللون
+  const getStoreStyle = (name: string, type?: string) => {
+    const isVehicle = type === 'vehicle' || name.includes('عربية') || name.includes('سيارة') || name.includes('سائق') || name.includes('مندوب');
+    const isMain = type === 'main' || name.includes('رئيسي') || name.includes('رئيسية');
+
+    if (isVehicle) {
+      return {
+        icon: '🚚',
+        typeLabel: 'عربية توزيع',
+        cardClass: 'border-l-4 border-l-sky-500 bg-gradient-to-br from-sky-50/70 via-blue-50/30 to-white shadow-md hover:shadow-lg',
+        badgeClass: 'bg-sky-100 text-sky-800 border-sky-200',
+        titleColor: 'text-sky-900',
+        qtyColor: 'text-sky-600',
+      };
+    }
+
+    if (isMain) {
+      return {
+        icon: '🏬',
+        typeLabel: 'مخزن رئيسي',
+        cardClass: 'border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white shadow-md hover:shadow-lg',
+        badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        titleColor: 'text-emerald-950',
+        qtyColor: 'text-emerald-700',
+      };
+    }
+
+    return {
+      icon: '🏢',
+      typeLabel: 'فرع/مخزن',
+      cardClass: 'border-l-4 border-l-indigo-500 bg-white shadow hover:shadow-md',
+      badgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      titleColor: 'text-indigo-900',
+      qtyColor: 'text-indigo-600',
+    };
+  };
+
   // بدء التعديل المباشر Inline
   function startInlineEdit(item: InvItem) {
     setEditingId(item.id);
     setInlineForm({
       name: item.product.name,
-      category: item.product.category || '',
+      category: item.product.category?.trim() || '',
       unit: item.product.unit || 'piece',
       units_per_carton: item.product.units_per_carton || 1,
       current_stock: Number(item.current_stock || 0),
@@ -260,7 +301,10 @@ function StockTab({ profile }: { profile: any }) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Overall Card */}
           <div className="card bg-gradient-to-r from-nazlawy-600 to-nazlawy-800 text-white shadow-xl transform hover:scale-[1.02] transition-transform">
-            <h3 className="text-lg font-bold opacity-90 mb-2">إجمالي كل المخازن</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold opacity-90">إجمالي كل المخازن</h3>
+              <span className="text-2xl">📦</span>
+            </div>
             <div className="space-y-1">
               <div className="flex justify-between">
                 <span className="text-sm opacity-80">عدد الأصناف:</span>
@@ -279,51 +323,82 @@ function StockTab({ profile }: { profile: any }) {
             </div>
           </div>
 
-          {/* Store Cards */}
-          {stores.map((s: any) => (
-            <div key={s.id} className="card border-l-4 border-l-nazlawy-500 hover:shadow-lg transition-shadow bg-white">
-              <h3 className="text-md font-bold text-gray-800 mb-2">🏢 {s.name}</h3>
-              <div className="space-y-1 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>عدد الأصناف:</span>
-                  <span className="font-mono font-bold text-gray-900">{s.total_items}</span>
+          {/* Store Cards with Distinct Styles */}
+          {stores.map((s: any) => {
+            const storeStyle = getStoreStyle(s.name, s.type);
+            return (
+              <div key={s.id} className={`card ${storeStyle.cardClass} transition-all`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`text-md font-extrabold flex items-center gap-1.5 ${storeStyle.titleColor}`}>
+                    <span className="text-xl">{storeStyle.icon}</span>
+                    <span>{s.name}</span>
+                  </h3>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${storeStyle.badgeClass}`}>
+                    {storeStyle.typeLabel}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>إجمالي القطع:</span>
-                  <span className="font-mono font-bold text-nazlawy-600">{formatQty(s.total_qty)}</span>
-                </div>
-                {showCost && (
-                  <div className="flex justify-between pt-2 border-t mt-2">
-                    <span>إجمالي التكلفة:</span>
-                    <span className="font-mono font-bold text-green-600">{formatEGP(s.total_value)} ج</span>
+                <div className="space-y-1 text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>عدد الأصناف:</span>
+                    <span className="font-mono font-bold text-gray-900">{s.total_items}</span>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span>إجمالي القطع:</span>
+                    <span className={`font-mono font-bold ${storeStyle.qtyColor}`}>{formatQty(s.total_qty)}</span>
+                  </div>
+                  {showCost && (
+                    <div className="flex justify-between pt-2 border-t mt-2">
+                      <span>إجمالي التكلفة:</span>
+                      <span className="font-mono font-bold text-green-700">{formatEGP(s.total_value)} ج</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Details Section */}
       <div className="flex items-center justify-between flex-wrap gap-3 mt-6">
-        <h2 className="text-xl font-bold text-slate-700">تفاصيل المخزون</h2>
+        <div>
+          <h2 className="text-xl font-bold text-slate-700">تفاصيل المخزون</h2>
+          {lowOnly && (
+            <p className="text-xs text-red-600 font-bold mt-0.5">
+              ⚠️ يتم الآن عرض جميع الأصناف تحت الحد الأدنى ({data?.items.length || 0} صنف) في قائمة واحدة كاملة بدون تقسيم صفحات.
+            </p>
+          )}
+        </div>
         <button onClick={() => setShowBulkAdd(true)} className="btn-primary text-sm">
           ➕ إدخال أصناف متعددة
         </button>
       </div>
       <div className="card flex flex-wrap gap-2">
         <select className="input-field text-sm w-auto" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
-          <option value="">كل المخازن</option>
-          {stores?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <option value="">كل المخازن والفروع</option>
+          {stores?.map(s => {
+            const st = getStoreStyle(s.name, s.type);
+            return <option key={s.id} value={s.id}>{st.icon} {s.name}</option>;
+          })}
         </select>
         <select className="input-field text-sm w-auto" value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">كل الفئات</option>
-          {categories?.map(c => <option key={c} value={c}>{c}</option>)}
+          <option value="">كل الفئات ({categories.length})</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
         </select>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 بحث..." className="input-field text-sm w-auto flex-1 min-w-[150px]" />
-        <label className="flex items-center gap-2 cursor-pointer text-sm">
-          <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} className="accent-nazlawy-500" />
-          <span>تحت الحد الأدنى فقط</span>
+        <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-red-700 bg-red-50/80 px-3 py-1.5 rounded-lg border border-red-200">
+          <input
+            type="checkbox"
+            checked={lowOnly}
+            onChange={(e) => {
+              setLowOnly(e.target.checked);
+              setPage(1);
+            }}
+            className="accent-red-600 w-4 h-4"
+          />
+          <span>⚠️ تحت الحد الأدنى فقط (عرض شامل)</span>
         </label>
       </div>
 
@@ -356,10 +431,12 @@ function StockTab({ profile }: { profile: any }) {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs font-semibold text-gray-700 block mb-0.5">الفئة</label>
-                        <input
-                          className="input-field text-xs bg-white"
+                        <CategoryCombobox
                           value={inlineForm.category}
-                          onChange={(e) => setInlineForm({ ...inlineForm, category: e.target.value })}
+                          onChange={(val) => setInlineForm({ ...inlineForm, category: val })}
+                          categories={categories}
+                          placeholder="الفئة..."
+                          className="text-xs py-1"
                         />
                       </div>
                       <div>
@@ -479,7 +556,13 @@ function StockTab({ profile }: { profile: any }) {
 
                   <div className="border-t pt-2 space-y-1.5 text-xs text-gray-600">
                     <div className="flex justify-between items-center">
-                      <span>🏢 المخزن: <b>{i.store.name}</b></span>
+                      <span className="flex items-center gap-1">
+                        <span>المخزن:</span>
+                        <span className={`px-2 py-0.5 rounded font-bold border inline-flex items-center gap-1 ${getStoreStyle(i.store.name, i.store.type).badgeClass}`}>
+                          <span>{getStoreStyle(i.store.name, i.store.type).icon}</span>
+                          <span>{i.store.name}</span>
+                        </span>
+                      </span>
                       <span>الحد الأدنى: <b className="font-mono">{i.reorder_level}</b></span>
                     </div>
                     {showCost && (
@@ -537,6 +620,7 @@ function StockTab({ profile }: { profile: any }) {
                   const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
                   const isEditing = editingId === i.id;
                   const unitInfo = getUnitLabel(i.product.unit);
+                  const storeStyle = getStoreStyle(i.store.name, i.store.type);
                   
                   if (isEditing) {
                     return (
@@ -550,12 +634,13 @@ function StockTab({ profile }: { profile: any }) {
                             autoFocus
                           />
                         </td>
-                        <td className="p-2">
-                          <input
-                            type="text"
-                            className="input-field text-xs py-1 bg-white"
+                        <td className="p-2 min-w-[150px]">
+                          <CategoryCombobox
                             value={inlineForm.category}
-                            onChange={(e) => setInlineForm({ ...inlineForm, category: e.target.value })}
+                            onChange={(val) => setInlineForm({ ...inlineForm, category: val })}
+                            categories={categories}
+                            placeholder="الفئة..."
+                            className="text-xs py-1"
                           />
                         </td>
                         <td className="p-2">
@@ -583,7 +668,10 @@ function StockTab({ profile }: { profile: any }) {
                           )}
                         </td>
                         <td className="p-2 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                          🏢 {i.store.name}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold border ${storeStyle.badgeClass}`}>
+                            <span>{storeStyle.icon}</span>
+                            <span>{i.store.name}</span>
+                          </span>
                         </td>
                         <td className="p-2">
                           <input
@@ -663,7 +751,12 @@ function StockTab({ profile }: { profile: any }) {
                           <span className="text-gray-400 font-normal">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-xs font-semibold text-slate-700">🏢 {i.store.name}</td>
+                      <td className="p-3 text-xs font-semibold whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold ${storeStyle.badgeClass}`}>
+                          <span>{storeStyle.icon}</span>
+                          <span>{i.store.name}</span>
+                        </span>
+                      </td>
                       <td className={`p-3 font-mono font-bold text-base ${lowStock ? 'text-red-600' : 'text-nazlawy-600'}`}>
                         {formatQty(i.current_stock)}
                       </td>
@@ -706,7 +799,8 @@ function StockTab({ profile }: { profile: any }) {
         </>
       )}
 
-      {data && data.total > 0 && (
+      {/* إخفاء الترقيم في حالة عرض تحت الحد الأدنى فقط */}
+      {data && data.total > 0 && !lowOnly && (
         <Pagination
           total={data.total}
           page={data.page}
@@ -2125,14 +2219,12 @@ function BulkAddModal({ stores, onClose, onSaved }: { stores: any[]; onClose: ()
                       disabled={loading}
                     />
                   </td>
-                  <td className="p-2 border">
-                    <input
-                      type="text"
-                      className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-nazlawy-500 rounded"
+                  <td className="p-2 border min-w-[140px]">
+                    <CategoryCombobox
                       value={item.category}
-                      onChange={(e) => updateItem(item.id, 'category', e.target.value)}
-                      placeholder="الفئة"
-                      disabled={loading}
+                      onChange={(val) => updateItem(item.id, 'category', val)}
+                      placeholder="الفئة..."
+                      className="text-xs py-1 border-0 focus:ring-2 focus:ring-nazlawy-500"
                     />
                   </td>
                   <td className="p-2 border">

@@ -24,8 +24,48 @@ export async function GET(request: NextRequest) {
       where.product.name = { contains: search, mode: 'insensitive' };
     }
     if (category) {
-      where.product.category = category;
+      const trimmed = category.trim();
+      where.product.category = { contains: trimmed, mode: 'insensitive' };
     }
+  }
+
+  if (lowStock) {
+    const allItems = await prisma.inventory.findMany({
+      where,
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            unit: true,
+            units_per_carton: true,
+            reorder_level: true,
+            last_purchase_price: true,
+          },
+        },
+        store: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { product: { name: 'asc' } },
+    });
+
+    const filtered = allItems.filter(
+      (item) => Number(item.current_stock) <= Number(item.product.reorder_level)
+    );
+
+    const augmented = filtered.map(i => ({
+      ...i,
+      product: {
+        ...i.product,
+        last_purchase_price: profile.can_see_cost ? i.product.last_purchase_price : null,
+      },
+      value: profile.can_see_cost ? Number(i.current_stock) * Number(i.product.last_purchase_price) : null,
+    }));
+
+    return NextResponse.json(
+      { ok: true, data: { items: augmented, total: augmented.length, limit: augmented.length, page: 1 } },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
   }
 
   const [items, total] = await Promise.all([

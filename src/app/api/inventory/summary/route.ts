@@ -51,8 +51,16 @@ export async function GET() {
       return acc;
     }, { total_items: 0, total_qty: 0, total_value: 0 });
 
+    const categoriesRaw = await prisma.products.findMany({
+      where: { is_active: true, category: { not: null } },
+      select: { category: true },
+    });
+    const categories = Array.from(
+      new Set(categoriesRaw.map(c => c.category?.trim()).filter(Boolean) as string[])
+    ).sort((a, b) => a.localeCompare(b, 'ar'));
+
     return NextResponse.json(
-      { ok: true, data: { stores: summary, overall } },
+      { ok: true, data: { stores: summary, overall, categories } },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   } catch (e: any) {

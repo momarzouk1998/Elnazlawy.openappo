@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
             data: {
               name: productName,
               description: item.description || null,
-              category: item.category || null,
+              category: item.category ? String(item.category).trim() : null,
               unit: item.unit || 'piece',
               units_per_carton: unitsPerCarton,
               barcode: item.barcode || null,

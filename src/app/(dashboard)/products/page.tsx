@@ -5,6 +5,7 @@ import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import Pagination from "@/components/Pagination";
+import CategoryCombobox from "@/components/CategoryCombobox";
 
 interface Product {
   id: string;
@@ -344,7 +345,11 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الفئة</label>
-            <input className="input-field" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            <CategoryCombobox
+              value={form.category}
+              onChange={(val) => setForm({ ...form, category: val })}
+              placeholder="اختر أو اكتب فئة..."
+            />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة الأساسية</label>
@@ -458,7 +463,11 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الفئة</label>
-            <input className="input-field" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+            <CategoryCombobox
+              value={form.category}
+              onChange={(val) => setForm({ ...form, category: val })}
+              placeholder="اختر أو اكتب فئة..."
+            />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الوحدة</label>
