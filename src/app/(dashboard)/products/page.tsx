@@ -28,7 +28,17 @@ export default function ProductsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [page, setPage] = useState(1);
   const searchParams = useSearchParams();
-  const { data, loading, refetch } = useApi<{ items: Product[]; total: number; limit: number; page: number }>(
+  const { data, loading, refetch } = useApi<{
+    items: Product[];
+    total: number;
+    limit: number;
+    page: number;
+    stats?: {
+      total_products: number;
+      low_stock_count: number;
+      total_stock_value: number;
+    };
+  }>(
     `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=50&page=${page}`
   );
   const { mutate } = useApiMutation();
@@ -49,9 +59,9 @@ export default function ProductsPage() {
   }, [searchParams]);
 
   const showCost = profile?.can_see_cost;
-  const items = data?.items ?? [];
-  const stockValue = items.reduce((s, p) => s + Number(p.last_purchase_price) * Number(p.total_stock), 0);
-  const lowStock = items.filter(p => Number(p.total_stock) <= p.reorder_level).length;
+  const totalProducts = data?.stats?.total_products ?? data?.total ?? 0;
+  const lowStock = data?.stats?.low_stock_count ?? 0;
+  const stockValue = data?.stats?.total_stock_value ?? 0;
 
   async function deleteProduct(p: Product) {
     if (!confirm(`حذف الصنف "${p.name}"؟\nملاحظة: لو له فواتير تاريخية هيتم إخفاؤه فقط.`)) return;
@@ -69,7 +79,7 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">🏷️ الأصناف</h1>
-          <p className="text-sm text-gray-500 mt-1">{items.length} صنف</p>
+          <p className="text-sm text-gray-500 mt-1">{totalProducts} صنف</p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary">+ إضافة صنف</button>
       </div>
@@ -95,19 +105,19 @@ export default function ProductsPage() {
         </select>
       </div>
 
-      {/* كاردات إجماليات تتحرك مع البحث/الفلتر */}
+      {/* كاردات إجماليات شاملة لكافة الأصناف */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="card p-4">
-          <div className="text-xs text-gray-500">عدد الأصناف</div>
-          <div className="text-2xl font-extrabold text-slate-650">{items.length}</div>
+          <div className="text-xs text-gray-500">إجمالي عدد الأصناف</div>
+          <div className="text-2xl font-extrabold text-slate-650">{totalProducts}</div>
         </div>
         <div className="card p-4">
-          <div className="text-xs text-gray-500">تحت الحد الأدنى</div>
+          <div className="text-xs text-gray-500">تحت الحد الأدنى (الكل)</div>
           <div className="text-2xl font-extrabold text-red-700">{lowStock}</div>
         </div>
         {showCost && (
           <div className="card p-4">
-            <div className="text-xs text-gray-500">قيمة المخزون (تكلفة)</div>
+            <div className="text-xs text-gray-500">إجمالي قيمة المخزون (تكلفة)</div>
             <div className="text-2xl font-extrabold text-nazlawy-600">{formatEGP(stockValue)} ج</div>
           </div>
         )}
@@ -232,10 +242,17 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
           {form.unit !== 'piece' && (
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">
-                سعة العبوة (قطع/كرتونة)
-                <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة/العلبة</span>
+                عدد القطع في الكرتونة
+                <span className="text-[11px] text-blue-600 font-normal mr-1 block">📦 عدد القطع داخل الكرتونة الواحدة (يُستخدم لتحويل العبوات في الشراء)</span>
               </label>
-              <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
+              <input
+                type="number"
+                min={1}
+                className="input-field font-mono"
+                value={form.units_per_carton}
+                onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })}
+                placeholder="مثال: 12"
+              />
             </div>
           )}
           <div>
@@ -309,7 +326,7 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
   async function save() {
     if (!form.name.trim()) { alert('❌ اسم الصنف مطلوب'); return; }
     if (form.last_purchase_price < 0) { alert('❌ سعر الشراء لا يمكن أن يكون سالباً'); return; }
-    if (form.units_per_carton < 1) { alert('❌ سعة الكرتونة يجب أن تكون 1 على الأقل'); return; }
+    if (form.units_per_carton < 1) { alert('❌ عدد القطع في الكرتونة يجب أن يكون 1 على الأقل'); return; }
     const { error } = await mutate('PATCH', `/api/products/${product.id}`, form);
     if (error) { alert('❌ ' + error); return; }
     onSaved();
@@ -339,10 +356,17 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
           {form.unit !== 'piece' && (
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">
-                سعة العبوة (قطع/كرتونة)
-                <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة/العلبة</span>
+                عدد القطع في الكرتونة
+                <span className="text-[11px] text-blue-600 font-normal mr-1 block">📦 عدد القطع داخل الكرتونة الواحدة (يُستخدم لتحويل العبوات في الشراء)</span>
               </label>
-              <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
+              <input
+                type="number"
+                min={1}
+                className="input-field font-mono"
+                value={form.units_per_carton}
+                onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })}
+                placeholder="مثال: 12"
+              />
             </div>
           )}
           <div>

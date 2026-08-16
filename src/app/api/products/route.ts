@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   }
   if (category) where.category = category;
 
-  const [items, total] = await Promise.all([
+  const [items, total, allProductsForStats] = await Promise.all([
     prisma.products.findMany({
       where,
       orderBy: { name: 'asc' },
@@ -61,7 +61,28 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.products.count({ where }),
+    prisma.products.findMany({
+      where,
+      select: {
+        reorder_level: true,
+        last_purchase_price: true,
+        inventory_items: { select: { current_stock: true } },
+      },
+    }),
   ]);
+
+  let totalStockValue = 0;
+  let lowStockCount = 0;
+
+  for (const p of allProductsForStats) {
+    const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
+    if (pStock <= Number(p.reorder_level || 0)) {
+      lowStockCount++;
+    }
+    if (profile.can_see_cost) {
+      totalStockValue += pStock * Number(p.last_purchase_price || 0);
+    }
+  }
 
   // Augment with total stock
   const augmented = items.map(p => ({
@@ -73,7 +94,20 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json(
-    { ok: true, data: { items: augmented, total, limit, page } },
+    {
+      ok: true,
+      data: {
+        items: augmented,
+        total,
+        limit,
+        page,
+        stats: {
+          total_products: total,
+          low_stock_count: lowStockCount,
+          total_stock_value: totalStockValue,
+        },
+      },
+    },
     { headers: { 'Cache-Control': 'private, max-age=15, stale-while-revalidate=60' } }
   );
 }
