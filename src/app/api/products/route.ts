@@ -50,6 +50,54 @@ export async function GET(request: NextRequest) {
   }
   if (category) where.category = category;
 
+  const lowStockOnly = searchParams.get('low_stock') === '1';
+
+  if (lowStockOnly) {
+    // جلب كافة الأصناف وفلترة النواقص وتحت الحد الأدنى
+    const allProducts = await prisma.products.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      include: {
+        inventory_items: { select: { current_stock: true, store_id: true, store: { select: { name: true } } } },
+      },
+    });
+
+    const augmented = allProducts.map(p => ({
+      ...p,
+      total_stock: p.inventory_items.reduce((sum, i) => sum + Number(i.current_stock), 0),
+      last_purchase_price: profile.can_see_cost ? p.last_purchase_price : null,
+      last_purchase_date: profile.can_see_cost ? p.last_purchase_date : null,
+    }));
+
+    const lowStockItems = augmented.filter(p => p.total_stock <= p.reorder_level);
+
+    let totalStockValue = 0;
+    for (const p of allProducts) {
+      const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
+      if (profile.can_see_cost) {
+        totalStockValue += pStock * Number(p.last_purchase_price || 0);
+      }
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        data: {
+          items: lowStockItems,
+          total: lowStockItems.length,
+          limit: lowStockItems.length,
+          page: 1,
+          stats: {
+            total_products: allProducts.length,
+            low_stock_count: lowStockItems.length,
+            total_stock_value: totalStockValue,
+          },
+        },
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    );
+  }
+
   const [items, total, allProductsForStats] = await Promise.all([
     prisma.products.findMany({
       where,

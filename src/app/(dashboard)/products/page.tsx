@@ -20,6 +20,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
+  const [tab, setTab] = useState<'all' | 'low_stock'>('all');
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -28,6 +29,11 @@ export default function ProductsPage() {
   const [profile, setProfile] = useState<any>(null);
   const [page, setPage] = useState(1);
   const searchParams = useSearchParams();
+
+  const apiUrl = tab === 'low_stock'
+    ? `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&low_stock=1`
+    : `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=50&page=${page}`;
+
   const { data, loading, refetch } = useApi<{
     items: Product[];
     total: number;
@@ -38,9 +44,7 @@ export default function ProductsPage() {
       low_stock_count: number;
       total_stock_value: number;
     };
-  }>(
-    `/api/products?search=${encodeURIComponent(debouncedSearch)}&category=${encodeURIComponent(category)}&limit=50&page=${page}`
-  );
+  }>(apiUrl);
   const { mutate } = useApiMutation();
 
   const categoryOptions = Array.from(
@@ -79,9 +83,42 @@ export default function ProductsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-650">🏷️ الأصناف</h1>
-          <p className="text-sm text-gray-500 mt-1">{totalProducts} صنف</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {tab === 'low_stock' ? `⚠️ النواقص وتحت الحد الأدنى (${data?.items.length || 0} صنف)` : `${totalProducts} صنف إجمالي`}
+          </p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary">+ إضافة صنف</button>
+      </div>
+
+      {/* شريط التبويبات */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button
+          onClick={() => { setTab('all'); setPage(1); }}
+          className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px flex items-center gap-2 ${
+            tab === 'all'
+              ? 'border-nazlawy-500 text-nazlawy-600 bg-nazlawy-50/50 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-t-lg'
+          }`}
+        >
+          <span>🏷️ كل الأصناف</span>
+          <span className="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full font-mono">
+            {totalProducts}
+          </span>
+        </button>
+
+        <button
+          onClick={() => { setTab('low_stock'); setPage(1); }}
+          className={`px-4 py-2.5 text-sm font-bold transition-all border-b-2 -mb-px flex items-center gap-2 ${
+            tab === 'low_stock'
+              ? 'border-red-500 text-red-600 bg-red-50/70 rounded-t-lg'
+              : 'border-transparent text-gray-500 hover:text-red-700 hover:bg-red-50/30 rounded-t-lg'
+          }`}
+        >
+          <span>⚠️ نواقص وتحت الحد الأدنى (عرض شامل)</span>
+          <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-mono font-bold animate-pulse">
+            {lowStock}
+          </span>
+        </button>
       </div>
 
       <div className="card flex flex-col gap-3 md:flex-row">
@@ -107,14 +144,25 @@ export default function ProductsPage() {
 
       {/* كاردات إجماليات شاملة لكافة الأصناف */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="card p-4">
+        <div
+          onClick={() => { setTab('all'); setPage(1); }}
+          className={`card p-4 cursor-pointer transition-all hover:scale-[1.01] ${tab === 'all' ? 'ring-2 ring-nazlawy-400 bg-nazlawy-50/30' : ''}`}
+        >
           <div className="text-xs text-gray-500">إجمالي عدد الأصناف</div>
           <div className="text-2xl font-extrabold text-slate-650">{totalProducts}</div>
         </div>
-        <div className="card p-4">
-          <div className="text-xs text-gray-500">تحت الحد الأدنى (الكل)</div>
+
+        <div
+          onClick={() => { setTab('low_stock'); setPage(1); }}
+          className={`card p-4 cursor-pointer transition-all hover:scale-[1.01] ${tab === 'low_stock' ? 'ring-2 ring-red-400 bg-red-50/40' : ''}`}
+        >
+          <div className="text-xs text-gray-500 flex items-center justify-between">
+            <span>تحت الحد الأدنى (الكل)</span>
+            <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded font-bold">عرض التاب</span>
+          </div>
           <div className="text-2xl font-extrabold text-red-700">{lowStock}</div>
         </div>
+
         {showCost && (
           <div className="card p-4">
             <div className="text-xs text-gray-500">إجمالي قيمة المخزون (تكلفة)</div>
@@ -123,50 +171,117 @@ export default function ProductsPage() {
         )}
       </div>
 
+      {tab === 'low_stock' && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-center justify-between flex-wrap gap-2 text-amber-900 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚠️</span>
+            <div>
+              <span className="font-bold">قائمة النواقص والأصناف تحت الحد الأدنى:</span>
+              <p className="text-xs text-amber-800 mt-0.5">يتم عرض كافة الأصناف التي تحتاج إعادة طلب فوراً في قائمة واحدة كاملة بدون تقسيم صفحات.</p>
+            </div>
+          </div>
+          <span className="bg-amber-200 text-amber-900 font-bold px-3 py-1 rounded-lg text-xs font-mono">
+            {data?.items.length || 0} صنف ناقص
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div>
       ) : (
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-100/90 text-slate-700 text-xs font-bold uppercase">
               <tr>
                 <th className="p-3 text-right">الاسم</th>
                 <th className="p-3 text-right">الفئة</th>
                 <th className="p-3 text-right">الوحدة</th>
                 <th className="p-3 text-right">إجمالي المخزون</th>
+                <th className="p-3 text-right">الحد الأدنى</th>
+                {tab === 'low_stock' && <th className="p-3 text-right text-red-700">النقص المطلوب</th>}
                 <th className="p-3 text-right">التوزيع بالمخازن</th>
-                <th className="p-3 text-right">إجراءات</th>
+                <th className="p-3 text-center">إجراءات</th>
               </tr>
             </thead>
             <tbody>
-              {data?.items.map((p) => (
-                <tr key={p.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3 font-semibold">{p.name}</td>
-                  <td className="p-3 text-gray-600">{p.category || '—'}</td>
-                  <td className="p-3">{p.unit === 'piece' ? 'قطعة' : p.unit === 'box' ? 'علبة' : 'كرتونة'}</td>
-                  <td className="p-3 font-bold text-nazlawy-600">{formatQty(p.total_stock)}</td>
-                  <td className="p-3 text-xs text-gray-600">
-                    {p.inventory_items.length > 0
-                      ? p.inventory_items.map(i => `${i.store.name}: ${formatQty(i.current_stock)}`).join(' • ')
-                      : '—'}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-1">
-                      <button onClick={() => setEditProduct(p)} className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200" title="تعديل">✏️</button>
-                      <button onClick={() => deleteProduct(p)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200" title="حذف">🗑️</button>
-                    </div>
+              {data?.items.map((p) => {
+                const isUnderLimit = Number(p.total_stock) <= Number(p.reorder_level);
+                const shortage = Math.max(0, Number(p.reorder_level) - Number(p.total_stock));
+
+                return (
+                  <tr
+                    key={p.id}
+                    className={`border-t transition-colors ${
+                      isUnderLimit ? 'bg-red-50/50 hover:bg-red-100/60' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <td className="p-3 font-bold text-slate-900">{p.name}</td>
+                    <td className="p-3 text-gray-600 text-xs">{p.category || '—'}</td>
+                    <td className="p-3 text-xs">
+                      <span className={`px-2 py-0.5 rounded font-semibold border ${
+                        p.unit === 'carton' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                        p.unit === 'box' ? 'bg-purple-100 text-purple-800 border-purple-200' :
+                        'bg-blue-100 text-blue-800 border-blue-200'
+                      }`}>
+                        {p.unit === 'piece' ? 'قطعة' : p.unit === 'box' ? 'علبة' : 'كرتونة'}
+                      </span>
+                      {p.unit !== 'piece' && (
+                        <span className="text-[11px] text-gray-500 mr-1.5 font-mono">
+                          ({p.units_per_carton} ق/كرتونة)
+                        </span>
+                      )}
+                    </td>
+                    <td className={`p-3 font-mono font-extrabold text-base ${
+                      isUnderLimit ? 'text-red-600' : 'text-nazlawy-600'
+                    }`}>
+                      {formatQty(p.total_stock)}
+                    </td>
+                    <td className="p-3 font-mono text-xs text-gray-500 font-bold">{p.reorder_level}</td>
+                    {tab === 'low_stock' && (
+                      <td className="p-3 font-mono text-xs font-extrabold text-red-600 bg-red-100/40">
+                        {shortage > 0 ? `-${formatQty(shortage)}` : '0 (على الحد)'}
+                      </td>
+                    )}
+                    <td className="p-3 text-xs text-gray-600">
+                      {p.inventory_items.length > 0
+                        ? p.inventory_items.map(i => `${i.store.name}: ${formatQty(i.current_stock)}`).join(' • ')
+                        : '— لا يوجد رصيد في أي مخزن —'}
+                    </td>
+                    <td className="p-3 text-center">
+                      <div className="flex justify-center gap-1.5">
+                        <button
+                          onClick={() => setEditProduct(p)}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold"
+                          title="تعديل بيانات الصنف"
+                        >
+                          ✏️ تعديل
+                        </button>
+                        <button
+                          onClick={() => deleteProduct(p)}
+                          className="text-xs p-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                          title="حذف الصنف"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {data?.items.length === 0 && (
+                <tr>
+                  <td colSpan={tab === 'low_stock' ? 8 : 7} className="p-12 text-center text-gray-400">
+                    {tab === 'low_stock' ? '🎉 ممتاز! لا توجد أي أصناف تحت الحد الأدنى حالياً.' : 'لا توجد أصناف'}
                   </td>
                 </tr>
-              ))}
-              {data?.items.length === 0 && (
-                <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد أصناف</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
 
-      {data && data.total > 0 && (
+      {/* الترقيم يظهر فقط في تاب كل الأصناف */}
+      {tab === 'all' && data && data.total > 0 && (
         <Pagination
           total={data.total}
           page={data.page}
