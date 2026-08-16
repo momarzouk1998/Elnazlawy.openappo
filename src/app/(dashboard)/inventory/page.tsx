@@ -131,17 +131,24 @@ function StockTab({ profile }: { profile: any }) {
   const overall = summaryData?.overall;
   const showCost = profile?.can_see_cost;
 
+  const [localItems, setLocalItems] = useState<InvItem[]>([]);
+
   useEffect(() => {
     const pageParam = searchParams.get('page');
     if (pageParam) setPage(parseInt(pageParam));
   }, [searchParams]);
 
+  useEffect(() => {
+    if (data?.items) {
+      setLocalItems(data.items);
+    }
+  }, [data?.items]);
+
   // استخراج الفئات المتاحة (منظفة وبدون أي تكرار ناتج عن مسافات زائدة)
   const categories = (
     summaryData?.categories ||
-    Array.from(new Set((data?.items || []).map(i => i.product.category?.trim()).filter(Boolean)))
+    Array.from(new Set(localItems.map(i => i.product.category?.trim()).filter(Boolean)))
   ) as string[];
-  const items = data?.items || [];
 
   function refreshAll() {
     refetch();
@@ -204,7 +211,7 @@ function StockTab({ profile }: { profile: any }) {
     setEditingId(null);
   }
 
-  // حفظ التعديل المباشر Inline
+  // حفظ التعديل المباشر Inline فورياً بدون إعادة تحميل الصفحة
   async function saveInlineEdit(item: InvItem) {
     if (!inlineForm.name.trim()) {
       alert('❌ اسم الصنف مطلوب');
@@ -219,9 +226,37 @@ function StockTab({ profile }: { profile: any }) {
       return;
     }
 
+    const updatedQty = Number(inlineForm.current_stock);
+    const updatedPrice = Number(inlineForm.last_purchase_price);
+    const updatedUnitsPerCarton = inlineForm.unit === 'piece' ? 1 : inlineForm.units_per_carton;
+    const updatedValue = updatedQty * updatedPrice;
+    const oldStock = Number(item.current_stock);
+
+    // تحديث فوري محلي في الجدول (Optimistic UI)
+    setLocalItems(prev => prev.map(row => {
+      if (row.id === item.id) {
+        return {
+          ...row,
+          current_stock: updatedQty,
+          reorder_level: Number(inlineForm.reorder_level),
+          value: updatedValue,
+          product: {
+            ...row.product,
+            name: inlineForm.name.trim(),
+            category: inlineForm.category.trim(),
+            unit: inlineForm.unit,
+            units_per_carton: updatedUnitsPerCarton,
+            last_purchase_price: updatedPrice,
+          },
+        };
+      }
+      return row;
+    }));
+    setEditingId(null);
+
     setSaving(true);
     try {
-      // 1. تحديث بيانات الصنف (الاسم، الفئة، الوحدة، سعة الكرتونة، الحد الأدنى، سعر الشراء)
+      // 1. تحديث بيانات الصنف
       const prodRes = await fetch(`/api/products/${item.product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -229,7 +264,7 @@ function StockTab({ profile }: { profile: any }) {
           name: inlineForm.name.trim(),
           category: inlineForm.category.trim(),
           unit: inlineForm.unit,
-          units_per_carton: inlineForm.unit === 'piece' ? 1 : inlineForm.units_per_carton,
+          units_per_carton: updatedUnitsPerCarton,
           reorder_level: inlineForm.reorder_level,
           last_purchase_price: inlineForm.last_purchase_price,
         }),
@@ -240,14 +275,13 @@ function StockTab({ profile }: { profile: any }) {
       }
 
       // 2. لو تم تغيير رصيد المخزن، نسجل حركة تسوية مخزنية
-      const oldStock = Number(item.current_stock);
-      if (Number(inlineForm.current_stock) !== oldStock) {
+      if (updatedQty !== oldStock) {
         const adjustRes = await fetch('/api/inventory/adjust', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             inventory_id: item.id,
-            new_quantity: Number(inlineForm.current_stock),
+            new_quantity: updatedQty,
             reason: `تعديل مباشر في صفحة المخزون (${item.store.name})`,
           }),
         });
@@ -257,10 +291,11 @@ function StockTab({ profile }: { profile: any }) {
         }
       }
 
-      setEditingId(null);
-      refreshAll();
+      // تحديث الإحصائيات في الخلفية بهدوء
+      refetchSummary();
     } catch (err: any) {
       alert('❌ خطأ: ' + err.message);
+      refetch(); // استرجاع البيانات في حالة الخطأ
     } finally {
       setSaving(false);
     }
@@ -270,17 +305,21 @@ function StockTab({ profile }: { profile: any }) {
   async function deleteItem(item: InvItem) {
     if (!confirm(`هل أنت متأكد من حذف الصنف "${item.product?.name}" من المخزن؟`)) return;
     
+    // إخفاء فوري من الجدول
+    setLocalItems(prev => prev.filter(row => row.id !== item.id));
+
     try {
       const response = await fetch(`/api/inventory/${item.id}`, { method: 'DELETE' });
       const json = await response.json();
       if (!response.ok) {
         alert('❌ ' + (json?.error?.message || 'حدث خطأ أثناء الحذف'));
+        refetch();
         return;
       }
-      alert('✅ تم الحذف بنجاح');
-      refreshAll();
+      refetchSummary();
     } catch (err: any) {
       alert('❌ خطأ: ' + err.message);
+      refetch();
     }
   }
 
@@ -402,11 +441,13 @@ function StockTab({ profile }: { profile: any }) {
         </label>
       </div>
 
-      {loading ? <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div> : (
+      {loading && localItems.length === 0 ? (
+        <div className="card text-center py-12 text-gray-500">⏳ جاري التحميل...</div>
+      ) : (
         <>
           {/* Mobile: كاردات مع تعديل Inline */}
           <div className="space-y-2.5 md:hidden">
-            {items.map(i => {
+            {localItems.map(i => {
               const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
               const isEditing = editingId === i.id;
               const unitInfo = getUnitLabel(i.product.unit);
@@ -506,6 +547,7 @@ function StockTab({ profile }: { profile: any }) {
 
                     <div className="flex gap-2 pt-2 border-t">
                       <button
+                        type="button"
                         onClick={() => saveInlineEdit(i)}
                         disabled={saving}
                         className="btn-primary flex-1 text-xs py-2 bg-green-600 hover:bg-green-700 font-bold"
@@ -513,6 +555,7 @@ function StockTab({ profile }: { profile: any }) {
                         {saving ? '⏳ جاري الحفظ...' : '✓ حفظ التعديلات'}
                       </button>
                       <button
+                        type="button"
                         onClick={cancelEdit}
                         disabled={saving}
                         className="btn-secondary text-xs px-4"
@@ -576,12 +619,14 @@ function StockTab({ profile }: { profile: any }) {
                     )}
                     <div className="flex gap-2 pt-1">
                       <button
+                        type="button"
                         onClick={() => startInlineEdit(i)}
                         className="flex-1 text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200 hover:bg-blue-100 flex items-center justify-center gap-1"
                       >
                         <span>✏️</span> تعديل مباشر
                       </button>
                       <button
+                        type="button"
                         onClick={() => deleteItem(i)}
                         className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-bold border border-red-200 hover:bg-red-100"
                         title="حذف من المخزن"
@@ -593,7 +638,7 @@ function StockTab({ profile }: { profile: any }) {
                 </div>
               );
             })}
-            {items.length === 0 && (
+            {localItems.length === 0 && (
               <div className="card text-center py-12 text-gray-400">لا توجد بيانات</div>
             )}
           </div>
@@ -616,7 +661,7 @@ function StockTab({ profile }: { profile: any }) {
                 </tr>
               </thead>
               <tbody>
-                {items.map(i => {
+                {localItems.map(i => {
                   const lowStock = Number(i.current_stock) <= Number(i.reorder_level);
                   const isEditing = editingId === i.id;
                   const unitInfo = getUnitLabel(i.product.unit);
@@ -712,6 +757,7 @@ function StockTab({ profile }: { profile: any }) {
                         <td className="p-2 text-center whitespace-nowrap">
                           <div className="flex justify-center items-center gap-1">
                             <button
+                              type="button"
                               onClick={() => saveInlineEdit(i)}
                               disabled={saving}
                               className="btn-primary text-xs px-2.5 py-1 bg-green-600 hover:bg-green-700 font-bold shadow-sm"
@@ -720,6 +766,7 @@ function StockTab({ profile }: { profile: any }) {
                               {saving ? '⏳' : '✓ حفظ'}
                             </button>
                             <button
+                              type="button"
                               onClick={cancelEdit}
                               disabled={saving}
                               className="btn-secondary text-xs px-2 py-1"
@@ -774,6 +821,7 @@ function StockTab({ profile }: { profile: any }) {
                       <td className="p-3 text-center">
                         <div className="flex justify-center items-center gap-1.5">
                           <button
+                            type="button"
                             onClick={() => startInlineEdit(i)}
                             className="text-xs px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold flex items-center gap-1 transition-all"
                             title="تعديل مباشر في الجدول"
@@ -781,6 +829,7 @@ function StockTab({ profile }: { profile: any }) {
                             <span>✏️</span> تعديل
                           </button>
                           <button
+                            type="button"
                             onClick={() => deleteItem(i)}
                             className="text-xs p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-all"
                             title="حذف من المخزن"
@@ -792,7 +841,7 @@ function StockTab({ profile }: { profile: any }) {
                     </tr>
                   );
                 })}
-                {items.length === 0 && <tr><td colSpan={showCost ? 10 : 8} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
+                {localItems.length === 0 && <tr><td colSpan={showCost ? 10 : 8} className="p-12 text-center text-gray-400">لا توجد بيانات</td></tr>}
               </tbody>
             </table>
           </div>
