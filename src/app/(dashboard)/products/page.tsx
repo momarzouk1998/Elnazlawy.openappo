@@ -218,7 +218,10 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">قطع/كرتونة</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">
+              سعة الكرتونة (قطع/كرتونة)
+              <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة الواحدة</span>
+            </label>
             <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
           </div>
           <div>
@@ -226,7 +229,7 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <input type="number" step="0.01" className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
             <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
           </div>
         </div>
@@ -287,7 +290,10 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">قطع/كرتونة</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">
+              سعة الكرتونة (قطع/كرتونة)
+              <span className="text-[11px] text-gray-400 font-normal mr-1 block">كم قطعة داخل الكرتونة الواحدة</span>
+            </label>
             <input type="number" min={1} className="input-field" value={form.units_per_carton} onChange={(e) => setForm({ ...form, units_per_carton: parseInt(e.target.value) || 1 })} />
           </div>
           <div>
@@ -295,9 +301,14 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
             <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
             <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
           </div>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex justify-between items-center text-slate-700">
+          <span>📦 رصيد المخزون الفعلي الحالي:</span>
+          <span className="font-bold font-mono text-nazlawy-600 text-sm">{formatQty(product.total_stock)} {product.unit === 'piece' ? 'قطعة' : product.unit === 'box' ? 'علبة' : 'كرتونة'}</span>
         </div>
         <div className="flex gap-2 pt-3">
           <button onClick={save} disabled={loading || !form.name.trim()} className="btn-primary flex-1">{loading ? 'جاري الحفظ...' : 'حفظ التعديلات'}</button>
