@@ -189,7 +189,7 @@ export default function POSPage() {
     
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
     const storeIdToSave = primaryStoreId || validItems[0]?.store_id || null;
-    const finalPaid = (finalStatus === 'مكتملة' && invoiceType !== 'عرض سعر') ? Math.min(total, Math.max(0, paidAmount)) : 0;
+    const finalPaid = invoiceType !== 'عرض سعر' ? Math.min(total, Math.max(0, paidAmount)) : 0;
 
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
@@ -317,11 +317,7 @@ export default function POSPage() {
             <select
               className="input-field text-sm"
               value={invoiceType}
-              onChange={(e) => {
-                const newType = e.target.value;
-                setInvoiceType(newType);
-                if (newType === "عرض سعر") setPaidAmount(0);
-              }}
+              onChange={(e) => setInvoiceType(e.target.value)}
             >
               <option value="عادية">عادية</option>
               <option value="ضريبية">ضريبية</option>
@@ -334,11 +330,7 @@ export default function POSPage() {
               <select
                 className="input-field text-sm"
                 value={status}
-                onChange={(e) => {
-                  const newStatus = e.target.value;
-                  setStatus(newStatus);
-                  if (newStatus !== "مكتملة") setPaidAmount(0);
-                }}
+                onChange={(e) => setStatus(e.target.value)}
               >
                 <option value="قيد التنفيذ">قيد التنفيذ (مسودة — قابلة للتعديل)</option>
                 <option value="مكتملة">مكتملة (نهائية — تخصم المخزون)</option>
@@ -429,7 +421,7 @@ export default function POSPage() {
           </div>
 
           {/* 💵 قسم المدفوعات والتحصيل */}
-          {invoiceType !== 'عرض سعر' && status === 'مكتملة' && (
+          {invoiceType !== 'عرض سعر' && (
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-emerald-900 flex items-center gap-1">
@@ -452,6 +444,13 @@ export default function POSPage() {
                   </button>
                 </div>
               </div>
+
+              {status === 'قيد التنفيذ' && (
+                <div className="bg-amber-100 text-amber-900 border border-amber-300 rounded-lg p-2 text-[11px] font-semibold flex items-center gap-1.5">
+                  <span>ℹ️</span>
+                  <span>الفاتورة مسودة (قيد التنفيذ): المبلغ المسجل يُحفظ كمسودة، ولن يُخصم من حساب العميل أو يُودع في الخزينة إلا عند إكمال الفاتورة.</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <div>

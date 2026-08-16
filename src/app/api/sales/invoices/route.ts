@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
           subtotal: invoiceData.subtotal || 0,
           discount: invoiceData.discount || 0,
           total: invoiceTotal,
-          paid_amount: willBeCompleted && !isQuotation ? paid_amount : 0,
+          paid_amount: paid_amount || 0,
           notes: invoiceData.notes || null,
           created_by: profile.id,
           salesperson: profile.full_name,

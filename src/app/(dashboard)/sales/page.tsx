@@ -402,6 +402,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
   const [editing, setEditing] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [discount, setDiscount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState(0);
   const [status, setStatus] = useState("");
   const [invoiceType, setInvoiceType] = useState("");
   const [notes, setNotes] = useState("");
@@ -410,6 +411,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     if (inv && !editing) {
       setItems(inv.items || []);
       setDiscount(Number(inv.discount || 0));
+      setPaidAmount(Number(inv.paid_amount || 0));
       setStatus(inv.status);
       setInvoiceType(inv.invoice_type);
       setNotes(inv.notes || "");
@@ -446,7 +448,11 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     if (validItems.length === 0) { alert("❌ لازم صنف واحد على الأقل"); return; }
     const { error } = await mutate("PATCH", `/api/sales/invoices/${invoiceId}`, {
       items: validItems.map((i: any) => ({ product_id: i.product_id, store_id: i.store_id || inv.store_id, quantity: i.quantity, unit_price: i.unit_price })),
-      discount, status: invoiceType === "عرض سعر" ? "قيد التنفيذ" : status, invoice_type: invoiceType, notes,
+      discount,
+      paid_amount: paidAmount,
+      status: invoiceType === "عرض سعر" ? "قيد التنفيذ" : status,
+      invoice_type: invoiceType,
+      notes,
     });
     if (error) { alert("❌ " + error); return; }
     alert("✅ تم حفظ التعديلات"); setEditing(false); refetch(); onChanged();
@@ -527,7 +533,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
         </div>
 
         {editing && !isCompleted && !isCancelled && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
               <label className="text-xs text-gray-600 block mb-1">النوع</label>
               <select className="input-field text-sm" value={invoiceType} onChange={e => setInvoiceType(e.target.value)}>
@@ -546,7 +552,18 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
               <label className="text-xs text-gray-600 block mb-1">الخصم</label>
               <input type="number" min={0} step={0.01} className="input-field text-sm" value={discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
             </div>
-            <div className="md:col-span-3">
+            {invoiceType !== "عرض سعر" && (
+              <div>
+                <label className="text-xs text-gray-600 block mb-1">المبلغ المدفوع (ج)</label>
+                <input type="number" min={0} step={0.01} className="input-field text-sm font-mono font-bold" value={paidAmount} onChange={e => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))} />
+              </div>
+            )}
+            {status === "قيد التنفيذ" && (
+              <div className="md:col-span-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-2 text-xs font-semibold">
+                ℹ️ الفاتورة قيد التنفيذ (مسودة): المبلغ المدفوع المسجل يُحفظ كمسودة، ولن يُخصم من حساب العميل أو يُودع في الخزينة إلا عند إكمال الفاتورة.
+              </div>
+            )}
+            <div className="md:col-span-4">
               <label className="text-xs text-gray-600 block mb-1">ملاحظات</label>
               <textarea className="input-field text-sm" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
