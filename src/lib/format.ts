@@ -74,3 +74,28 @@ export const EXPENSE_CATEGORIES = [
   'إيجار', 'كهرباء', 'مياه', 'مرتبات', 'عمولة مندوب',
   'سلف', 'صيانة', 'مواصلات', 'تسويق', 'متنوعة', 'أخرى',
 ];
+
+// Arabic normalization helper for resilient search (لمبة/لمبه, الترا/ألترا, etc.)
+export function normalizeArabic(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[\u064B-\u0652\u0670]/g, '') // Remove tashkeel & dagger alif
+    .replace(/[ـ\-_]/g, '') // Remove tatweel & hyphens
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Tokenized search: all query words must match somewhere in target
+export function matchesArabicSearch(target: string | null | undefined, query: string | null | undefined): boolean {
+  if (!query || !query.trim()) return true;
+  if (!target) return false;
+  const normTarget = normalizeArabic(target);
+  const normQuery = normalizeArabic(query);
+  const words = normQuery.split(' ').filter(Boolean);
+  return words.every(w => normTarget.includes(w));
+}

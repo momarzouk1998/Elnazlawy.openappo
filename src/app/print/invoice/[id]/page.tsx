@@ -48,10 +48,12 @@ export default async function InvoicePrintPage({
 
   const isTax = invoice.invoice_type === 'ضريبية';
 
-  // الرصيد السابق = الرصيد الحالي - قيمة الفاتورة
+  // الرصيد السابق = الرصيد الحالي - صافي الزيادة (الإجمالي - المدفوع)
   const hasCustomer = !!invoice.customer;
+  const paid = Number(invoice.paid_amount || 0);
+  const netAdded = Number(invoice.total) - paid;
   const prevBalance = hasCustomer
-    ? Number(invoice.customer!.balance) - Number(invoice.total)
+    ? Number(invoice.customer!.balance) - netAdded
     : null;
   const newBalance = hasCustomer ? Number(invoice.customer!.balance) : null;
 
@@ -273,6 +275,42 @@ export default async function InvoicePrintPage({
             <span>إجمالي الفاتورة:</span>
             <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total))} ج</span>
           </div>
+
+          {paid > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.85rem',
+                color: C.green,
+                fontWeight: 700,
+                marginTop: '3px',
+              }}
+            >
+              <span>المدفوع نقداً:</span>
+              <span style={{ fontFamily: 'monospace' }}>- {formatEGP(paid)} ج</span>
+            </div>
+          )}
+
+          {paid > 0 && Number(invoice.total) - paid > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.9rem',
+                color: C.darkOrange,
+                fontWeight: 800,
+                borderTop: `1px dotted ${C.border}`,
+                paddingTop: '3px',
+                marginTop: '3px',
+              }}
+            >
+              <span>المتبقي من الفاتورة:</span>
+              <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total) - paid)} ج</span>
+            </div>
+          )}
         </div>
 
         {/* Customer Balance Section (Compact) */}
@@ -290,7 +328,7 @@ export default async function InvoicePrintPage({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
+                gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
                 borderBottom: `1px solid ${C.border}`,
                 backgroundColor: '#f1f5f9',
@@ -300,13 +338,14 @@ export default async function InvoicePrintPage({
               }}
             >
               <div>الحساب السابق</div>
-              <div>الفاتورة الحالية</div>
-              <div style={{ color: C.dark }}>الرصيد المتبقي</div>
+              <div>الفاتورة</div>
+              {paid > 0 && <div>المدفوع منها</div>}
+              <div style={{ color: C.dark }}>الرصيد النهائي</div>
             </div>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr',
+                gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
                 padding: '5px 0',
                 fontFamily: 'monospace',
@@ -319,6 +358,11 @@ export default async function InvoicePrintPage({
               <div style={{ color: C.darkOrange }}>
                 +{formatEGP(Number(invoice.total))} ج
               </div>
+              {paid > 0 && (
+                <div style={{ color: C.green }}>
+                  -{formatEGP(paid)} ج
+                </div>
+              )}
               <div style={{ color: newBalance > 0.01 ? C.red : newBalance < -0.01 ? C.green : C.dark, fontSize: '0.88rem' }}>
                 {formatEGP(newBalance)} ج
               </div>

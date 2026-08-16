@@ -4,6 +4,20 @@ import { getCurrentUser } from '@/lib/auth-server';
 import { hashPassword } from '@/lib/db/auth';
 import { Prisma } from '@prisma/client';
 
+function buildArabicVariations(term: string): string[] {
+  const vars = new Set<string>();
+  vars.add(term);
+  vars.add(term.replace(/ة/g, 'ه'));
+  vars.add(term.replace(/ه/g, 'ة'));
+  const alefNorm = term.replace(/[أإآٱ]/g, 'ا');
+  vars.add(alefNorm);
+  vars.add(alefNorm.replace(/ة/g, 'ه'));
+  vars.add(alefNorm.replace(/ه/g, 'ة'));
+  vars.add(alefNorm.replace(/ي/g, 'ى'));
+  vars.add(alefNorm.replace(/ى/g, 'ي'));
+  return Array.from(vars).filter(Boolean);
+}
+
 export async function GET(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED', message: 'غير مسجل' } }, { status: 401 });
@@ -16,7 +30,24 @@ export async function GET(request: NextRequest) {
   const offset = (page - 1) * limit;
 
   const where: Prisma.productsWhereInput = { is_active: true };
-  if (search) where.name = { contains: search, mode: 'insensitive' };
+  if (search) {
+    const tokens = search.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+      const vars = buildArabicVariations(tokens[0]);
+      where.OR = vars.map(v => ({
+        name: { contains: v, mode: 'insensitive' }
+      }));
+    } else if (tokens.length > 1) {
+      where.AND = tokens.map(token => {
+        const vars = buildArabicVariations(token);
+        return {
+          OR: vars.map(v => ({
+            name: { contains: v, mode: 'insensitive' }
+          }))
+        };
+      });
+    }
+  }
   if (category) where.category = category;
 
   const [items, total] = await Promise.all([

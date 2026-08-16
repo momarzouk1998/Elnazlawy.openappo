@@ -169,12 +169,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           });
         }
         
-        // رصيد العميل
+        // رصيد العميل (صافي بعد خصم أي مدفوعات)
         if (existing.customer_id) {
-          await tx.customers.update({
-            where: { id: existing.customer_id },
-            data: { balance: { increment: Number(existing.total) } },
-          });
+          const paid = Number(existing.paid_amount || 0);
+          const netDebt = Number(existing.total) - paid;
+          if (netDebt !== 0) {
+            await tx.customers.update({
+              where: { id: existing.customer_id },
+              data: { balance: { increment: netDebt } },
+            });
+          }
         }
       }
 

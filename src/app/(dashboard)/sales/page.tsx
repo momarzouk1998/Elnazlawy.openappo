@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
-import { formatEGP, formatDate, statusColor } from "@/lib/format";
+import { formatEGP, formatDate, statusColor, matchesArabicSearch } from "@/lib/format";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
@@ -392,7 +392,11 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
 }) {
   const { data: inv, loading, refetch } = useApi<any>(`/api/sales/invoices/${invoiceId}`);
   const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>("/api/stores");
-  const { data: productsData } = useApi<{ items: { id: string; name: string; default_sale_price: number; total_stock: number }[] }>("/api/products?limit=200");
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const { data: searchProductsData, loading: searchingProducts } = useApi<{ items: { id: string; name: string; default_sale_price: number; total_stock: number }[] }>(
+    showProductPicker ? `/api/products?search=${encodeURIComponent(productSearch)}&limit=100` : null
+  );
   const { mutate, loading: saving } = useApiMutation();
 
   const [editing, setEditing] = useState(false);
@@ -401,8 +405,6 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
   const [status, setStatus] = useState("");
   const [invoiceType, setInvoiceType] = useState("");
   const [notes, setNotes] = useState("");
-  const [showProductPicker, setShowProductPicker] = useState(false);
-  const [productSearch, setProductSearch] = useState("");
 
   if (inv && items.length === 0 && !editing) {
     setItems(inv.items || []);
@@ -461,9 +463,9 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     alert("✅ تم الحذف النهائي"); onClose(); onChanged();
   }
 
-  const filteredProducts = (productsData?.items || []).filter((p: any) =>
-    !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())
-  ).slice(0, 30);
+  const filteredProducts = (searchProductsData?.items || []).filter((p: any) =>
+    matchesArabicSearch(p.name, productSearch)
+  );
 
   return (
     <ModalShell onClose={onClose} wide>
@@ -557,6 +559,18 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
           <div className="flex justify-between text-lg font-extrabold border-t pt-2 text-red-700">
             <span>الإجمالي النهائي:</span><span className="font-mono">{formatEGP(Number(inv.total))} ج</span>
           </div>
+          {Number(inv.paid_amount) > 0 && (
+            <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded">
+              <span>المبلغ المدفوع (تحصيل فوري):</span>
+              <span className="font-mono">{formatEGP(Number(inv.paid_amount))} ج</span>
+            </div>
+          )}
+          {Number(inv.paid_amount) > 0 && Number(inv.total) - Number(inv.paid_amount) > 0 && (
+            <div className="flex justify-between text-gray-700 text-xs px-2">
+              <span>المتبقي على العميل:</span>
+              <span className="font-mono font-bold text-red-600">{formatEGP(Number(inv.total) - Number(inv.paid_amount))} ج</span>
+            </div>
+          )}
           {inv.notes && !editing && <div className="text-xs text-gray-600 pt-2 border-t">📝 {inv.notes}</div>}
         </div>
 
@@ -589,13 +603,23 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
               <input autoFocus value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="🔍 ابحث عن صنف..." className="input-field" />
             </div>
             <div className="overflow-y-auto flex-1">
-              {filteredProducts.map((p: any) => (
-                <button key={p.id} onClick={() => addItem(p)} className="w-full text-right p-3 border-b hover:bg-gray-50 flex justify-between items-center">
-                  <div><div className="font-semibold text-sm">{p.name}</div><div className="text-xs text-gray-500">{formatEGP(p.default_sale_price)} ج</div></div>
-                  <span className="text-xs text-gray-400">+ إضافة</span>
-                </button>
-              ))}
-              {filteredProducts.length === 0 && <div className="p-8 text-center text-gray-400">لا توجد نتائج</div>}
+              {searchingProducts ? (
+                <div className="p-8 text-center text-gray-500 font-bold">⏳ جاري البحث...</div>
+              ) : filteredProducts.length > 0 ? (
+                filteredProducts.map((p: any) => (
+                  <button key={p.id} onClick={() => addItem(p)} className="w-full text-right p-3 border-b hover:bg-gray-50 flex justify-between items-center transition-colors">
+                    <div>
+                      <div className="font-semibold text-sm text-gray-800">{p.name}</div>
+                      <div className="text-xs text-gray-500">{formatEGP(p.default_sale_price)} ج</div>
+                    </div>
+                    <span className="text-xs font-bold text-nazlawy-600 bg-nazlawy-50 px-2 py-1 rounded">+ إضافة</span>
+                  </button>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-400 font-semibold">
+                  {productSearch.trim() ? `لا توجد نتائج لـ "${productSearch}"` : 'لا توجد أصناف'}
+                </div>
+              )}
             </div>
             <div className="p-3 border-t"><button onClick={() => setShowProductPicker(false)} className="btn-secondary w-full">إغلاق</button></div>
           </div>

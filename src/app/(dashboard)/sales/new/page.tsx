@@ -23,6 +23,9 @@ export default function POSPage() {
   const [invoiceType, setInvoiceType] = useState("عادية");
   const [status, setStatus] = useState("قيد التنفيذ");
   const [discount, setDiscount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState("نقدي");
+  const [treasuryId, setTreasuryId] = useState("");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
@@ -30,6 +33,13 @@ export default function POSPage() {
   const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
+  const { data: treasuriesData } = useApi<{ items: { id: string; name: string; current_balance: number }[] }>('/api/treasury');
+
+  useEffect(() => {
+    if (treasuriesData?.items && treasuriesData.items.length > 0 && !treasuryId) {
+      setTreasuryId(treasuriesData.items[0].id);
+    }
+  }, [treasuriesData, treasuryId]);
 
   useEffect(() => {
     if (stores?.items && stores.items.length > 0 && !primaryStoreId) {
@@ -179,6 +189,7 @@ export default function POSPage() {
     
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
     const storeIdToSave = primaryStoreId || validItems[0]?.store_id || null;
+    const finalPaid = (finalStatus === 'مكتملة' && invoiceType !== 'عرض سعر') ? Math.min(total, Math.max(0, paidAmount)) : 0;
 
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
@@ -189,12 +200,16 @@ export default function POSPage() {
       subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
       discount,
       total: Math.max(0, validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) - discount),
+      paid_amount: finalPaid,
+      payment_method: paymentMethod,
+      treasury_id: treasuryId || null,
       notes,
     });
     if (error) { alert('❌ ' + error); return; }
     alert(`✅ تم حفظ الفاتورة رقم ${data?.invoice_number}`);
     setCart([]);
     setDiscount(0);
+    setPaidAmount(0);
     setNotes("");
     if (finalStatus === 'مكتملة') {
       router.push(`/print/invoice/${data?.id}`);
@@ -387,15 +402,98 @@ export default function POSPage() {
           )}
         </div>
 
-        <div className="card space-y-2">
-          <div className="flex justify-between text-sm"><span>الإجمالي:</span><span className="font-bold">{formatEGP(subtotal)} ج</span></div>
+        <div className="card space-y-2.5">
+          <div className="flex justify-between text-sm"><span>الإجمالي قبل الخصم:</span><span className="font-bold">{formatEGP(subtotal)} ج</span></div>
           <div className="flex justify-between items-center text-sm">
             <span>الخصم:</span>
             <input type="number" min={0} step={0.01} className="w-24 input-field text-sm p-1" value={discount} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
           </div>
-          <div className="flex justify-between text-lg font-extrabold border-t pt-2">
-            <span>الصافي:</span><span className="text-nazlawy-600">{formatEGP(total)} ج</span>
+          <div className="flex justify-between text-base font-extrabold border-t pt-1.5 text-slate-800">
+            <span>صافي الفاتورة:</span><span className="text-nazlawy-600 font-mono">{formatEGP(total)} ج</span>
           </div>
+
+          {/* 💵 قسم المدفوعات والتحصيل */}
+          {invoiceType !== 'عرض سعر' && (
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-emerald-900 flex items-center gap-1">
+                  💵 التحصيل والمدفوعات
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaidAmount(total)}
+                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-colors"
+                  >
+                    ⚡ سداد كامل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaidAmount(0)}
+                    className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold cursor-pointer transition-colors"
+                  >
+                    آجل (0)
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">المبلغ المدفوع (ج)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={total}
+                    step="any"
+                    value={paidAmount}
+                    onChange={(e) => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="input-field text-xs p-1 font-mono font-bold text-center bg-white border-emerald-300"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">طريقة الدفع</label>
+                  <select
+                    className="input-field text-[11px] p-1 bg-white border-emerald-300"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    disabled={paidAmount <= 0}
+                  >
+                    <option value="نقدي">💵 نقدي</option>
+                    <option value="إنستاباي">📱 إنستاباي</option>
+                    <option value="فودافون كاش">📞 فودافون كاش</option>
+                    <option value="تحويل بنكي">🏦 تحويل بنكي</option>
+                    <option value="شيك">🧾 شيك</option>
+                  </select>
+                </div>
+              </div>
+
+              {paidAmount > 0 && treasuriesData?.items && treasuriesData.items.length > 0 && (
+                <div>
+                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">الخزينة المستلمة</label>
+                  <select
+                    className="input-field text-[11px] p-1 bg-white border-emerald-300"
+                    value={treasuryId}
+                    onChange={(e) => setTreasuryId(e.target.value)}
+                  >
+                    {treasuriesData.items.map(t => (
+                      <option key={t.id} value={t.id}>
+                        🏦 {t.name} (رصيد: {formatEGP(t.current_balance)} ج)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center text-xs pt-1 border-t border-emerald-200">
+                <span className="text-gray-600">المتبقي على العميل:</span>
+                <strong className={`font-mono ${total - paidAmount > 0 ? 'text-red-600 font-bold' : 'text-emerald-700'}`}>
+                  {formatEGP(Math.max(0, total - paidAmount))} ج
+                </strong>
+              </div>
+            </div>
+          )}
+
           <textarea className="input-field text-xs" rows={2} placeholder="ملاحظات (اختياري)" value={notes} onChange={(e) => setNotes(e.target.value)} />
           <button onClick={save} disabled={saving || cart.length === 0} className="btn-primary w-full">
             {saving ? '⏳ جاري الحفظ...' : ((status === 'مكتملة' && invoiceType !== 'عرض سعر') ? `✅ حفظ وطباعة (${formatEGP(total)} ج)` : `💾 حفظ كمسودة (${formatEGP(total)} ج)`)}

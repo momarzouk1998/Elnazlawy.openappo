@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { items: invoiceItems, ...invoiceData } = body;
+    const { items: invoiceItems, paid_amount: rawPaidAmount, payment_method, treasury_id, ...invoiceData } = body;
+    const paid_amount = Math.max(0, parseFloat(rawPaidAmount) || 0);
 
     // === فاليديشن أساسي ===
     if (!Array.isArray(invoiceItems) || invoiceItems.length === 0) {
@@ -75,8 +76,9 @@ export async function POST(request: NextRequest) {
     // تحديد لو هنخصم مخزون (سيتم التحقق داخل الـ transaction مع row lock)
     const isQuotation = invoiceData.invoice_type === 'عرض سعر';
     const willBeCompleted = (invoiceData.status || 'قيد التنفيذ') === 'مكتملة';
+    const invoiceTotal = Math.max(0, Number(invoiceData.total || 0));
 
-    // === Transaction: invoice + items + (stock decrement if completed) + customer balance ===
+    // === Transaction: invoice + items + (stock decrement if completed) + customer balance + payments ===
     const result = await prisma.$transaction(async (tx) => {
       // 1. Get next invoice number
       const maxInv = await tx.sales_invoices.aggregate({ _max: { invoice_number: true } });
@@ -104,7 +106,8 @@ export async function POST(request: NextRequest) {
           status: invoiceData.status || 'قيد التنفيذ',
           subtotal: invoiceData.subtotal || 0,
           discount: invoiceData.discount || 0,
-          total: invoiceData.total || 0,
+          total: invoiceTotal,
+          paid_amount: willBeCompleted && !isQuotation ? paid_amount : 0,
           notes: invoiceData.notes || null,
           created_by: profile.id,
           salesperson: profile.full_name,
@@ -159,7 +162,7 @@ export async function POST(request: NextRequest) {
           
           const available = inv ? Number(inv.current_stock) : 0;
           if (available < Number(item.quantity)) {
-            throw new Error(`الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})`);
+            throw new Error(`الصنف غیر متوفر بالكمية المطلوبة (متاح: ${available})`);
           }
         }
         
@@ -181,18 +184,56 @@ export async function POST(request: NextRequest) {
       }
 
       // 7. Net profit
-      const net_profit = Number(invoiceData.total || 0) - totalCost;
+      const net_profit = invoiceTotal - totalCost;
       await tx.sales_invoices.update({
         where: { id: invoice.id },
         data: { net_profit },
       });
 
-      // 8. Customer balance (فقط لو مكتملة)
+      // 8. Payment and Treasury (فقط لو مكتملة وفيه مبلغ مدفوع)
+      if (willBeCompleted && !isQuotation && paid_amount > 0) {
+        // البحث عن الخزينة المستهدفة
+        let targetTreasuryId = treasury_id;
+        if (!targetTreasuryId) {
+          const firstTreasury = await tx.treasuries.findFirst({
+            where: { is_active: true },
+            orderBy: { created_at: 'asc' },
+          });
+          targetTreasuryId = firstTreasury?.id;
+        }
+
+        if (targetTreasuryId) {
+          // تسجيل سند تحصيل في حساب العميل والخزينة
+          await tx.customer_payments.create({
+            data: {
+              customer_id: invoiceData.customer_id || null,
+              invoice_id: invoice.id,
+              amount: paid_amount,
+              payment_method: payment_method || 'نقدي',
+              treasury_id: targetTreasuryId,
+              payment_date: invoice.invoice_date,
+              notes: `تحصيل نقدي مع فاتورة مبيعات #${invoice_number}`,
+              created_by: profile.id,
+            },
+          });
+
+          // زيادة رصيد الخزينة
+          await tx.treasuries.update({
+            where: { id: targetTreasuryId },
+            data: { current_balance: { increment: paid_amount } },
+          });
+        }
+      }
+
+      // 9. Customer balance (فقط لو مكتملة)
       if (invoiceData.customer_id && willBeCompleted && !isQuotation) {
-        await tx.customers.update({
-          where: { id: invoiceData.customer_id },
-          data: { balance: { increment: invoiceData.total || 0 } },
-        });
+        const netCustomerDebt = invoiceTotal - (paid_amount || 0);
+        if (netCustomerDebt !== 0) {
+          await tx.customers.update({
+            where: { id: invoiceData.customer_id },
+            data: { balance: { increment: netCustomerDebt } },
+          });
+        }
       }
 
       return invoice;
@@ -203,3 +244,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }
 }
+
