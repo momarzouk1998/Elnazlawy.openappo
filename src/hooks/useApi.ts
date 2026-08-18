@@ -131,15 +131,7 @@ export function useApi<T>(path: string | null) {
       const c = getCached<T>(path);
       if (c) {
         setState({ data: c, loading: false, error: null });
-        const cachedTs = sessionCache.get(path)?.ts || 0;
-        const age = Date.now() - cachedTs;
-        // ✅ حتى لو الكاش طازج (< 10s)، نعمل revalidate صامت في الخلفية
-        //    عشان الفواتير الجديدة تظهر بدون refresh يدوي
-        //    (الـ spinner ما بيبقاش ظاهر لأن البيانات موجودة)
-        if (age < SESSION_TTL_MS) {
-          // ✅ لا نعمل early return — نكمّل ونعمل fetch في الخلفية
-          //    بس من غير ما نغير loading state (عشان مفيش spinner)
-        }
+        // ✅ نكمّل الـ fetch في الخلفية بدون spinner (stale-while-revalidate)
       }
     }
     abortRef.current?.abort()
