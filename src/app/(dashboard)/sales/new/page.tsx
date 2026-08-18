@@ -458,7 +458,6 @@ export default function POSPage() {
                   <input
                     type="number"
                     min={0}
-                    max={total}
                     step="any"
                     value={paidAmount}
                     onChange={(e) => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))}
@@ -506,6 +505,11 @@ export default function POSPage() {
                   {formatEGP(Math.max(0, total - paidAmount))} ج
                 </strong>
               </div>
+              {paidAmount > total && total > 0 && (
+                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2 text-[11px] text-emerald-800 font-bold flex items-center gap-1.5">
+                  💰 دفعة مقدمة: {formatEGP(paidAmount - total)} ج — ستُضاف كرصيد دائن في حساب العميل
+                </div>
+              )}
             </div>
           )}
 

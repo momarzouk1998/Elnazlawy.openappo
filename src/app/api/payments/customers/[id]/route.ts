@@ -96,19 +96,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
 
-      // 5. تحديث المبلغ المدفوع على الفاتورة
-      if (existing.invoice_id && amountDiff !== 0) {
-        const invoice = existing.invoice;
-        if (invoice) {
-          const totalInvoice = Number(invoice.total);
-          const currentPaid = Number(invoice.paid_amount || 0);
-          const newPaid = Math.min(totalInvoice, Math.max(0, currentPaid + amountDiff));
-          
-          await tx.sales_invoices.update({
-            where: { id: existing.invoice_id },
-            data: { paid_amount: newPaid },
-          });
-        }
+      // 5. إعادة حساب المبلغ المدفوع على الفاتورة من سندات التحصيل الفعلية
+      if (existing.invoice_id) {
+        const allPaid = await tx.customer_payments.aggregate({
+          where: { invoice_id: existing.invoice_id },
+          _sum: { amount: true },
+        });
+        const invoiceTotal = Number(existing.invoice?.total || 0);
+        const newPaid = Math.min(invoiceTotal, Number(allPaid._sum.amount || 0));
+        await tx.sales_invoices.update({
+          where: { id: existing.invoice_id },
+          data: { paid_amount: newPaid },
+        });
       }
 
       // 6. سجل حركة خزينة جديدة للتعديل
@@ -179,18 +178,20 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
         });
       }
 
-      // 3. تقليل المبلغ المدفوع من الفاتورة
+      // 3. إعادة حساب المبلغ المدفوع على الفاتورة من سندات التحصيل الفعلية (بدلاً من الطرح من الـ snapshot)
       if (payment.invoice_id) {
-        const invoice = payment.invoice;
-        if (invoice) {
-          const currentPaid = Number(invoice.paid_amount || 0);
-          const newPaid = Math.max(0, currentPaid - amount);
-          
-          await tx.sales_invoices.update({
-            where: { id: payment.invoice_id },
-            data: { paid_amount: newPaid },
-          });
-        }
+        const remaining = await tx.customer_payments.aggregate({
+          where: { invoice_id: payment.invoice_id, id: { not: id } },
+          _sum: { amount: true },
+        });
+        const newPaid = Math.min(
+          Number(payment.invoice?.total || 0),
+          Number(remaining._sum.amount || 0)
+        );
+        await tx.sales_invoices.update({
+          where: { id: payment.invoice_id },
+          data: { paid_amount: newPaid },
+        });
       }
 
       // 4. سجل حركة عكسية في الخزينة

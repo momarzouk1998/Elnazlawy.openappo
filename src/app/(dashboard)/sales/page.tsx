@@ -556,6 +556,9 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
               <div>
                 <label className="text-xs text-gray-600 block mb-1">المبلغ المدفوع (ج)</label>
                 <input type="number" min={0} step={0.01} className="input-field text-sm font-mono font-bold" value={paidAmount} onChange={e => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))} />
+                {paidAmount > total && total > 0 && (
+                  <p className="text-xs text-emerald-700 font-bold mt-0.5">💰 دفعة مقدمة: {formatEGP(paidAmount - total)} ج — رصيد دائن للعميل</p>
+                )}
               </div>
             )}
             {status === "قيد التنفيذ" && (

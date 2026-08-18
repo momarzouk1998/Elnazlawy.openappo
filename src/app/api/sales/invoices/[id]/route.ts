@@ -181,7 +181,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // التعامل مع المدفوعات إن وجدت
         const requestedPaid = body.paid_amount !== undefined ? Math.max(0, parseFloat(body.paid_amount) || 0) : finalPaidAmount;
         if (requestedPaid > 0) {
-          finalPaidAmount = Math.min(Number(existing.total), requestedPaid);
+          finalPaidAmount = requestedPaid;
           let targetTreasuryId = body.treasury_id;
           if (!targetTreasuryId) {
             const firstTreasury = await tx.treasuries.findFirst({
@@ -212,13 +212,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
         
-        // رصيد العميل (صافي الزيادة = الإجمالي - المدفوع)
+        // رصيد العميل: balance += (total - paid) — لو paid > total بيصبح سالب = رصيد دائن
         if (existing.customer_id) {
-          const netDebt = Number(existing.total) - finalPaidAmount;
-          if (netDebt !== 0) {
+          const balanceDelta = Number(existing.total) - finalPaidAmount;
+          if (balanceDelta !== 0) {
             await tx.customers.update({
               where: { id: existing.customer_id },
-              data: { balance: { increment: netDebt } },
+              data: { balance: { increment: balanceDelta } },
             });
           }
         }

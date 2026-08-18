@@ -61,8 +61,7 @@ export async function POST(request: NextRequest) {
     // === فاليديشن أساسي ===
     if (!Array.isArray(invoiceItems) || invoiceItems.length === 0) {
       return NextResponse.json({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'الفاتورة يجب أن تحتوي على صنف واحد على الأقل' } }, { status: 400 });
-    }
-    for (const item of invoiceItems) {
+    }    for (const item of invoiceItems) {
       const qty = Number(item.quantity);
       const price = Number(item.unit_price);
       if (!Number.isFinite(qty) || qty <= 0) {
@@ -77,6 +76,9 @@ export async function POST(request: NextRequest) {
     const isQuotation = invoiceData.invoice_type === 'عرض سعر';
     const willBeCompleted = (invoiceData.status || 'قيد التنفيذ') === 'مكتملة';
     const invoiceTotal = Math.max(0, Number(invoiceData.total || 0));
+
+    // التحقق من أن المدفوع لا يتجاوز الإجمالي — ملاحظة: الدفع الزيادة مسموح به وينعكس كرصيد دائن على العميل
+    // لا يوجد منع هنا، السلوك الصحيح هو: netCustomerDebt = total - paid_amount (قد يكون سالب = دائن)
 
     // === Transaction: invoice + items + (stock decrement if completed) + customer balance + payments ===
     const result = await prisma.$transaction(async (tx) => {
@@ -227,11 +229,12 @@ export async function POST(request: NextRequest) {
 
       // 9. Customer balance (فقط لو مكتملة)
       if (invoiceData.customer_id && willBeCompleted && !isQuotation) {
-        const netCustomerDebt = invoiceTotal - (paid_amount || 0);
-        if (netCustomerDebt !== 0) {
+        // balance += (total - paid): لو paid > total يصبح سالب = رصيد دائن على العميل (دفعة مقدمة)
+        const balanceDelta = invoiceTotal - paid_amount;
+        if (balanceDelta !== 0) {
           await tx.customers.update({
             where: { id: invoiceData.customer_id },
-            data: { balance: { increment: netCustomerDebt } },
+            data: { balance: { increment: balanceDelta } },
           });
         }
       }

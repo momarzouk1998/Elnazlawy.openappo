@@ -49,7 +49,14 @@ export default async function InvoicePrintPage({
   const isTax = invoice.invoice_type === 'ضريبية';
   const isCancelled = invoice.status === 'ملغاة';
   const hasCustomer = !!invoice.customer;
-  const paid = Number(invoice.paid_amount || 0);
+
+  // المبلغ المدفوع الفعلي = مجموع كل سندات التحصيل المرتبطة بهذه الفاتورة
+  // هذا أدق من invoice.paid_amount الذي يُحدَّث تدريجياً وقد يختلف في حالات الحذف/التعديل
+  const invoicePayments = await prisma.customer_payments.findMany({
+    where: { invoice_id: invoice.id },
+    select: { amount: true },
+  });
+  const paid = invoicePayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   let prevBalance: number | null = null;
   let newBalance: number | null = null;
@@ -61,7 +68,8 @@ export default async function InvoicePrintPage({
     // 1. الرصيد الافتتاحي
     const opening = Number(invoice.customer.opening_balance || 0);
 
-    // 2. الفواتير السابقة المكتملة التي سبقت هذه الفاتورة
+    // 2. إجمالي الفواتير المكتملة السابقة (قبل هذه الفاتورة)
+    //    نستخدم total فقط (بدون خصم paid_amount) لأن المدفوعات ستُحسب منفصلاً في الخطوة 3
     const priorInvoices = await prisma.sales_invoices.findMany({
       where: {
         customer_id: custId,
@@ -69,19 +77,20 @@ export default async function InvoicePrintPage({
         created_at: { lt: invDate },
         id: { not: invoice.id },
       },
-      select: { total: true, paid_amount: true },
+      select: { total: true },
     });
-    const priorInvoicesNet = priorInvoices.reduce(
-      (sum, inv) => sum + (Number(inv.total) - Number(inv.paid_amount || 0)),
+    const priorInvoicesTotal = priorInvoices.reduce(
+      (sum, inv) => sum + Number(inv.total),
       0
     );
 
-    // 3. المدفوعات المستقلة السابقة (التي ليست مرتبطة بفاتورة)
+    // 3. جميع المدفوعات السابقة (سواء كانت مرتبطة بفاتورة أم لا)
+    //    هذا هو التصحيح الرئيسي: كانت الكود القديم يستثني المدفوعات المرتبطة بفواتير
+    //    مما كان يؤدي إلى عدم ظهور المبلغ المدفوع في الطباعة
     const priorPayments = await prisma.customer_payments.findMany({
       where: {
         customer_id: custId,
         created_at: { lt: invDate },
-        invoice_id: null,
       },
       select: { amount: true },
     });
@@ -90,7 +99,7 @@ export default async function InvoicePrintPage({
       0
     );
 
-    // 4. المرتجعات السابقة
+    // 4. المرتجعات السابقة (تُقلل الرصيد لأنها تُعيد المبلغ للعميل)
     const priorReturns = await prisma.customer_return_invoices.findMany({
       where: {
         customer_id: custId,
@@ -104,11 +113,15 @@ export default async function InvoicePrintPage({
       0
     );
 
-    prevBalance = opening + priorInvoicesNet - priorPaymentsTotal - priorReturnsTotal;
+    // المعادلة الصحيحة: رصيد قبل الفاتورة = افتتاحي + فواتير سابقة − مدفوعات سابقة − مرتجعات سابقة
+    prevBalance = opening + priorInvoicesTotal - priorPaymentsTotal - priorReturnsTotal;
 
     if (isCancelled) {
+      // الفاتورة الملغاة لا تؤثر على الرصيد
       newBalance = prevBalance;
     } else {
+      // الرصيد الجديد = رصيد قبل + (إجمالي الفاتورة − المدفوع منها)
+      // paid = invoice.paid_amount وهو محدَّث دائماً بجميع المدفوعات المرتبطة بهذه الفاتورة
       newBalance = prevBalance + (Number(invoice.total) - paid);
     }
   }
@@ -365,6 +378,25 @@ export default async function InvoicePrintPage({
             >
               <span>المتبقي من الفاتورة:</span>
               <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total) - paid)} ج</span>
+            </div>
+          )}
+
+          {paid > 0 && paid > Number(invoice.total) && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontSize: '0.85rem',
+                color: C.green,
+                fontWeight: 800,
+                borderTop: `1px dotted ${C.border}`,
+                paddingTop: '3px',
+                marginTop: '3px',
+              }}
+            >
+              <span>💰 دفعة مقدمة (رصيد دائن):</span>
+              <span style={{ fontFamily: 'monospace' }}>{formatEGP(paid - Number(invoice.total))} ج</span>
             </div>
           )}
         </div>
