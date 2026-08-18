@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
           total: stores.length
         }
       },
-      { headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' } }
+      { headers: { 'Cache-Control': 'no-store' } }
     );
 
   } catch (e: any) {

@@ -11,7 +11,7 @@ export async function GET() {
   });
   return NextResponse.json(
     { ok: true, data: { items: treasuries, total: treasuries.length } },
-    { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=60' } }
+    { headers: { 'Cache-Control': 'no-store' } }
   );
 }
 

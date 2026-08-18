@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
           limit
         }
       },
-      { headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' } }
+      { headers: { 'Cache-Control': 'no-store' } }
     );
 
   } catch (e: any) {
