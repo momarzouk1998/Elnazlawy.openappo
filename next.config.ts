@@ -13,10 +13,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     serverActions: { bodySizeLimit: "10mb" },
-    // staleTimes: التحكم في كم من الوقت تظل البيانات "طازجة" قبل الحاجة لإعادة التحقق
+    // staleTimes: تصفير الكاش في المتصفح لضمان تحميل البيانات الطازجة دائماً
     staleTimes: {
-      dynamic: 30,        // الصفحات الديناميكية: 30 ثانية
-      static: 300,        // الصفحات الثابتة: 5 دقائق
+      dynamic: 0,
+      static: 0,
     },
   },
   async headers() {
