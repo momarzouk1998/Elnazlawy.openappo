@@ -96,6 +96,12 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
     const pageParam = searchParams.get('page');
     if (pageParam) setPage(parseInt(pageParam));
   }, [searchParams]);
+
+  // ✅ refetch فوري لما اليوزر يرجع لصفحة المبيعات (من الطباعة مثلاً)
+  useEffect(() => {
+    refetch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { data: customers } = useApi<{ items: { id: string; name: string; phone: string | null; balance: number }[] }>(
     "/api/customers?limit=200"
   );

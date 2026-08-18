@@ -280,6 +280,8 @@ export default function POSPage() {
     setDiscount(0);
     setPaidAmount(0);
     setNotes("");
+    // ✅ router.refresh() يمسح Next.js Router Cache عشان /sales يجيب بيانات جديدة
+    router.refresh();
     if (finalStatus === 'مكتملة') {
       router.push(`/print/invoice/${data?.id}`);
     } else {
