@@ -51,12 +51,13 @@ export default async function InvoicePrintPage({
   const hasCustomer = !!invoice.customer;
 
   // المبلغ المدفوع الفعلي = مجموع كل سندات التحصيل المرتبطة بهذه الفاتورة
-  // هذا أدق من invoice.paid_amount الذي يُحدَّث تدريجياً وقد يختلف في حالات الحذف/التعديل
+  // أو المبلغ المسجل على الفاتورة كـ fallback
   const invoicePayments = await prisma.customer_payments.findMany({
     where: { invoice_id: invoice.id },
     select: { amount: true },
   });
-  const paid = invoicePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const paymentsSum = invoicePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const paid = invoicePayments.length > 0 ? paymentsSum : Number(invoice.paid_amount || 0);
 
   let prevBalance: number | null = null;
   let newBalance: number | null = null;
@@ -68,13 +69,12 @@ export default async function InvoicePrintPage({
     // 1. الرصيد الافتتاحي
     const opening = Number(invoice.customer.opening_balance || 0);
 
-    // 2. إجمالي الفواتير المكتملة السابقة (قبل هذه الفاتورة)
-    //    نستخدم total فقط (بدون خصم paid_amount) لأن المدفوعات ستُحسب منفصلاً في الخطوة 3
+    // 2. إجمالي الفواتير المكتملة السابقة (قبل أو مساوية لتاريخ هذه الفاتورة مع استثنائها)
     const priorInvoices = await prisma.sales_invoices.findMany({
       where: {
         customer_id: custId,
         status: 'مكتملة',
-        created_at: { lt: invDate },
+        created_at: { lte: invDate },
         id: { not: invoice.id },
       },
       select: { total: true },
@@ -84,13 +84,15 @@ export default async function InvoicePrintPage({
       0
     );
 
-    // 3. جميع المدفوعات السابقة (سواء كانت مرتبطة بفاتورة أم لا)
-    //    هذا هو التصحيح الرئيسي: كانت الكود القديم يستثني المدفوعات المرتبطة بفواتير
-    //    مما كان يؤدي إلى عدم ظهور المبلغ المدفوع في الطباعة
+    // 3. جميع المدفوعات السابقة (التي سبقت أو ساوت تاريخ الفاتورة ولا تخصها)
     const priorPayments = await prisma.customer_payments.findMany({
       where: {
         customer_id: custId,
-        created_at: { lt: invDate },
+        created_at: { lte: invDate },
+        OR: [
+          { invoice_id: null },
+          { invoice_id: { not: invoice.id } },
+        ],
       },
       select: { amount: true },
     });
@@ -99,12 +101,12 @@ export default async function InvoicePrintPage({
       0
     );
 
-    // 4. المرتجعات السابقة (تُقلل الرصيد لأنها تُعيد المبلغ للعميل)
+    // 4. المرتجعات السابقة
     const priorReturns = await prisma.customer_return_invoices.findMany({
       where: {
         customer_id: custId,
         status: { not: 'ملغاة' },
-        created_at: { lt: invDate },
+        created_at: { lte: invDate },
       },
       select: { total_amount: true },
     });
@@ -113,15 +115,12 @@ export default async function InvoicePrintPage({
       0
     );
 
-    // المعادلة الصحيحة: رصيد قبل الفاتورة = افتتاحي + فواتير سابقة − مدفوعات سابقة − مرتجعات سابقة
+    // المعادلة التاريخية الصحيحة
     prevBalance = opening + priorInvoicesTotal - priorPaymentsTotal - priorReturnsTotal;
 
     if (isCancelled) {
-      // الفاتورة الملغاة لا تؤثر على الرصيد
       newBalance = prevBalance;
     } else {
-      // الرصيد الجديد = رصيد قبل + (إجمالي الفاتورة − المدفوع منها)
-      // paid = invoice.paid_amount وهو محدَّث دائماً بجميع المدفوعات المرتبطة بهذه الفاتورة
       newBalance = prevBalance + (Number(invoice.total) - paid);
     }
   }

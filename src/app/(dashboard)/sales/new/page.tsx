@@ -12,7 +12,18 @@ interface Product {
 }
 interface Customer { id: string; name: string; balance: number; phone?: string | null; }
 interface Store { id: string; name: string; type: string; }
-interface CartItem { product_id: string; product_name: string; store_id: string; store_name: string; quantity: number; unit_price: number; available: number; product_ref: Product; }
+// ✅ نخزن الكمية والسعر كـ string في الـ cart عشان نسمع كل keystroke لحظياً
+//    ونعمل parse فقط للحسابات (subtotal/total). هذا يمنع مشكلة "بيكتب 2 فيطلع 0"
+interface CartItem {
+  product_id: string;
+  product_name: string;
+  store_id: string;
+  store_name: string;
+  quantity: string;       // ← string (لحظي)
+  unit_price: string;     // ← string (لحظي)
+  available: number;
+  product_ref: Product;
+}
 
 export default function POSPage() {
   const router = useRouter();
@@ -21,7 +32,7 @@ export default function POSPage() {
   const [customerId, setCustomerId] = useState("");
   const [primaryStoreId, setPrimaryStoreId] = useState("");
   const [invoiceType, setInvoiceType] = useState("عادية");
-  const [status, setStatus] = useState("قيد التنفيذ");
+  const [status, setStatus] = useState("مكتملة");
   const [discount, setDiscount] = useState(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState("نقدي");
@@ -47,7 +58,7 @@ export default function POSPage() {
     }
   }, [stores, primaryStoreId]);
 
-  const subtotal = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+  const subtotal = cart.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0), 0);
   const total = Math.max(0, subtotal - discount);
 
   // المخزون المتاح للصنف في المخزن المختار
@@ -70,26 +81,33 @@ export default function POSPage() {
 
   function addToCart(p: Product) {
     if (!stores?.items?.length) {
-      alert('❌ لا يوجد مخازن معرفة في السيستم');
+      alert('� لا يوجد مخازن معرفة في السيستم');
       return;
     }
-    
+
     // المخزن المستهدف: المخزن المختار بالرئيسي، أو أول مخزن
     const chosenStoreId = primaryStoreId || stores.items[0].id;
     const targetStore = stores.items.find(s => s.id === chosenStoreId) || stores.items[0];
     const available = stockFor(p, targetStore.id);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === targetStore.id);
-    
+
     if (existing) {
-      setCart(cart.map(c => (c.product_id === p.id && c.store_id === targetStore.id) ? { ...c, quantity: c.quantity + 1 } : c));
+      // ✅ functional updater يضمن قراءة آخر قيمة (حتى لو المستخدم ضغط بسرعة)
+      setCart(prev => prev.map(c => {
+        if (c.product_id === p.id && c.store_id === targetStore.id) {
+          const currentQty = parseFloat(c.quantity) || 0;
+          return { ...c, quantity: String(currentQty + 1) };
+        }
+        return c;
+      }));
     } else {
       setCart([...cart, {
         product_id: p.id,
         product_name: p.name,
         store_id: targetStore.id,
         store_name: targetStore.name,
-        quantity: 1,
-        unit_price: Number(p.default_sale_price || 0),
+        quantity: '1',
+        unit_price: String(p.default_sale_price || 0),
         available,
         product_ref: p
       }]);
@@ -97,46 +115,83 @@ export default function POSPage() {
   }
 
   function updateItem(idx: number, field: keyof CartItem, value: any) {
-    let shouldOpenSplit = false;
-    let splitParams: any = null;
+    // ✅ نخلي الـ quantity/unit_price كـ string في الـ state
+    //    عشان المستخدم لو كتب "2.5" ما يطلعش 0 في النص
+    //    (لو حوّلنا لـ number، parseFloat("") = NaN → 0)
+    setCart(prev => {
+      let shouldOpenSplit = false;
+      let splitParams: any = null;
+      const newCart = prev.map((c, i) => {
+        if (i !== idx) return c;
+        let next = { ...c, [field]: value };
 
-    setCart(cart.map((c, i) => {
-      if (i !== idx) return c;
-      let next = { ...c, [field]: value };
-      if (field === 'quantity') {
-        const q = Number(value);
-        if (!Number.isFinite(q) || q <= 0) {
-          next.quantity = 0;
-        } else if (q > c.available) {
-          if (c.product_ref.total_stock >= q) {
-            shouldOpenSplit = true;
-            splitParams = { product: c.product_ref, requestedQty: q, currentStoreId: c.store_id, itemIdx: i };
-            return c; // لا تحدث الكمية هنا، سنحدثها في الـ Modal
-          } else {
-            alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح في جميع المخازن (${c.product_ref.total_stock})`);
-            next.quantity = c.available;
+        if (field === 'quantity') {
+          // ✅ string → number فقط للفحص، نخلي string في الـ state
+          const qStr = String(value);
+          const q = parseFloat(qStr);
+
+          // خانة فاضية أو نص غير صالح = خلّيها فاضية (مش 0)
+          if (qStr === '' || qStr === '.' || qStr === '-') {
+            next.quantity = qStr;
+            return next;
           }
-        } else {
-          next.quantity = q;
+          if (!Number.isFinite(q) || q < 0) {
+            next.quantity = '0';
+            return next;
+          }
+          if (q === 0) {
+            next.quantity = '0';
+            return next;
+          }
+          if (q > c.available) {
+            if (c.product_ref.total_stock >= q) {
+              shouldOpenSplit = true;
+              splitParams = { product: c.product_ref, requestedQty: q, currentStoreId: c.store_id, itemIdx: i };
+              // نخلي الكمية زي ما هي لحد ما الـ modal يتعمل
+              next.quantity = qStr;
+              return next;
+            } else {
+              alert(`⚠️ الكمية المطلوبة تتجاوز إجمالي المخزون المتاح في جميع المخازن (${c.product_ref.total_stock})`);
+              next.quantity = String(c.available);
+              return next;
+            }
+          }
+          // ✅ خلي string كما هو (مثلاً "2" أو "2.5")
+          next.quantity = qStr;
         }
-      }
-      if (field === 'unit_price') {
-        const v = Number(value);
-        next.unit_price = Number.isFinite(v) && v >= 0 ? v : 0;
-      }
-      return next;
-    }));
 
-    if (shouldOpenSplit && splitParams) {
-      setSmartSplitItem(splitParams);
-    }
+        if (field === 'unit_price') {
+          const vStr = String(value);
+          const v = parseFloat(vStr);
+          // نفس المنطق: فاضي = فاضي، مش 0
+          if (vStr === '' || vStr === '.' || vStr === '-') {
+            next.unit_price = vStr;
+            return next;
+          }
+          if (!Number.isFinite(v) || v < 0) {
+            next.unit_price = '0';
+            return next;
+          }
+          next.unit_price = vStr;
+        }
+        return next;
+      });
+      // ✅ حفظ splitParams في state خارج الـ updater بعد ما الـ setCart يخلص
+      if (shouldOpenSplit && splitParams) {
+        setTimeout(() => setSmartSplitItem(splitParams), 0);
+      }
+      return newCart;
+    });
   }
 
   function adjustQty(idx: number, delta: number) {
-    const c = cart[idx];
-    if (!c) return;
-    const newQty = c.quantity + delta;
-    updateItem(idx, 'quantity', newQty);
+    // ✅ functional updater يضمن قراءة آخر قيمة (حتى لو ضغط + بسرعة)
+    setCart(prev => prev.map((c, i) => {
+      if (i !== idx) return c;
+      const currentQty = parseFloat(c.quantity) || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      return { ...c, quantity: String(newQty) };
+    }));
   }
 
   function removeItem(idx: number) {
@@ -163,8 +218,8 @@ export default function POSPage() {
           product_name: product.name,
           store_id: split.store_id,
           store_name: split.store_name,
-          quantity: split.quantity,
-          unit_price: Number(product.default_sale_price),
+          quantity: String(split.quantity),
+          unit_price: String(Number(product.default_sale_price)),
           available: stockFor(product, split.store_id),
           product_ref: product
         });
@@ -177,7 +232,12 @@ export default function POSPage() {
 
   async function save() {
     if (cart.length === 0) { alert('السلة فارغة'); return; }
-    const validItems = cart.filter(c => c.quantity > 0 && c.unit_price >= 0);
+    // ✅ parse الـ strings لـ numbers عند الحفظ فقط
+    const validItems = cart.filter(c => {
+      const q = parseFloat(c.quantity);
+      const p = parseFloat(c.unit_price);
+      return Number.isFinite(q) && q > 0 && Number.isFinite(p) && p >= 0;
+    });
     const invalid = cart.length - validItems.length;
     if (invalid > 0) {
       if (!confirm(`يوجد ${invalid} صنف بكمية أو سعر صفر وسيتم استبعاده. متابعة؟`)) return;
@@ -186,20 +246,29 @@ export default function POSPage() {
     if (status !== 'قيد التنفيذ' && invoiceType !== 'عرض سعر' && !customerId) {
       if (!confirm('لم تختر عميل. هل تريد المتابعة؟')) return;
     }
-    
+
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
     const storeIdToSave = primaryStoreId || validItems[0]?.store_id || null;
-    const finalPaid = invoiceType !== 'عرض سعر' ? Math.min(total, Math.max(0, paidAmount)) : 0;
+    const finalPaid = invoiceType !== 'عرض سعر' ? Math.max(0, Number(paidAmount) || 0) : 0;
+
+    // ✅ parse الكمية والسعر لـ number قبل الإرسال للسيرفر
+    const validItemsForApi = validItems.map(c => ({
+      product_id: c.product_id,
+      store_id: c.store_id,
+      quantity: parseFloat(c.quantity),
+      unit_price: parseFloat(c.unit_price),
+    }));
+    const subtotalCalc = validItemsForApi.reduce((s, i) => s + i.quantity * i.unit_price, 0);
 
     const { error, data } = await mutate<{ id: string; invoice_number: number }>('POST', '/api/sales/invoices', {
       customer_id: customerId || null,
       store_id: storeIdToSave,
       invoice_type: invoiceType,
       status: finalStatus,
-      items: validItems.map(c => ({ product_id: c.product_id, store_id: c.store_id, quantity: c.quantity, unit_price: c.unit_price })),
-      subtotal: validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0),
+      items: validItemsForApi,
+      subtotal: subtotalCalc,
       discount,
-      total: Math.max(0, validItems.reduce((s, i) => s + i.quantity * i.unit_price, 0) - discount),
+      total: Math.max(0, subtotalCalc - discount),
       paid_amount: finalPaid,
       payment_method: paymentMethod,
       treasury_id: treasuryId || null,
@@ -361,18 +430,18 @@ export default function POSPage() {
                           step="any"
                           className="input-field text-xs p-1 text-center w-full"
                           value={c.quantity}
-                          onChange={(e) => updateItem(i, 'quantity', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateItem(i, 'quantity', e.target.value)}
                         />
                         <button type="button" onClick={() => adjustQty(i, 1)} className="w-6 h-7 shrink-0 rounded bg-gray-200 text-gray-700 font-bold hover:bg-gray-300">+</button>
                       </div>
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">سعر الوحدة (ج)</label>
-                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_price} onChange={(e) => updateItem(i, 'unit_price', parseFloat(e.target.value) || 0)} />
+                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_price} onChange={(e) => updateItem(i, 'unit_price', e.target.value)} />
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">الإجمالي</label>
-                      <div className="text-xs font-bold text-nazlawy-600 text-center p-1 bg-white rounded border">{formatEGP(c.quantity * c.unit_price)}</div>
+                      <div className="text-xs font-bold text-nazlawy-600 text-center p-1 bg-white rounded border">{formatEGP((parseFloat(c.quantity) || 0) * (parseFloat(c.unit_price) || 0))}</div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-1 items-center">
@@ -384,7 +453,8 @@ export default function POSPage() {
                         onChange={(e) => {
                           const newStoreId = e.target.value;
                           const newStore = stores?.items.find(s => s.id === newStoreId);
-                          setCart(cart.map((row, idx) => idx === i ? { ...row, store_id: newStoreId, store_name: newStore?.name || '', available: stockFor(c.product_ref, newStoreId) } : row));
+                          // ✅ functional updater
+                          setCart(prev => prev.map((row, idx) => idx === i ? { ...row, store_id: newStoreId, store_name: newStore?.name || '', available: stockFor(c.product_ref, newStoreId) } : row));
                         }}
                       >
                         {(stores?.items || []).map(s => {
@@ -399,7 +469,7 @@ export default function POSPage() {
                     </div>
                     <div className="text-[10px] text-gray-500">
                       متاح هنا: {formatQty(c.available)}
-                      {c.quantity > c.available && c.available > 0 && (
+                      {parseFloat(c.quantity) > c.available && c.available > 0 && (
                         <span className="text-red-600 font-bold block">⚠️ الكمية أكبر من المتاح</span>
                       )}
                     </div>

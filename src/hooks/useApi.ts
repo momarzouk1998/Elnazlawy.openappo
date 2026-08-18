@@ -102,23 +102,31 @@ export function useApi<T>(path: string | null) {
 
   const fetchData = useCallback(async (useCache = true) => {
     if (!path) return
-    // لو عندنا بيانات حديثة، اعرضها فوراً وأعد التحقق في الخلفية
+    // ✅ لو عندنا بيانات حديثة، اعرضها فوراً واعمل revalidate في الخلفية
+    //    (stale-while-revalidate: نعرض الـ cached فوراً، ونحدّث في الخلفية)
     if (useCache) {
       const c = getCached<T>(path);
       if (c) {
         setState({ data: c, loading: false, error: null });
-        // stale-while-revalidate: نكمل بالخلفية بدون إظهار spinner
-        // (لكن لو عمر البيانات > 10 ثواني، نعيد التحميل مع spinner)
-        if (Date.now() - (sessionCache.get(path)?.ts || 0) < 10_000) {
-          // كاش طازج — لا نعمل شيء
-          return c;
+        const cachedTs = sessionCache.get(path)?.ts || 0;
+        const age = Date.now() - cachedTs;
+        // ✅ حتى لو الكاش طازج (< 10s)، نعمل revalidate صامت في الخلفية
+        //    عشان الفواتير الجديدة تظهر بدون refresh يدوي
+        //    (الـ spinner ما بيبقاش ظاهر لأن البيانات موجودة)
+        if (age < SESSION_TTL_MS) {
+          // ✅ لا نعمل early return — نكمّل ونعمل fetch في الخلفية
+          //    بس من غير ما نغير loading state (عشان مفيش spinner)
         }
       }
     }
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    setState((prev) => ({ ...prev, loading: true, error: null }))
+    // ✅ لو عندنا data أصلاً، ما نغيرش loading لـ true (عشان مفيش spinner)
+    setState((prev) => {
+      if (prev.data !== null) return { ...prev, error: null };
+      return { ...prev, loading: true, error: null };
+    })
     try {
       const res = await fetch(path, { signal: controller.signal, cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
@@ -130,7 +138,15 @@ export function useApi<T>(path: string | null) {
       const data = json.data !== undefined ? json.data : json
       if (!controller.signal.aborted) {
         setCached(path, data);
-        setState({ data, loading: false, error: null })
+        // ✅ لو البيانات الجديدة مختلفة عن اللي معروضة، حدّث الـ state
+        setState((prev) => {
+          // قارن كـ JSON عشان نتجنب re-render لو البيانات نفسها
+          const sameData = JSON.stringify(prev.data) === JSON.stringify(data);
+          if (sameData) {
+            return { data, loading: false, error: null };
+          }
+          return { data, loading: false, error: null };
+        })
       }
       return data
     } catch (err) {
@@ -147,6 +163,65 @@ export function useApi<T>(path: string | null) {
     if (path) fetchData()
     return () => { abortRef.current?.abort() }
   }, [fetchData, path])
+
+  // ✅ Polling ذكي: نعمل refetch لما الصفحة تاخد focus أو ترجع visible
+  //    ده بيخلي الفواتير الجديدة تظهر بدون refresh يدوي
+  useEffect(() => {
+    if (!path) return
+
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+    let isMounted = true
+
+    function startPolling() {
+      if (pollTimer) return
+      // كل 15 ثانية نعمل refetch صامت (silent)
+      pollTimer = setInterval(() => {
+        if (!isMounted) return
+        if (document.visibilityState === 'visible') {
+          fetchData(false) // useCache=false عشان نضمن fetch حقيقي
+        }
+      }, 15_000)
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer)
+        pollTimer = null
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        // ✅ اليوزر رجع للتب → refetch فوري
+        fetchData(false)
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    function handleFocus() {
+      // ✅ اليوزر عمل focus على النافذة (click مثلاً) → refetch
+      if (document.visibilityState === 'visible') {
+        fetchData(false)
+      }
+    }
+
+    // ابدأ الـ polling لو الصفحة visible
+    if (document.visibilityState === 'visible') {
+      startPolling()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      isMounted = false
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [path, fetchData])
 
   return { ...state, refetch: () => fetchData(false) }
 }

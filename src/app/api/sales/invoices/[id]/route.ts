@@ -147,7 +147,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       if (!wasCompleted && isCompletedNow && !isQuotation) {
         // من مسودة/قيد التنفيذ → مكتملة: تحقق من المخزون وخصمه + تسجيل المدفوعات ورصيد العميل
-        
+
         // التحقق من المخزون أولاً (قبل أي تعديل)
         for (const it of existing.items) {
           if (!it.store_id) continue;
@@ -159,18 +159,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             throw new Error(`المخزون غير كافٍ للصنف "${it.product_name}" (متاح: ${available})`);
           }
         }
-        
+
         // خصم المخزون
         for (const it of existing.items) {
           if (!it.store_id) continue;
-          
+
           // Upsert inventory
           const inv = await tx.inventory.upsert({
             where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
             update: {},
             create: { product_id: it.product_id, store_id: it.store_id, current_stock: 0 },
           });
-          
+
           // Decrement stock
           await tx.inventory.update({
             where: { id: inv.id },
@@ -211,7 +211,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             });
           }
         }
-        
+
         // رصيد العميل: balance += (total - paid) — لو paid > total بيصبح سالب = رصيد دائن
         if (existing.customer_id) {
           const balanceDelta = Number(existing.total) - finalPaidAmount;
@@ -222,6 +222,167 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             });
           }
         }
+      }
+
+      // 2b) ✅ إصلاح: تعديل paid_amount على فاتورة مكتملة (Bug #1)
+      //    لما المستخدم يفتح مودال فاتورة مكتملة ويغير المبلغ المدفوع
+      if (wasCompleted && isCompletedNow && !isQuotation && body.paid_amount !== undefined) {
+        const newPaid = Math.max(0, parseFloat(body.paid_amount) || 0);
+        const oldPaid = Number(existing.paid_amount || 0);
+        const diff = newPaid - oldPaid;
+
+        if (diff !== 0) {
+          // إيجاد آخر سند تحصيل مرتبط بالفاتورة لتعديله (لو واحد بس)
+          // أو إنشاء واحد جديد لو فيه أكتر من واحد
+          const existingPayments = await tx.customer_payments.findMany({
+            where: { invoice_id: id },
+            orderBy: { created_at: 'asc' },
+          });
+
+          const totalExistingPaid = existingPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+          if (existingPayments.length === 1) {
+            // حالة بسيطة: سند واحد بس، نعدّل المبلغ فيه
+            const payment = existingPayments[0];
+            await tx.customer_payments.update({
+              where: { id: payment.id },
+              data: {
+                amount: newPaid,
+                payment_method: body.payment_method || payment.payment_method,
+                treasury_id: body.treasury_id || payment.treasury_id,
+                notes: `${payment.notes || ''} [مُعدَّل]`,
+              },
+            });
+
+            // تعديل رصيد الخزينة (لو نفس الخزينة)
+            if (payment.treasury_id && !body.treasury_id) {
+              await tx.treasuries.update({
+                where: { id: payment.treasury_id },
+                data: { current_balance: { increment: diff } },
+              });
+            } else if (body.treasury_id && body.treasury_id !== payment.treasury_id) {
+              // نقل بين خزائن
+              if (payment.treasury_id) {
+                await tx.treasuries.update({
+                  where: { id: payment.treasury_id },
+                  data: { current_balance: { decrement: oldPaid } },
+                });
+              }
+              await tx.treasuries.update({
+                where: { id: body.treasury_id },
+                data: { current_balance: { increment: newPaid } },
+              });
+            }
+          } else if (existingPayments.length === 0 && newPaid > 0) {
+            // ما كانش فيه سندات أصلاً، ننشئ واحد جديد
+            let targetTreasuryId = body.treasury_id;
+            if (!targetTreasuryId) {
+              const firstTreasury = await tx.treasuries.findFirst({
+                where: { is_active: true },
+                orderBy: { created_at: 'asc' },
+              });
+              targetTreasuryId = firstTreasury?.id;
+            }
+            if (targetTreasuryId) {
+              await tx.customer_payments.create({
+                data: {
+                  customer_id: existing.customer_id || null,
+                  invoice_id: id,
+                  amount: newPaid,
+                  payment_method: body.payment_method || 'نقدي',
+                  treasury_id: targetTreasuryId,
+                  payment_date: existing.invoice_date,
+                  notes: `تحصيل مُضاف لتعديل فاتورة #${existing.invoice_number}`,
+                  created_by: profile.id,
+                },
+              });
+              await tx.treasuries.update({
+                where: { id: targetTreasuryId },
+                data: { current_balance: { increment: newPaid } },
+              });
+            }
+          } else {
+            // عدة سندات: نضيف سند بالفرق فقط (آمن للحالات المعقدة)
+            if (diff > 0) {
+              // دفعة جديدة (زيادة التحصيل)
+              let targetTreasuryId = body.treasury_id;
+              if (!targetTreasuryId) {
+                targetTreasuryId = existingPayments[existingPayments.length - 1].treasury_id;
+              }
+              if (targetTreasuryId) {
+                await tx.customer_payments.create({
+                  data: {
+                    customer_id: existing.customer_id || null,
+                    invoice_id: id,
+                    amount: diff,
+                    payment_method: body.payment_method || 'نقدي',
+                    treasury_id: targetTreasuryId,
+                    payment_date: existing.invoice_date,
+                    notes: `دفعة إضافية على فاتورة #${existing.invoice_number}`,
+                    created_by: profile.id,
+                  },
+                });
+                await tx.treasuries.update({
+                  where: { id: targetTreasuryId },
+                  data: { current_balance: { increment: diff } },
+                });
+              }
+            } else if (diff < 0) {
+              // تخفيض التحصيل: لازم نخصم من الخزينة بدون حذف السندات
+              // (الحالة المعقدة — نخصم من آخر سند)
+              let remaining = Math.abs(diff);
+              for (let i = existingPayments.length - 1; i >= 0 && remaining > 0; i--) {
+                const p = existingPayments[i];
+                const pAmt = Number(p.amount);
+                if (pAmt <= remaining) {
+                  await tx.customer_payments.delete({ where: { id: p.id } });
+                  if (p.treasury_id) {
+                    await tx.treasuries.update({
+                      where: { id: p.treasury_id },
+                      data: { current_balance: { decrement: pAmt } },
+                    });
+                  }
+                  remaining -= pAmt;
+                } else {
+                  await tx.customer_payments.update({
+                    where: { id: p.id },
+                    data: { amount: pAmt - remaining },
+                  });
+                  if (p.treasury_id) {
+                    await tx.treasuries.update({
+                      where: { id: p.treasury_id },
+                      data: { current_balance: { decrement: remaining } },
+                    });
+                  }
+                  remaining = 0;
+                }
+              }
+            }
+          }
+
+          // ✅ تعديل رصيد العميل بالعلاقة العكسية:
+          //    زيادة التحصيل = تقليل رصيد العميل (مش زيادة)
+          //    نقص التحصيل = زيادة رصيد العميل (مش نقصان)
+          if (existing.customer_id) {
+            await tx.customers.update({
+              where: { id: existing.customer_id },
+              data: { balance: { decrement: diff } },
+            });
+          }
+
+          finalPaidAmount = newPaid;
+        }
+      }
+
+      // 2c) ✅ ضمان الاتساق: إعادة حساب paid_amount من مجموع customer_payments الفعلي
+      //    (Bug #4 — كان ممكن paid_amount على الفاتورة يختلف عن مجموع السندات)
+      if (isCompletedNow && !isQuotation) {
+        const allPayments = await tx.customer_payments.aggregate({
+          where: { invoice_id: id },
+          _sum: { amount: true },
+        });
+        const sumPaid = Number(allPayments._sum.amount || 0);
+        finalPaidAmount = Math.min(Number(existing.total), sumPaid);
       }
 
       // 3) تحديث الحالة/النوع/الملاحظات/المدفوع
