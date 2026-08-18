@@ -78,12 +78,12 @@ export default async function InvoicePrintPage({
       const invDate = invoice.created_at || invoice.invoice_date;
       const opening = Number(invoice.customer.opening_balance || 0);
 
+      // استخدام الترتيب التسلسلي برقم الفاتورة لمنع أي تداخل زمني
       const priorInvoices = await prisma.sales_invoices.findMany({
         where: {
           customer_id: custId,
           status: 'مكتملة',
-          created_at: { lte: invDate },
-          id: { not: invoice.id },
+          invoice_number: { lt: invoice.invoice_number },
         },
         select: { total: true },
       });
@@ -95,10 +95,13 @@ export default async function InvoicePrintPage({
       const priorPayments = await prisma.customer_payments.findMany({
         where: {
           customer_id: custId,
-          created_at: { lte: invDate },
           OR: [
-            { invoice_id: null },
-            { invoice_id: { not: invoice.id } },
+            { invoice_id: null, created_at: { lt: invDate } },
+            {
+              invoice: {
+                invoice_number: { lt: invoice.invoice_number },
+              },
+            },
           ],
         },
         select: { amount: true },

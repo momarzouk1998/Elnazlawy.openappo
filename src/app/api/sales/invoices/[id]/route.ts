@@ -59,6 +59,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      let snapshotPrevBalance: number | null | undefined = undefined;
+      let snapshotNewBalance: number | null | undefined = undefined;
+
       // 1) تحديث البنود لو الحالة لم تكن مكتملة
       if (!wasCompleted && Array.isArray(body.items)) {
         const newItems = body.items as any[];
@@ -212,19 +215,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
 
-        // رصيد العميل: balance += (total - paid) — لو paid > total بيصبح سالب = رصيد دائن
+        // رصيد العميل: balance += (total - paid) — وحفظ الـ snapshot
         if (existing.customer_id) {
-          const balanceDelta = Number(existing.total) - finalPaidAmount;
-          if (balanceDelta !== 0) {
-            await tx.customers.update({
-              where: { id: existing.customer_id },
-              data: { balance: { increment: balanceDelta } },
-            });
+          const cust = await tx.customers.findUnique({
+            where: { id: existing.customer_id },
+            select: { balance: true },
+          });
+          if (cust) {
+            snapshotPrevBalance = Number(cust.balance);
+            const balanceDelta = Number(existing.total) - finalPaidAmount;
+            snapshotNewBalance = snapshotPrevBalance + balanceDelta;
+            if (balanceDelta !== 0) {
+              await tx.customers.update({
+                where: { id: existing.customer_id },
+                data: { balance: { increment: balanceDelta } },
+              });
+            }
           }
         }
       }
 
-      // 2b) ✅ إصلاح: تعديل paid_amount على فاتورة مكتملة (Bug #1)
+      // 2b) ✅ إصلاح: تعديل paid_amount على فاتورة مكتملة
       //    لما المستخدم يفتح مودال فاتورة مكتملة ويغير المبلغ المدفوع
       if (wasCompleted && isCompletedNow && !isQuotation && body.paid_amount !== undefined) {
         const newPaid = Math.max(0, parseFloat(body.paid_amount) || 0);
@@ -232,6 +243,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const diff = newPaid - oldPaid;
 
         if (diff !== 0) {
+          if (existing.customer_prev_balance !== null) {
+            snapshotNewBalance = Number(existing.customer_prev_balance) + (Number(existing.total) - newPaid);
+          }
           // إيجاد آخر سند تحصيل مرتبط بالفاتورة لتعديله (لو واحد بس)
           // أو إنشاء واحد جديد لو فيه أكتر من واحد
           const existingPayments = await tx.customer_payments.findMany({
@@ -384,13 +398,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         finalPaidAmount = sumPaid > 0 ? sumPaid : finalPaidAmount;
       }
 
-      // 3) تحديث الحالة/النوع/الملاحظات/المدفوع
+      // 3) تحديث الحالة/النوع/الملاحظات/المدفوع والرصيد الثابت
       const updated = await tx.sales_invoices.update({
         where: { id },
         data: {
           status: newStatus,
           invoice_type: body.invoice_type ?? existing.invoice_type,
           paid_amount: isCompletedNow && !isQuotation ? finalPaidAmount : 0,
+          customer_prev_balance: snapshotPrevBalance !== undefined ? snapshotPrevBalance : existing.customer_prev_balance,
+          customer_new_balance: snapshotNewBalance !== undefined ? snapshotNewBalance : existing.customer_new_balance,
           notes: body.notes ?? existing.notes,
           updated_at: new Date(),
         },
