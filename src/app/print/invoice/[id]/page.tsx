@@ -63,65 +63,71 @@ export default async function InvoicePrintPage({
   let newBalance: number | null = null;
 
   if (hasCustomer && invoice.customer) {
-    const custId = invoice.customer.id;
-    const invDate = invoice.created_at || invoice.invoice_date;
-
-    // 1. الرصيد الافتتاحي
-    const opening = Number(invoice.customer.opening_balance || 0);
-
-    // 2. إجمالي الفواتير المكتملة السابقة (قبل أو مساوية لتاريخ هذه الفاتورة مع استثنائها)
-    const priorInvoices = await prisma.sales_invoices.findMany({
-      where: {
-        customer_id: custId,
-        status: 'مكتملة',
-        created_at: { lte: invDate },
-        id: { not: invoice.id },
-      },
-      select: { total: true },
-    });
-    const priorInvoicesTotal = priorInvoices.reduce(
-      (sum, inv) => sum + Number(inv.total),
-      0
-    );
-
-    // 3. جميع المدفوعات السابقة (التي سبقت أو ساوت تاريخ الفاتورة ولا تخصها)
-    const priorPayments = await prisma.customer_payments.findMany({
-      where: {
-        customer_id: custId,
-        created_at: { lte: invDate },
-        OR: [
-          { invoice_id: null },
-          { invoice_id: { not: invoice.id } },
-        ],
-      },
-      select: { amount: true },
-    });
-    const priorPaymentsTotal = priorPayments.reduce(
-      (sum, p) => sum + Number(p.amount),
-      0
-    );
-
-    // 4. المرتجعات السابقة
-    const priorReturns = await prisma.customer_return_invoices.findMany({
-      where: {
-        customer_id: custId,
-        status: { not: 'ملغاة' },
-        created_at: { lte: invDate },
-      },
-      select: { total_amount: true },
-    });
-    const priorReturnsTotal = priorReturns.reduce(
-      (sum, r) => sum + Number(r.total_amount),
-      0
-    );
-
-    // المعادلة التاريخية الصحيحة
-    prevBalance = opening + priorInvoicesTotal - priorPaymentsTotal - priorReturnsTotal;
-
-    if (isCancelled) {
-      newBalance = prevBalance;
+    // 1. الأولوية الأولى: قراءة الرصيد الثابت المحفوظ لحظة إنشاء الفاتورة (Snapshot)
+    if (
+      invoice.customer_prev_balance !== null &&
+      invoice.customer_prev_balance !== undefined &&
+      invoice.customer_new_balance !== null &&
+      invoice.customer_new_balance !== undefined
+    ) {
+      prevBalance = Number(invoice.customer_prev_balance);
+      newBalance = isCancelled ? prevBalance : Number(invoice.customer_new_balance);
     } else {
-      newBalance = prevBalance + (Number(invoice.total) - paid);
+      // 2. Fallback للفواتير القديمة
+      const custId = invoice.customer.id;
+      const invDate = invoice.created_at || invoice.invoice_date;
+      const opening = Number(invoice.customer.opening_balance || 0);
+
+      const priorInvoices = await prisma.sales_invoices.findMany({
+        where: {
+          customer_id: custId,
+          status: 'مكتملة',
+          created_at: { lte: invDate },
+          id: { not: invoice.id },
+        },
+        select: { total: true },
+      });
+      const priorInvoicesTotal = priorInvoices.reduce(
+        (sum, inv) => sum + Number(inv.total),
+        0
+      );
+
+      const priorPayments = await prisma.customer_payments.findMany({
+        where: {
+          customer_id: custId,
+          created_at: { lte: invDate },
+          OR: [
+            { invoice_id: null },
+            { invoice_id: { not: invoice.id } },
+          ],
+        },
+        select: { amount: true },
+      });
+      const priorPaymentsTotal = priorPayments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0
+      );
+
+      const priorReturns = await prisma.customer_return_invoices.findMany({
+        where: {
+          customer_id: custId,
+          status: { not: 'ملغاة' },
+          created_at: { lte: invDate },
+        },
+        select: { total_amount: true },
+      });
+      const priorReturnsTotal = priorReturns.reduce(
+        (sum, r) => sum + Number(r.total_amount),
+        0
+      );
+
+      prevBalance = opening + priorInvoicesTotal - priorPaymentsTotal - priorReturnsTotal;
+
+      if (isCancelled) {
+        newBalance = prevBalance;
+      } else {
+        newBalance = prevBalance + (Number(invoice.total) - paid);
+      }
     }
   }
 

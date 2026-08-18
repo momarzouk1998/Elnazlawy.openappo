@@ -375,14 +375,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
 
       // 2c) ✅ ضمان الاتساق: إعادة حساب paid_amount من مجموع customer_payments الفعلي
-      //    (Bug #4 — كان ممكن paid_amount على الفاتورة يختلف عن مجموع السندات)
       if (isCompletedNow && !isQuotation) {
         const allPayments = await tx.customer_payments.aggregate({
           where: { invoice_id: id },
           _sum: { amount: true },
         });
         const sumPaid = Number(allPayments._sum.amount || 0);
-        finalPaidAmount = Math.min(Number(existing.total), sumPaid);
+        finalPaidAmount = sumPaid > 0 ? sumPaid : finalPaidAmount;
       }
 
       // 3) تحديث الحالة/النوع/الملاحظات/المدفوع

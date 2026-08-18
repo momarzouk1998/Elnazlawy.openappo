@@ -86,17 +86,34 @@ export async function POST(request: NextRequest) {
       const maxInv = await tx.sales_invoices.aggregate({ _max: { invoice_number: true } });
       const invoice_number = (maxInv._max.invoice_number || 0) + 1;
 
-      // 2. Per-customer sequence
+      // 2. Per-customer sequence & balance snapshot
       let customer_seq = 0;
+      let prevCustomerBalance: number | null = null;
+      let newCustomerBalance: number | null = null;
+
       if (invoiceData.customer_id) {
-        const maxCust = await tx.sales_invoices.aggregate({
-          where: { customer_id: invoiceData.customer_id },
-          _max: { customer_seq: true },
-        });
+        const [maxCust, cust] = await Promise.all([
+          tx.sales_invoices.aggregate({
+            where: { customer_id: invoiceData.customer_id },
+            _max: { customer_seq: true },
+          }),
+          tx.customers.findUnique({
+            where: { id: invoiceData.customer_id },
+            select: { balance: true },
+          }),
+        ]);
         customer_seq = (maxCust._max.customer_seq || 0) + 1;
+        if (cust) {
+          prevCustomerBalance = Number(cust.balance);
+          if (willBeCompleted && !isQuotation) {
+            newCustomerBalance = prevCustomerBalance + (invoiceTotal - paid_amount);
+          } else {
+            newCustomerBalance = prevCustomerBalance;
+          }
+        }
       }
 
-      // 3. Create invoice
+      // 3. Create invoice with balance snapshot
       const invoice = await tx.sales_invoices.create({
         data: {
           invoice_number,
@@ -110,6 +127,8 @@ export async function POST(request: NextRequest) {
           discount: invoiceData.discount || 0,
           total: invoiceTotal,
           paid_amount: paid_amount || 0,
+          customer_prev_balance: prevCustomerBalance,
+          customer_new_balance: newCustomerBalance,
           notes: invoiceData.notes || null,
           created_by: profile.id,
           salesperson: profile.full_name,

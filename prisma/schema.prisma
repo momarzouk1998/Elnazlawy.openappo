@@ -229,6 +229,9 @@ model sales_invoices {
   net_profit          Decimal   @default(0) @db.Decimal(15, 2)
   // Amount paid (from customer_payments)
   paid_amount         Decimal   @default(0) @db.Decimal(15, 2)
+  // Snapshot of customer balance before and after this invoice
+  customer_prev_balance Decimal? @db.Decimal(15, 2)
+  customer_new_balance  Decimal? @db.Decimal(15, 2)
   // Void reason (if cancelled via reverse-void)
   void_reason         String?   @db.Text
   // Original invoice (for reverse void)
