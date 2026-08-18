@@ -8,14 +8,37 @@ interface ApiState<T> {
   error: string | null
 }
 
-// مخزن مؤقت في الذاكرة (داخل الجلسة) — يمنع fetch مكرر لنفس الرابط في نفس التحميل
+// مخزن مؤقت في الذاكرة (داخل الجلسة)
 const sessionCache = new Map<string, { data: any; ts: number }>();
-const SESSION_TTL_MS = 30_000; // 30 ثانية — كافٍ لمنع الازدواج
+
+// البيانات التحويلية (فواتير، مدفوعات، مخزون) تنتهي بعد 5 ثوانٍ فقط
+// البيانات الثابتة (عملاء، موردين، أصناف) تنتهي بعد 30 ثانية
+const TRANSACTIONAL_TTL_MS = 5_000;
+const STATIC_TTL_MS = 30_000;
+
+const TRANSACTIONAL_PREFIXES = [
+  '/api/sales/invoices',
+  '/api/purchases/invoices',
+  '/api/transfers',
+  '/api/payments',
+  '/api/treasury',
+  '/api/expenses',
+  '/api/dashboard',
+  '/api/inventory',
+  '/api/checks',
+];
+
+function getTtl(path: string): number {
+  const pathOnly = path.split('?')[0];
+  return TRANSACTIONAL_PREFIXES.some(p => pathOnly.startsWith(p))
+    ? TRANSACTIONAL_TTL_MS
+    : STATIC_TTL_MS;
+}
 
 function getCached<T>(path: string): T | null {
   const c = sessionCache.get(path);
   if (!c) return null;
-  if (Date.now() - c.ts > SESSION_TTL_MS) {
+  if (Date.now() - c.ts > getTtl(path)) {
     sessionCache.delete(path);
     return null;
   }
