@@ -128,17 +128,34 @@ export default function CustomerDetailPage() {
   );
 }
 
-// حذف العميل (آمن)
+// حذف العميل (مع تأكيد الحذف الشامل للفواتير والمدفوعات إن وجدت)
 async function deleteCustomer(customer: CustomerDetail, router: ReturnType<typeof useRouter>) {
-  if (!confirm(`حذف العميل "${customer.name}"؟`)) return;
+  if (!confirm(`هل تريد بالتأكيد حذف العميل "${customer.name}"؟`)) return;
+
   const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE', cache: 'no-store' });
   const json = await res.json();
+
   if (!res.ok) {
+    if (json?.requires_confirmation) {
+      const confirmed = confirm(json.message);
+      if (confirmed) {
+        const forceRes = await fetch(`/api/customers/${customer.id}?force=true`, { method: 'DELETE', cache: 'no-store' });
+        const forceJson = await forceRes.json();
+        if (!forceRes.ok) {
+          alert('❌ ' + (forceJson?.error?.message || 'تعذّر حذف العميل'));
+          return;
+        }
+        alert('✅ تم حذف العميل وجميع معاملاته وفواتيره بنجاح');
+        router.push('/customers');
+        return;
+      }
+      return;
+    }
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
     return;
   }
-  alert('✅ تم حذف العميل');
-  // router.push لوحده كافي — الكاش بيتمسح تلقائياً من useApiMutation
+
+  alert('✅ تم حذف العميل بنجاح');
   router.push('/customers');
 }
 

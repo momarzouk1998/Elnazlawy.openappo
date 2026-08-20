@@ -86,8 +86,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// DELETE /api/customers/[id] — حذف آمن (soft-delete) أو منع لو فيه حركات
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// DELETE /api/customers/[id] — حذف عميل (يدعم الحذف الشامل مع الفواتير والمدفوعات بعد التأكيد)
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
   if (profile.role === 'rep') {
@@ -96,21 +96,72 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
   try {
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const force = searchParams.get('force') === 'true';
 
-    // فحص: يوجد فواتير أو مدفوعات؟ — منع الحذف نهائياً
-    const [salesCount, paymentsCount] = await Promise.all([
+    // فحص الحركات المرتبطة بالعميل
+    const [salesCount, paymentsCount, returnsCount] = await Promise.all([
       prisma.sales_invoices.count({ where: { customer_id: id } }),
       prisma.customer_payments.count({ where: { customer_id: id } }),
+      prisma.customer_return_invoices.count({ where: { customer_id: id } }),
     ]);
 
-    if (salesCount > 0 || paymentsCount > 0) {
+    const totalTransactions = salesCount + paymentsCount + returnsCount;
+
+    // إذا وُجدت حركات ولم يتم إرسال تأكيد force=true
+    if (totalTransactions > 0 && !force) {
       return NextResponse.json(
-        { ok: false, error: { code: 'HAS_TRANSACTIONS', message: `لا يمكن حذف العميل: له ${salesCount} فاتورة و ${paymentsCount} مدفوعة. احذف الحركات أولاً.` } },
-        { status: 400 }
+        {
+          ok: false,
+          requires_confirmation: true,
+          counts: { sales: salesCount, payments: paymentsCount, returns: returnsCount },
+          message: `⚠️ تنبيه هام: هذا العميل مرتبط بـ:\n• ${salesCount} فاتورة مبيعات\n• ${paymentsCount} سند تحصيل\n• ${returnsCount} فاتورة مرتجع\n\nهل أنت متأكد من حذف العميل وكافة فواتيره ومدفوعاته وسجلاته بالكامل؟ لن يمكن التراجع عن هذه العملية.`,
+        },
+        { status: 409 }
       );
     }
 
-    await prisma.customers.delete({ where: { id } });
+    // تنفيذ الحذف الشامل داخل Transaction متكاملة
+    await prisma.$transaction(async (tx) => {
+      // 1. حذف بنود فواتير المبيعات ثم فواتير المبيعات
+      const customerInvoices = await tx.sales_invoices.findMany({
+        where: { customer_id: id },
+        select: { id: true },
+      });
+      const invoiceIds = customerInvoices.map((inv) => inv.id);
+      if (invoiceIds.length > 0) {
+        await tx.sales_invoice_items.deleteMany({
+          where: { invoice_id: { in: invoiceIds } },
+        });
+        await tx.sales_invoices.deleteMany({
+          where: { customer_id: id },
+        });
+      }
+
+      // 2. حذف مدفوعات العميل
+      await tx.customer_payments.deleteMany({
+        where: { customer_id: id },
+      });
+
+      // 3. حذف بنود المرتجعات ثم فواتير المرتجعات
+      const customerReturns = await tx.customer_return_invoices.findMany({
+        where: { customer_id: id },
+        select: { id: true },
+      });
+      const returnIds = customerReturns.map((r) => r.id);
+      if (returnIds.length > 0) {
+        await tx.customer_return_invoice_items.deleteMany({
+          where: { return_id: { in: returnIds } },
+        });
+        await tx.customer_return_invoices.deleteMany({
+          where: { customer_id: id },
+        });
+      }
+
+      // 4. حذف العميل نهائياً
+      await tx.customers.delete({ where: { id } });
+    });
+
     return NextResponse.json({ ok: true, data: { deleted: true } });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
