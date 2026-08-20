@@ -496,8 +496,20 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
         <button onClick={onClose} className="text-2xl text-gray-400 hover:text-red-500">✕</button>
       </div>
       <div className="p-4 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <Info label="العميل" value={inv.customer?.name || "—"} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm items-center">
+          <div className="flex items-center justify-between col-span-2 md:col-span-1 bg-slate-50 p-2 rounded-lg border border-slate-200">
+            <Info label="العميل" value={inv.customer?.name || "—"} />
+            {inv.customer_id && (
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 py-1.5 rounded-md shadow flex items-center gap-1 active:scale-95 transition-all"
+                title="تسجيل تحصيل جديد لهذا العميل"
+              >
+                <span>💳 تحصيل</span>
+              </button>
+            )}
+          </div>
           <Info label="المخزن" value={inv.store?.name || "—"} />
           <Info label="المنشئ" value={inv.creator?.full_name || "—"} />
         </div>

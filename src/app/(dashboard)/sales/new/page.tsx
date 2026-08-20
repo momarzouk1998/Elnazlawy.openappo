@@ -362,20 +362,7 @@ export default function POSPage() {
             </select>
           </div>
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-gray-600 block">العميل</label>
-              {customerId && (
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(true)}
-                  className="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
-                  title="تسجيل سند تحصيل منفصل لهذا العميل وإيداعه في الخزينة"
-                >
-                  <span>💳</span>
-                  <span>تسجيل تحصيل</span>
-                </button>
-              )}
-            </div>
+            <label className="text-xs text-gray-600 block mb-1">العميل</label>
             <SearchableSelect
               options={customerOptions}
               value={customerId}
@@ -383,6 +370,27 @@ export default function POSPage() {
               placeholder="🔍 ابحث عن عميل بالاسم أو الهاتف..."
               emptyLabel="— بدون عميل —"
             />
+            {customerId && selectedCustomer && (
+              <div className="mt-2 flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💳</span>
+                  <div>
+                    <span className="text-gray-600 block text-[11px] font-semibold">رصيد العميل الحالي:</span>
+                    <strong className={`font-mono text-sm ${Number(selectedCustomer.balance) > 0 ? 'text-amber-800 font-bold' : 'text-emerald-800'}`}>
+                      {formatEGP(Number(selectedCustomer.balance))} ج
+                    </strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow flex items-center gap-1.5 transition-all"
+                  title="تسجيل سند تحصيل منفصل للعميل"
+                >
+                  <span>+ تسجيل تحصيل 💳</span>
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs text-gray-600 block mb-1">النوع</label>
