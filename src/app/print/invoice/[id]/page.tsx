@@ -50,30 +50,45 @@ export default async function InvoicePrintPage({
   const isCancelled = invoice.status === 'ملغاة';
   const hasCustomer = !!invoice.customer;
 
-  // المبلغ المدفوع الفعلي = مجموع كل سندات التحصيل المرتبطة بهذه الفاتورة
-  // أو المبلغ المسجل على الفاتورة كـ fallback
-  const invoicePayments = await prisma.customer_payments.findMany({
-    where: { invoice_id: invoice.id },
-    select: { amount: true },
-  });
-  const paymentsSum = invoicePayments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const paid = invoicePayments.length > 0 ? paymentsSum : Number(invoice.paid_amount || 0);
+  // 1. جميع المدفوعات المسجلة للعميل في تاريخ هذه الفاتورة (أو المرتبطة بها)
+  let paidOnDate = 0;
+  if (hasCustomer && invoice.customer) {
+    const invDateOnly = new Date(invoice.invoice_date);
+    invDateOnly.setUTCHours(0, 0, 0, 0);
+    const nextDay = new Date(invDateOnly);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+    const sameDatePayments = await prisma.customer_payments.findMany({
+      where: {
+        customer_id: invoice.customer.id,
+        OR: [
+          { invoice_id: invoice.id },
+          {
+            payment_date: {
+              gte: invDateOnly,
+              lt: nextDay,
+            },
+          },
+        ],
+      },
+      select: { amount: true },
+    });
+    paidOnDate = sameDatePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  }
 
   let prevBalance: number | null = null;
   let newBalance: number | null = null;
 
   if (hasCustomer && invoice.customer) {
-    // 1. الأولوية الأولى: قراءة الرصيد الثابت المحفوظ لحظة إنشاء الفاتورة (Snapshot)
+    // 1. الأولوية الأولى: قراءة الرصيد السابق المحفوظ لحظة الفاتورة
     if (
       invoice.customer_prev_balance !== null &&
-      invoice.customer_prev_balance !== undefined &&
-      invoice.customer_new_balance !== null &&
-      invoice.customer_new_balance !== undefined
+      invoice.customer_prev_balance !== undefined
     ) {
       prevBalance = Number(invoice.customer_prev_balance);
-      newBalance = isCancelled ? prevBalance : Number(invoice.customer_new_balance);
+      newBalance = isCancelled ? prevBalance : prevBalance + (Number(invoice.total) - paidOnDate);
     } else {
-      // 2. Fallback للفواتير القديمة
+      // 2. Fallback للفواتير القديمة بالتسلسل الرقمي
       const custId = invoice.customer.id;
       const invDate = invoice.created_at || invoice.invoice_date;
       const opening = Number(invoice.customer.opening_balance || 0);
@@ -129,7 +144,7 @@ export default async function InvoicePrintPage({
       if (isCancelled) {
         newBalance = prevBalance;
       } else {
-        newBalance = prevBalance + (Number(invoice.total) - paid);
+        newBalance = prevBalance + (Number(invoice.total) - paidOnDate);
       }
     }
   }
@@ -352,61 +367,6 @@ export default async function InvoicePrintPage({
             <span>إجمالي الفاتورة:</span>
             <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total))} ج</span>
           </div>
-
-          {paid > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.85rem',
-                color: C.green,
-                fontWeight: 700,
-                marginTop: '3px',
-              }}
-            >
-              <span>المدفوع نقداً:</span>
-              <span style={{ fontFamily: 'monospace' }}>- {formatEGP(paid)} ج</span>
-            </div>
-          )}
-
-          {paid > 0 && Number(invoice.total) - paid > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.9rem',
-                color: C.darkOrange,
-                fontWeight: 800,
-                borderTop: `1px dotted ${C.border}`,
-                paddingTop: '3px',
-                marginTop: '3px',
-              }}
-            >
-              <span>المتبقي من الفاتورة:</span>
-              <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total) - paid)} ج</span>
-            </div>
-          )}
-
-          {paid > 0 && paid > Number(invoice.total) && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '0.85rem',
-                color: C.green,
-                fontWeight: 800,
-                borderTop: `1px dotted ${C.border}`,
-                paddingTop: '3px',
-                marginTop: '3px',
-              }}
-            >
-              <span>💰 دفعة مقدمة (رصيد دائن):</span>
-              <span style={{ fontFamily: 'monospace' }}>{formatEGP(paid - Number(invoice.total))} ج</span>
-            </div>
-          )}
         </div>
 
         {/* Customer Balance Section (Compact) */}
@@ -429,7 +389,7 @@ export default async function InvoicePrintPage({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: isCancelled ? '1fr 1fr' : paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
+                gridTemplateColumns: isCancelled ? '1fr 1fr' : paidOnDate > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
                 borderBottom: `1px solid ${isCancelled ? '#fecdd3' : C.border}`,
                 backgroundColor: isCancelled ? '#ffe4e6' : '#f1f5f9',
@@ -438,15 +398,15 @@ export default async function InvoicePrintPage({
                 color: isCancelled ? '#9f1239' : C.muted,
               }}
             >
-              <div>الحساب قبل الفاتورة</div>
-              {!isCancelled && <div>الفاتورة</div>}
-              {!isCancelled && paid > 0 && <div>المدفوع منها</div>}
-              <div style={{ color: C.dark }}>{isCancelled ? 'رصيد العميل' : 'الرصيد النهائي'}</div>
+              <div>الحساب السابق</div>
+              {!isCancelled && <div>+ الفاتورة الحالية</div>}
+              {!isCancelled && paidOnDate > 0 && <div style={{ color: C.green }}>- المدفوع بتاريخ الفاتورة</div>}
+              <div style={{ color: C.dark }}>{isCancelled ? 'رصيد العميل' : '= إجمالي المتبقي'}</div>
             </div>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: isCancelled ? '1fr 1fr' : paid > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
+                gridTemplateColumns: isCancelled ? '1fr 1fr' : paidOnDate > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
                 padding: '5px 0',
                 fontFamily: 'monospace',
@@ -461,9 +421,9 @@ export default async function InvoicePrintPage({
                   +{formatEGP(Number(invoice.total))} ج
                 </div>
               )}
-              {!isCancelled && paid > 0 && (
+              {!isCancelled && paidOnDate > 0 && (
                 <div style={{ color: C.green }}>
-                  -{formatEGP(paid)} ج
+                  -{formatEGP(paidOnDate)} ج
                 </div>
               )}
               <div style={{ color: newBalance > 0.01 ? C.red : newBalance < -0.01 ? C.green : C.dark, fontSize: '0.88rem' }}>

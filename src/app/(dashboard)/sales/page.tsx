@@ -5,6 +5,7 @@ import { formatEGP, formatDate, statusColor, matchesArabicSearch } from "@/lib/f
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
+import CustomerPaymentModal from "@/components/CustomerPaymentModal";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import Pagination from "@/components/Pagination";
 
@@ -412,6 +413,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
   const [status, setStatus] = useState("");
   const [invoiceType, setInvoiceType] = useState("");
   const [notes, setNotes] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     if (inv && !editing) {
@@ -455,7 +457,6 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     const { error } = await mutate("PATCH", `/api/sales/invoices/${invoiceId}`, {
       items: validItems.map((i: any) => ({ product_id: i.product_id, store_id: i.store_id || inv.store_id, quantity: i.quantity, unit_price: i.unit_price })),
       discount,
-      paid_amount: paidAmount,
       status: invoiceType === "عرض سعر" ? "قيد التنفيذ" : status,
       invoice_type: invoiceType,
       notes,
@@ -558,21 +559,7 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
               <label className="text-xs text-gray-600 block mb-1">الخصم</label>
               <input type="number" min={0} step={0.01} className="input-field text-sm" value={discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
             </div>
-            {invoiceType !== "عرض سعر" && (
-              <div>
-                <label className="text-xs text-gray-600 block mb-1">المبلغ المدفوع (ج)</label>
-                <input type="number" min={0} step={0.01} className="input-field text-sm font-mono font-bold" value={paidAmount} onChange={e => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))} />
-                {paidAmount > total && total > 0 && (
-                  <p className="text-xs text-emerald-700 font-bold mt-0.5">💰 دفعة مقدمة: {formatEGP(paidAmount - total)} ج — رصيد دائن للعميل</p>
-                )}
-              </div>
-            )}
-            {status === "قيد التنفيذ" && (
-              <div className="md:col-span-4 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-2 text-xs font-semibold">
-                ℹ️ الفاتورة قيد التنفيذ (مسودة): المبلغ المدفوع المسجل يُحفظ كمسودة، ولن يُخصم من حساب العميل أو يُودع في الخزينة إلا عند إكمال الفاتورة.
-              </div>
-            )}
-            <div className="md:col-span-4">
+            <div className="md:col-span-3">
               <label className="text-xs text-gray-600 block mb-1">ملاحظات</label>
               <textarea className="input-field text-sm" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
@@ -602,6 +589,15 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
 
         <div className="flex flex-wrap gap-2 pt-3 border-t">
           <button onClick={() => window.open(`/print/invoice/${invoiceId}?autoprint=1`, "_blank")} className="btn-secondary text-sm">🖨️ طباعة</button>
+          {inv.customer_id && (
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+            >
+              <span>💳</span>
+              <span>تسجيل تحصيل</span>
+            </button>
+          )}
           {!isCancelled && !isCompleted && (
             <>
               {!editing ? (
@@ -621,6 +617,20 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
           <button onClick={onClose} className="btn-secondary text-sm">إغلاق</button>
         </div>
       </div>
+
+      {showPaymentModal && (
+        <CustomerPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          defaultCustomerId={inv.customer_id}
+          defaultCustomerName={inv.customer?.name}
+          defaultInvoiceId={inv.id}
+          onSuccess={() => {
+            refetch();
+            onChanged();
+          }}
+        />
+      )}
 
       {showProductPicker && (
         <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowProductPicker(false)}>

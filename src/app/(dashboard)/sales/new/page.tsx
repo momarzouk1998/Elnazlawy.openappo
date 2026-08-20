@@ -4,6 +4,7 @@ import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
+import CustomerPaymentModal from "@/components/CustomerPaymentModal";
 
 interface Product {
   id: string; name: string; unit: string; default_sale_price: number; total_stock: number;
@@ -34,23 +35,14 @@ export default function POSPage() {
   const [invoiceType, setInvoiceType] = useState("عادية");
   const [status, setStatus] = useState("مكتملة");
   const [discount, setDiscount] = useState(0);
-  const [paidAmount, setPaidAmount] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState("نقدي");
-  const [treasuryId, setTreasuryId] = useState("");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
   const { mutate, loading: saving } = useApiMutation();
   const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
-  const { data: treasuriesData } = useApi<{ items: { id: string; name: string; current_balance: number }[] }>('/api/treasury');
-
-  useEffect(() => {
-    if (treasuriesData?.items && treasuriesData.items.length > 0 && !treasuryId) {
-      setTreasuryId(treasuriesData.items[0].id);
-    }
-  }, [treasuriesData, treasuryId]);
 
   useEffect(() => {
     if (stores?.items && stores.items.length > 0 && !primaryStoreId) {
@@ -60,6 +52,7 @@ export default function POSPage() {
 
   const subtotal = cart.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0), 0);
   const total = Math.max(0, subtotal - discount);
+  const selectedCustomer = customers?.items.find(c => c.id === customerId);
 
   // المخزون المتاح للصنف في المخزن المختار
   function stockFor(p: Product, sId: string): number {
@@ -249,7 +242,6 @@ export default function POSPage() {
 
     const finalStatus = invoiceType === 'عرض سعر' ? 'قيد التنفيذ' : status;
     const storeIdToSave = primaryStoreId || validItems[0]?.store_id || null;
-    const finalPaid = invoiceType !== 'عرض سعر' ? Math.max(0, Number(paidAmount) || 0) : 0;
 
     // ✅ parse الكمية والسعر لـ number قبل الإرسال للسيرفر
     const validItemsForApi = validItems.map(c => ({
@@ -269,16 +261,12 @@ export default function POSPage() {
       subtotal: subtotalCalc,
       discount,
       total: Math.max(0, subtotalCalc - discount),
-      paid_amount: finalPaid,
-      payment_method: paymentMethod,
-      treasury_id: treasuryId || null,
       notes,
     });
     if (error) { alert('❌ ' + error); return; }
     alert(`✅ تم حفظ الفاتورة رقم ${data?.invoice_number}`);
     setCart([]);
     setDiscount(0);
-    setPaidAmount(0);
     setNotes("");
     // ✅ router.refresh() يمسح Next.js Router Cache عشان /sales يجيب بيانات جديدة
     router.refresh();
@@ -374,7 +362,20 @@ export default function POSPage() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-600 block mb-1">العميل</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-600 block">العميل</label>
+              {customerId && (
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 font-bold px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                  title="تسجيل سند تحصيل منفصل لهذا العميل وإيداعه في الخزينة"
+                >
+                  <span>💳</span>
+                  <span>تسجيل تحصيل</span>
+                </button>
+              )}
+            </div>
             <SearchableSelect
               options={customerOptions}
               value={customerId}
@@ -492,96 +493,21 @@ export default function POSPage() {
             <span>صافي الفاتورة:</span><span className="text-nazlawy-600 font-mono">{formatEGP(total)} ج</span>
           </div>
 
-          {/* 💵 قسم المدفوعات والتحصيل */}
-          {invoiceType !== 'عرض سعر' && (
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-emerald-900 flex items-center gap-1">
-                  💵 التحصيل والمدفوعات
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPaidAmount(total)}
-                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-colors"
-                  >
-                    ⚡ سداد كامل
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaidAmount(0)}
-                    className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[10px] font-bold cursor-pointer transition-colors"
-                  >
-                    آجل (0)
-                  </button>
-                </div>
-              </div>
-
-              {status === 'قيد التنفيذ' && (
-                <div className="bg-amber-100 text-amber-900 border border-amber-300 rounded-lg p-2 text-[11px] font-semibold flex items-center gap-1.5">
-                  <span>ℹ️</span>
-                  <span>الفاتورة مسودة (قيد التنفيذ): المبلغ المسجل يُحفظ كمسودة، ولن يُخصم من حساب العميل أو يُودع في الخزينة إلا عند إكمال الفاتورة.</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">المبلغ المدفوع (ج)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="any"
-                    value={paidAmount}
-                    onChange={(e) => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="input-field text-xs p-1 font-mono font-bold text-center bg-white border-emerald-300"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">طريقة الدفع</label>
-                  <select
-                    className="input-field text-[11px] p-1 bg-white border-emerald-300"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    disabled={paidAmount <= 0}
-                  >
-                    <option value="نقدي">💵 نقدي</option>
-                    <option value="إنستاباي">📱 إنستاباي</option>
-                    <option value="فودافون كاش">📞 فودافون كاش</option>
-                    <option value="تحويل بنكي">🏦 تحويل بنكي</option>
-                    <option value="شيك">🧾 شيك</option>
-                  </select>
-                </div>
-              </div>
-
-              {paidAmount > 0 && treasuriesData?.items && treasuriesData.items.length > 0 && (
-                <div>
-                  <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">الخزينة المستلمة</label>
-                  <select
-                    className="input-field text-[11px] p-1 bg-white border-emerald-300"
-                    value={treasuryId}
-                    onChange={(e) => setTreasuryId(e.target.value)}
-                  >
-                    {treasuriesData.items.map(t => (
-                      <option key={t.id} value={t.id}>
-                        🏦 {t.name} (رصيد: {formatEGP(t.current_balance)} ج)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center text-xs pt-1 border-t border-emerald-200">
-                <span className="text-gray-600">المتبقي على العميل:</span>
-                <strong className={`font-mono ${total - paidAmount > 0 ? 'text-red-600 font-bold' : 'text-emerald-700'}`}>
-                  {formatEGP(Math.max(0, total - paidAmount))} ج
+          {/* رصيد العميل وملخص الحساب */}
+          {selectedCustomer && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
+              <div className="flex justify-between items-center text-gray-600">
+                <span>رصيد العميل الحالي:</span>
+                <strong className={`font-mono ${selectedCustomer.balance > 0 ? 'text-amber-700 font-bold' : 'text-emerald-700'}`}>
+                  {formatEGP(selectedCustomer.balance)} ج
                 </strong>
               </div>
-              {paidAmount > total && total > 0 && (
-                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2 text-[11px] text-emerald-800 font-bold flex items-center gap-1.5">
-                  💰 دفعة مقدمة: {formatEGP(paidAmount - total)} ج — ستُضاف كرصيد دائن في حساب العميل
-                </div>
-              )}
+              <div className="flex justify-between items-center text-gray-700 font-bold pt-1.5 border-t border-slate-200">
+                <span>الرصيد بعد إضافة الفاتورة:</span>
+                <span className="font-mono text-nazlawy-700 font-extrabold text-sm">
+                  {formatEGP(selectedCustomer.balance + total)} ج
+                </span>
+              </div>
             </div>
           )}
 
@@ -597,6 +523,15 @@ export default function POSPage() {
           initialName={search}
           onClose={() => setShowNewProduct(false)}
           onAdded={(p) => { addToCart(p); setShowNewProduct(false); }}
+        />
+      )}
+
+      {showPaymentModal && (
+        <CustomerPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          defaultCustomerId={customerId}
+          defaultCustomerName={selectedCustomer?.name}
         />
       )}
       
