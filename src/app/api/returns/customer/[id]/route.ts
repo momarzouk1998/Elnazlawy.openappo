@@ -22,10 +22,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ ok: true, data: ret });
 }
 
-// DELETE /api/returns/customer/[id] — إلغاء المرتجع (عكس التأثير)
+// DELETE /api/returns/customer/[id] — إلغاء أو حذف المرتجع وبنوده
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
+  if (profile.role === 'rep') {
+    return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'لا تملك صلاحية الحذف' } }, { status: 403 });
+  }
 
   try {
     const { id } = await params;
@@ -38,20 +41,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     });
     if (!ret) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
 
-    if (ret.created_by !== profile.id && profile.role !== 'admin') {
-      return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
-    }
-
-    // حذف نهائي — للأدمن فقط
+    // حذف نهائي للمرتجع وبنوده
     if (permanent) {
-      if (profile.role !== 'admin') {
-        return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'الحذف النهائي للأدمن فقط' } }, { status: 403 });
-      }
       await prisma.$transaction(async (tx) => {
         await tx.customer_return_invoice_items.deleteMany({ where: { return_id: id } });
         await tx.customer_return_invoices.delete({ where: { id } });
       });
-      return NextResponse.json({ ok: true, data: { message: 'تم حذف المرتجع نهائياً' } });
+      return NextResponse.json({ ok: true, data: { message: 'تم حذف فاتورة المرتجع وبنودها نهائياً' } });
     }
 
     if (ret.status === 'ملغاة') {

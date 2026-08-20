@@ -33,7 +33,11 @@ export default function SalesPage() {
   const [tab, setTab] = useState<Tab>(searchParams.get("tab") === "returns" ? "returns" : "sales");
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => {
-    getCurrentUserClient().then(p => { if (p?.role === "admin") setIsAdmin(true); });
+    getCurrentUserClient().then(p => {
+      if (p?.role === "admin" || p?.role === "accountant" || p?.role === "manager") {
+        setIsAdmin(true);
+      }
+    });
   }, []);
 
   return (
