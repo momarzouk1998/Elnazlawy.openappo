@@ -50,30 +50,35 @@ export default async function InvoicePrintPage({
   const isCancelled = invoice.status === 'ملغاة';
   const hasCustomer = !!invoice.customer;
 
-  // 1. جميع المدفوعات المسجلة للعميل في تاريخ هذه الفاتورة (أو المرتبطة بها)
-  let paidOnDate = 0;
+  // 1. حساب المدفوع المرتبط بالفاتورة بدقة تامة
+  let paidOnDate = Number(invoice.paid_amount || 0);
   if (hasCustomer && invoice.customer) {
-    const invDateOnly = new Date(invoice.invoice_date);
-    invDateOnly.setUTCHours(0, 0, 0, 0);
-    const nextDay = new Date(invDateOnly);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-
-    const sameDatePayments = await prisma.customer_payments.findMany({
-      where: {
-        customer_id: invoice.customer.id,
-        OR: [
-          { invoice_id: invoice.id },
-          {
-            payment_date: {
-              gte: invDateOnly,
-              lt: nextDay,
-            },
-          },
-        ],
-      },
+    const linkedPayments = await prisma.customer_payments.findMany({
+      where: { invoice_id: invoice.id },
       select: { amount: true },
     });
-    paidOnDate = sameDatePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const linkedTotal = linkedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    paidOnDate = Math.max(paidOnDate, linkedTotal);
+
+    // إذا لم يكن هناك دفع مسجل على الفاتورة، نبحث عن مدفوعات في نفس تاريخ الفاتورة
+    if (paidOnDate === 0) {
+      const invDateOnly = new Date(invoice.invoice_date);
+      invDateOnly.setUTCHours(0, 0, 0, 0);
+      const nextDay = new Date(invDateOnly);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+      const sameDatePayments = await prisma.customer_payments.findMany({
+        where: {
+          customer_id: invoice.customer.id,
+          payment_date: {
+            gte: invDateOnly,
+            lt: nextDay,
+          },
+        },
+        select: { amount: true },
+      });
+      paidOnDate = sameDatePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    }
   }
 
   let prevBalance: number | null = null;
@@ -86,7 +91,11 @@ export default async function InvoicePrintPage({
       invoice.customer_prev_balance !== undefined
     ) {
       prevBalance = Number(invoice.customer_prev_balance);
-      newBalance = isCancelled ? prevBalance : prevBalance + (Number(invoice.total) - paidOnDate);
+      newBalance = isCancelled
+        ? prevBalance
+        : invoice.customer_new_balance !== null && invoice.customer_new_balance !== undefined
+          ? Number(invoice.customer_new_balance)
+          : prevBalance + (Number(invoice.total) - paidOnDate);
     } else {
       // 2. Fallback للفواتير القديمة بالتسلسل الرقمي
       const custId = invoice.customer.id;

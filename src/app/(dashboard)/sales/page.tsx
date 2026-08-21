@@ -80,11 +80,11 @@ function TabBtn({ active, onClick, color, children }: {
 // TAB 1 — فواتير المبيعات
 // ═══════════════════════════════════════════════════════════
 function SalesTab({ isAdmin }: { isAdmin: boolean }) {
+  const [customerId, setCustomerId] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
-  const [customerId, setCustomerId] = useState("");
-  const [openInvoice, setOpenInvoice] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [openInvoice, setOpenInvoice] = useState<Invoice | string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -183,7 +183,7 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
               </thead>
               <tbody>
                 {data?.items.map(inv => (
-                  <tr key={inv.id} onClick={() => setOpenInvoice(inv.id)} className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors">
+                  <tr key={inv.id} onClick={() => setOpenInvoice(inv)} className="border-t hover:bg-nazlawy-50 cursor-pointer transition-colors">
                     <td className="p-3 font-mono font-bold">#{inv.invoice_number}</td>
                     <td className="p-3 text-xs">{formatDate(inv.invoice_date)}</td>
                     <td className="p-3 text-xs">{inv.invoice_type}</td>
@@ -217,8 +217,13 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
       )}
 
       {openInvoice && (
-        <InvoiceDetailsModal invoiceId={openInvoice} isAdmin={isAdmin}
-          onClose={() => setOpenInvoice(null)} onChanged={refetch} />
+        <InvoiceDetailsModal
+          invoice={typeof openInvoice === 'object' ? openInvoice : null}
+          invoiceId={typeof openInvoice === 'object' ? openInvoice.id : openInvoice}
+          isAdmin={isAdmin}
+          onClose={() => setOpenInvoice(null)}
+          onChanged={refetch}
+        />
       )}
     </div>
   );
@@ -397,9 +402,8 @@ function CustomerReturnDetailsModal({ returnId, isAdmin, onClose, onChanged }: {
 
 // ═══════════════════════════════════════════════════════════
 // MODAL — تفاصيل فاتورة المبيعات (full edit)
-// ═══════════════════════════════════════════════════════════
-function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
-  invoiceId: string; isAdmin: boolean; onClose: () => void; onChanged: () => void;
+function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }: {
+  invoice?: Invoice | null; invoiceId: string; isAdmin: boolean; onClose: () => void; onChanged: () => void;
 }) {
   const { data: inv, loading, refetch } = useApi<any>(`/api/sales/invoices/${invoiceId}`);
   const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>("/api/stores");
@@ -430,12 +434,22 @@ function InvoiceDetailsModal({ invoiceId, isAdmin, onClose, onChanged }: {
     }
   }, [inv, editing]);
 
-  if (loading) return <ModalShell onClose={onClose}><p>⏳ جاري التحميل...</p></ModalShell>;
-  if (!inv)    return <ModalShell onClose={onClose}><p>❌ لم يتم العثور على الفاتورة</p></ModalShell>;
+  const activeInv = inv || invoice;
+  if (!activeInv && loading) {
+    return (
+      <ModalShell onClose={onClose} wide>
+        <div className="p-8 text-center space-y-3">
+          <div className="w-8 h-8 border-4 border-nazlawy-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm font-bold text-gray-600">جاري فتح الفاتورة...</p>
+        </div>
+      </ModalShell>
+    );
+  }
+  if (!activeInv) return <ModalShell onClose={onClose}><p>❌ لم يتم العثور على الفاتورة</p></ModalShell>;
 
-  const isCompleted = inv.status === "مكتملة";
-  const isCancelled = inv.status === "ملغاة";
-  const isQuotation = inv.invoice_type === "عرض سعر";
+  const isCompleted = activeInv.status === "مكتملة";
+  const isCancelled = activeInv.status === "ملغاة";
+  const isQuotation = activeInv.invoice_type === "عرض سعر";
   const subtotal = items.reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_price), 0);
   const total = Math.max(0, subtotal - discount);
 

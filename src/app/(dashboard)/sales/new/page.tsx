@@ -35,6 +35,9 @@ export default function POSPage() {
   const [invoiceType, setInvoiceType] = useState("عادية");
   const [status, setStatus] = useState("مكتملة");
   const [discount, setDiscount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState("نقدي");
+  const [treasuryId, setTreasuryId] = useState("");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -43,6 +46,13 @@ export default function POSPage() {
   const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
+  const { data: treasuriesData } = useApi<{ items: { id: string; name: string; current_balance: number }[] }>('/api/treasury');
+
+  useEffect(() => {
+    if (treasuriesData?.items && treasuriesData.items.length > 0 && !treasuryId) {
+      setTreasuryId(treasuriesData.items[0].id);
+    }
+  }, [treasuriesData, treasuryId]);
 
   useEffect(() => {
     if (stores?.items && stores.items.length > 0 && !primaryStoreId) {
@@ -261,12 +271,16 @@ export default function POSPage() {
       subtotal: subtotalCalc,
       discount,
       total: Math.max(0, subtotalCalc - discount),
+      paid_amount: paidAmount,
+      treasury_id: paidAmount > 0 ? treasuryId : undefined,
+      payment_method: paymentMethod,
       notes,
     });
     if (error) { alert('❌ ' + error); return; }
     alert(`✅ تم حفظ الفاتورة رقم ${data?.invoice_number}`);
     setCart([]);
     setDiscount(0);
+    setPaidAmount(0);
     setNotes("");
     // ✅ router.refresh() يمسح Next.js Router Cache عشان /sales يجيب بيانات جديدة
     router.refresh();
@@ -501,19 +515,77 @@ export default function POSPage() {
             <span>صافي الفاتورة:</span><span className="text-nazlawy-600 font-mono">{formatEGP(total)} ج</span>
           </div>
 
+          {/* حقول الدفع الفوري */}
+          {invoiceType !== 'عرض سعر' && (
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-bold text-emerald-950">المبلغ المدفوع (ج):</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  className="w-28 input-field text-sm p-1 text-center font-mono font-extrabold border-emerald-300"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder="0"
+                />
+              </div>
+
+              {paidAmount > 0 && (
+                <div className="grid grid-cols-2 gap-1.5 pt-1 text-xs">
+                  <div>
+                    <label className="text-[10px] text-emerald-800 font-bold block mb-0.5">الخزينة المستلمة</label>
+                    <select
+                      className="input-field text-xs p-1 bg-white"
+                      value={treasuryId}
+                      onChange={(e) => setTreasuryId(e.target.value)}
+                    >
+                      {(treasuriesData?.items || []).map((t) => (
+                        <option key={t.id} value={t.id}>🏦 {t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-emerald-800 font-bold block mb-0.5">طريقة الدفع</label>
+                    <select
+                      className="input-field text-xs p-1 bg-white"
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                    >
+                      <option value="نقدي">💵 نقدي</option>
+                      <option value="إنستاباي">📱 إنستاباي</option>
+                      <option value="فودافون كاش">📱 فودافون كاش</option>
+                      <option value="تحويل بنكي">🏛️ تحويل بنكي</option>
+                      <option value="شيك">📄 شيك</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {paidAmount > 0 && total > 0 && (
+                <div className="flex justify-between text-xs font-semibold pt-1 border-t border-emerald-200">
+                  <span className="text-gray-600">المتبقي من الفاتورة:</span>
+                  <span className={`font-mono font-bold ${total - paidAmount > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {formatEGP(Math.max(0, total - paidAmount))} ج
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* رصيد العميل وملخص الحساب */}
           {selectedCustomer && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
               <div className="flex justify-between items-center text-gray-600">
-                <span>رصيد العميل الحالي:</span>
+                <span>رصيد العميل السابق:</span>
                 <strong className={`font-mono ${selectedCustomer.balance > 0 ? 'text-amber-700 font-bold' : 'text-emerald-700'}`}>
                   {formatEGP(selectedCustomer.balance)} ج
                 </strong>
               </div>
               <div className="flex justify-between items-center text-gray-700 font-bold pt-1.5 border-t border-slate-200">
-                <span>الرصيد بعد إضافة الفاتورة:</span>
+                <span>الرصيد بعد إضافة الفاتورة والتحصيل:</span>
                 <span className="font-mono text-nazlawy-700 font-extrabold text-sm">
-                  {formatEGP(selectedCustomer.balance + total)} ج
+                  {formatEGP(selectedCustomer.balance + (total - paidAmount))} ج
                 </span>
               </div>
             </div>

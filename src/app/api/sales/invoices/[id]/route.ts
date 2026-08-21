@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { getCurrentUser } from '@/lib/auth-server';
 
-// GET /api/sales/invoices/[id] - جلب فاتورة بالتفاصيل
+// GET /api/sales/invoices/[id] - جلب فاتورة بالتفاصيل (خفيف وسريع)
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
@@ -15,8 +15,26 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         customer: { select: { id: true, name: true, phone: true, balance: true } },
         store: { select: { id: true, name: true } },
         creator: { select: { id: true, full_name: true } },
-        items: { include: { product: { select: { id: true, name: true } } } },
-        payments: { include: { treasury: { select: { id: true, name: true } } } },
+        items: {
+          select: {
+            id: true,
+            product_id: true,
+            product_name: true,
+            quantity: true,
+            unit_price: true,
+            line_total: true,
+            store_id: true,
+          },
+        },
+        payments: {
+          select: {
+            id: true,
+            amount: true,
+            payment_method: true,
+            payment_date: true,
+            treasury: { select: { id: true, name: true } },
+          },
+        },
       },
     });
     if (!invoice) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
