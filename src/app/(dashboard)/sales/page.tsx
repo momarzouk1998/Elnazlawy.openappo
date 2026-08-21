@@ -434,8 +434,8 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
     }
   }, [inv, editing]);
 
-  const activeInv = inv || invoice;
-  if (!activeInv && loading) {
+  const invData = inv || invoice;
+  if (!invData) {
     return (
       <ModalShell onClose={onClose} wide>
         <div className="p-8 text-center space-y-3">
@@ -445,17 +445,16 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
       </ModalShell>
     );
   }
-  if (!activeInv) return <ModalShell onClose={onClose}><p>❌ لم يتم العثور على الفاتورة</p></ModalShell>;
 
-  const isCompleted = activeInv.status === "مكتملة";
-  const isCancelled = activeInv.status === "ملغاة";
-  const isQuotation = activeInv.invoice_type === "عرض سعر";
+  const isCompleted = invData.status === "مكتملة";
+  const isCancelled = invData.status === "ملغاة";
+  const isQuotation = invData.invoice_type === "عرض سعر";
   const subtotal = items.reduce((s: number, i: any) => s + Number(i.quantity) * Number(i.unit_price), 0);
   const total = Math.max(0, subtotal - discount);
 
   function addItem(p: any) {
-    const store = storesData?.items.find(s => s.id === inv.store_id) || storesData?.items[0];
-    setItems([...items, { product_id: p.id, product_name: p.name, quantity: 1, unit_price: Number(p.default_sale_price), store_id: inv.store_id || store?.id }]);
+    const store = storesData?.items.find(s => s.id === invData.store_id) || storesData?.items[0];
+    setItems([...items, { product_id: p.id, product_name: p.name, quantity: 1, unit_price: Number(p.default_sale_price), store_id: invData.store_id || store?.id }]);
     setShowProductPicker(false); setProductSearch("");
   }
   function removeItem(idx: number) { setItems(items.filter((_: any, i: number) => i !== idx)); }
@@ -473,7 +472,7 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
     const validItems = items.filter((i: any) => Number(i.quantity) > 0 && Number(i.unit_price) >= 0);
     if (validItems.length === 0) { alert("❌ لازم صنف واحد على الأقل"); return; }
     const { error } = await mutate("PATCH", `/api/sales/invoices/${invoiceId}`, {
-      items: validItems.map((i: any) => ({ product_id: i.product_id, store_id: i.store_id || inv.store_id, quantity: i.quantity, unit_price: i.unit_price })),
+      items: validItems.map((i: any) => ({ product_id: i.product_id, store_id: i.store_id || invData.store_id, quantity: i.quantity, unit_price: i.unit_price })),
       discount,
       status: invoiceType === "عرض سعر" ? "قيد التنفيذ" : status,
       invoice_type: invoiceType,
@@ -497,23 +496,24 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
   }
 
   const filteredProducts = searchProductsData?.items || [];
+  const displayItems = items.length > 0 ? items : (invData.items || []);
 
   return (
     <ModalShell onClose={onClose} wide>
       <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-10">
         <div>
-          <h2 className="text-lg font-bold">🛒 فاتورة مبيعات #{inv.invoice_number}
-            <span className={`badge ${statusColor(inv.status)} mr-2`}>{inv.status}</span>
+          <h2 className="text-lg font-bold">🛒 فاتورة مبيعات #{invData.invoice_number}
+            <span className={`badge ${statusColor(invData.status)} mr-2`}>{invData.status}</span>
           </h2>
-          <p className="text-xs text-gray-500">{formatDate(inv.invoice_date)} • {inv.invoice_type}</p>
+          <p className="text-xs text-gray-500">{formatDate(invData.invoice_date)} • {invData.invoice_type}</p>
         </div>
         <button onClick={onClose} className="text-2xl text-gray-400 hover:text-red-500">✕</button>
       </div>
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm items-center">
           <div className="flex items-center justify-between col-span-2 md:col-span-1 bg-slate-50 p-2 rounded-lg border border-slate-200">
-            <Info label="العميل" value={inv.customer?.name || "—"} />
-            {inv.customer_id && (
+            <Info label="العميل" value={invData.customer?.name || "—"} />
+            {invData.customer_id && (
               <button
                 type="button"
                 onClick={() => setShowPaymentModal(true)}
@@ -524,13 +524,13 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
               </button>
             )}
           </div>
-          <Info label="المخزن" value={inv.store?.name || "—"} />
-          <Info label="المنشئ" value={inv.creator?.full_name || "—"} />
+          <Info label="المخزن" value={invData.store?.name || "—"} />
+          <Info label="المنشئ" value={invData.creator?.full_name || "—"} />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold">الأصناف ({items.length})</h3>
+            <h3 className="font-bold">الأصناف ({displayItems.length})</h3>
             {editing && !isCompleted && !isCancelled && (
               <button onClick={() => setShowProductPicker(true)} className="text-xs btn-primary py-1 px-3">+ صنف</button>
             )}
@@ -556,12 +556,12 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
                 </tr>
               </thead>
               <tbody>
-                {inv.items.map((it: any) => (
-                  <tr key={it.id} className="border-t">
+                {displayItems.map((it: any, idx: number) => (
+                  <tr key={it.id || idx} className="border-t">
                     <td className="p-2">{it.product_name}</td>
                     <td className="p-2 text-center font-mono">{Number(it.quantity)}</td>
                     <td className="p-2 text-left font-mono">{formatEGP(Number(it.unit_price))}</td>
-                    <td className="p-2 text-left font-mono font-bold">{formatEGP(Number(it.line_total))}</td>
+                    <td className="p-2 text-left font-mono font-bold">{formatEGP(Number(it.line_total || (Number(it.quantity) * Number(it.unit_price))))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -597,29 +597,29 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
         )}
 
         <div className="border-t pt-3 space-y-1 text-sm">
-          <div className="flex justify-between"><span>الإجمالي قبل الخصم:</span><span className="font-mono font-bold">{formatEGP(Number(inv.subtotal))} ج</span></div>
-          {Number(inv.discount) > 0 && <div className="flex justify-between text-yellow-700"><span>الخصم:</span><span className="font-mono font-bold">- {formatEGP(Number(inv.discount))} ج</span></div>}
+          <div className="flex justify-between"><span>الإجمالي قبل الخصم:</span><span className="font-mono font-bold">{formatEGP(Number(invData.subtotal))} ج</span></div>
+          {Number(invData.discount) > 0 && <div className="flex justify-between text-yellow-700"><span>الخصم:</span><span className="font-mono font-bold">- {formatEGP(Number(invData.discount))} ج</span></div>}
           <div className="flex justify-between text-lg font-extrabold border-t pt-2 text-red-700">
-            <span>الإجمالي النهائي:</span><span className="font-mono">{formatEGP(Number(inv.total))} ج</span>
+            <span>الإجمالي النهائي:</span><span className="font-mono">{formatEGP(Number(invData.total))} ج</span>
           </div>
-          {Number(inv.paid_amount) > 0 && (
+          {Number(invData.paid_amount) > 0 && (
             <div className="flex justify-between text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded">
               <span>المبلغ المدفوع (تحصيل فوري):</span>
-              <span className="font-mono">{formatEGP(Number(inv.paid_amount))} ج</span>
+              <span className="font-mono">{formatEGP(Number(invData.paid_amount))} ج</span>
             </div>
           )}
-          {Number(inv.paid_amount) > 0 && Number(inv.total) - Number(inv.paid_amount) > 0 && (
+          {Number(invData.paid_amount) > 0 && Number(invData.total) - Number(invData.paid_amount) > 0 && (
             <div className="flex justify-between text-gray-700 text-xs px-2">
               <span>المتبقي على العميل:</span>
-              <span className="font-mono font-bold text-red-600">{formatEGP(Number(inv.total) - Number(inv.paid_amount))} ج</span>
+              <span className="font-mono font-bold text-red-600">{formatEGP(Number(invData.total) - Number(invData.paid_amount))} ج</span>
             </div>
           )}
-          {inv.notes && !editing && <div className="text-xs text-gray-600 pt-2 border-t">📝 {inv.notes}</div>}
+          {invData.notes && !editing && <div className="text-xs text-gray-600 pt-2 border-t">📝 {invData.notes}</div>}
         </div>
 
         <div className="flex flex-wrap gap-2 pt-3 border-t">
           <button onClick={() => window.open(`/print/invoice/${invoiceId}?autoprint=1`, "_blank")} className="btn-secondary text-sm">🖨️ طباعة</button>
-          {inv.customer_id && (
+          {invData.customer_id && (
             <button
               onClick={() => setShowPaymentModal(true)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
@@ -635,7 +635,7 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
               ) : (
                 <>
                   <button onClick={saveChanges} disabled={saving} className="btn-primary text-sm">{saving ? "⏳ جاري الحفظ..." : "💾 حفظ"}</button>
-                  <button onClick={() => { setEditing(false); setItems(inv.items); setDiscount(Number(inv.discount)); setStatus(inv.status); setInvoiceType(inv.invoice_type); setNotes(inv.notes || ""); }} className="btn-secondary text-sm">إلغاء التعديل</button>
+                  <button onClick={() => { setEditing(false); setItems(invData.items || []); setDiscount(Number(invData.discount || 0)); setStatus(invData.status); setInvoiceType(invData.invoice_type); setNotes(invData.notes || ""); }} className="btn-secondary text-sm">إلغاء التعديل</button>
                 </>
               )}
               <button onClick={cancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء الفاتورة</button>
@@ -652,9 +652,9 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
         <CustomerPaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
-          defaultCustomerId={inv.customer_id}
-          defaultCustomerName={inv.customer?.name}
-          defaultInvoiceId={inv.id}
+          defaultCustomerId={invData.customer_id}
+          defaultCustomerName={invData.customer?.name}
+          defaultInvoiceId={invData.id}
           onSuccess={() => {
             refetch();
             onChanged();
