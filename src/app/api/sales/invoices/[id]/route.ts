@@ -456,15 +456,67 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN', message: 'الحذف النهائي للأدمن فقط' } }, { status: 403 });
       }
 
-      // حذف نهائي
+      const keepPayments = searchParams.get('keepPayments') === 'true';
+
+      // جلب بيانات الفاتورة مع المدفوعات لمعالجة الخزينة والرصيد
+      const invoiceToDelete = await prisma.sales_invoices.findUnique({
+        where: { id },
+        include: { items: true, payments: true },
+      });
+      if (!invoiceToDelete) return NextResponse.json({ ok: false, error: { code: 'NOT_FOUND' } }, { status: 404 });
+
       await prisma.$transaction(async (tx) => {
+        if (keepPayments) {
+          // الإبقاء على المدفوعات كرصيد دائن — فقط فك ارتباطها بالفاتورة
+          for (const payment of invoiceToDelete.payments) {
+            await tx.customer_payments.update({
+              where: { id: payment.id },
+              data: { invoice_id: null },
+            });
+          }
+          // عكس دين الفاتورة الكامل من رصيد العميل (الدفع فضل في الخزينة)
+          if (invoiceToDelete.customer_id && invoiceToDelete.status === 'مكتملة') {
+            const invoiceTotal = Number(invoiceToDelete.total);
+            if (invoiceTotal !== 0) {
+              await tx.customers.update({
+                where: { id: invoiceToDelete.customer_id },
+                data: { balance: { decrement: invoiceTotal } },
+              });
+            }
+          }
+        } else {
+          // حذف المدفوعات وعكس الخزينة ورصيد العميل
+          for (const payment of invoiceToDelete.payments) {
+            if (payment.treasury_id && Number(payment.amount) > 0) {
+              await tx.treasuries.update({
+                where: { id: payment.treasury_id },
+                data: { current_balance: { decrement: Number(payment.amount) } },
+              });
+            }
+            await tx.customer_payments.delete({ where: { id: payment.id } });
+          }
+          if (invoiceToDelete.customer_id && invoiceToDelete.status === 'مكتملة') {
+            const netDebt = Number(invoiceToDelete.total) - Number(invoiceToDelete.paid_amount || 0);
+            if (netDebt !== 0) {
+              await tx.customers.update({
+                where: { id: invoiceToDelete.customer_id },
+                data: { balance: { decrement: netDebt } },
+              });
+            }
+          }
+        }
+
+        // حذف البنود والفاتورة نهائياً
         await tx.sales_invoice_items.deleteMany({ where: { invoice_id: id } });
-        await tx.customer_payments.deleteMany({ where: { invoice_id: id } });
         await tx.sales_invoices.delete({ where: { id } });
       });
 
-      return NextResponse.json({ ok: true, data: { message: 'تم حذف الفاتورة نهائياً' } });
+      const msg = keepPayments
+        ? 'تم حذف الفاتورة نهائياً — المدفوعات أصبحت رصيداً دائناً للعميل'
+        : 'تم حذف الفاتورة نهائياً مع جميع المدفوعات';
+      return NextResponse.json({ ok: true, data: { message: msg } });
     }
+
 
     // الإلغاء العادي (إرجاع المخزون وعكس المدفوعات والخزينة)
     const invoice = await prisma.sales_invoices.findUnique({
@@ -481,6 +533,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ ok: false, error: { code: 'ALREADY_CANCELLED' } }, { status: 400 });
     }
 
+    const keepPayments = searchParams.get('keepPayments') === 'true';
+
     await prisma.$transaction(async (tx) => {
       // إرجاع المخزون لو كانت مكتملة
       if (invoice.status === 'مكتملة' && invoice.invoice_type !== 'عرض سعر') {
@@ -493,25 +547,45 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
           });
         }
 
-        // عكس المدفوعات والخزينة
-        for (const payment of invoice.payments) {
-          if (payment.treasury_id && Number(payment.amount) > 0) {
-            await tx.treasuries.update({
-              where: { id: payment.treasury_id },
-              data: { current_balance: { decrement: Number(payment.amount) } },
+        if (keepPayments) {
+          // إلغاء الفاتورة فقط — المدفوعات تفضل في الخزينة وتصبح رصيد دائن للعميل
+          // فك ارتباط السندات بالفاتورة فقط (تفضل كرصيد عام للعميل)
+          for (const payment of invoice.payments) {
+            await tx.customer_payments.update({
+              where: { id: payment.id },
+              data: { invoice_id: null },
             });
           }
-          await tx.customer_payments.delete({ where: { id: payment.id } });
-        }
-
-        // إرجاع رصيد العميل بالصافي الفعلي الذي أضيف لحسابه سابقاً (الإجمالي - المدفوع)
-        if (invoice.customer_id) {
-          const netDebt = Number(invoice.total) - Number(invoice.paid_amount || 0);
-          if (netDebt !== 0) {
-            await tx.customers.update({
-              where: { id: invoice.customer_id },
-              data: { balance: { decrement: netDebt } },
-            });
+          // عكس دين الفاتورة كاملاً (total) — لأن الدفع بقي في الخزينة وخُصم من رصيد العميل مسبقاً
+          if (invoice.customer_id) {
+            const invoiceTotal = Number(invoice.total);
+            if (invoiceTotal !== 0) {
+              await tx.customers.update({
+                where: { id: invoice.customer_id },
+                data: { balance: { decrement: invoiceTotal } },
+              });
+            }
+          }
+        } else {
+          // عكس كل شيء — حذف السندات وخصم الخزينة وإرجاع رصيد العميل
+          for (const payment of invoice.payments) {
+            if (payment.treasury_id && Number(payment.amount) > 0) {
+              await tx.treasuries.update({
+                where: { id: payment.treasury_id },
+                data: { current_balance: { decrement: Number(payment.amount) } },
+              });
+            }
+            await tx.customer_payments.delete({ where: { id: payment.id } });
+          }
+          // إرجاع رصيد العميل بالصافي الفعلي (الإجمالي - المدفوع)
+          if (invoice.customer_id) {
+            const netDebt = Number(invoice.total) - Number(invoice.paid_amount || 0);
+            if (netDebt !== 0) {
+              await tx.customers.update({
+                where: { id: invoice.customer_id },
+                data: { balance: { decrement: netDebt } },
+              });
+            }
           }
         }
       }
@@ -528,7 +602,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       });
     });
 
-    return NextResponse.json({ ok: true, data: { message: 'تم إلغاء الفاتورة وإرجاع المخزون والمدفوعات' } });
+    const msg = keepPayments
+      ? 'تم إلغاء الفاتورة وإرجاع المخزون — مبلغ الدفع أصبح رصيدًا دائنًا للعميل'
+      : 'تم إلغاء الفاتورة وإرجاع المخزون والمدفوعات';
+    return NextResponse.json({ ok: true, data: { message: msg } });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: { code: 'DB_ERROR', message: e?.message } }, { status: 500 });
   }
