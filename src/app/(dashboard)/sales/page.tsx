@@ -610,8 +610,8 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
           )}
           {Number(invData.paid_amount) > 0 && Number(invData.total) - Number(invData.paid_amount) > 0 && (
             <div className="flex justify-between text-gray-700 text-xs px-2">
-              <span>المتبقي على العميل:</span>
-              <span className="font-mono font-bold text-red-600">{formatEGP(Number(invData.total) - Number(invData.paid_amount))} ج</span>
+              <span>المتبقي من الفاتورة:</span>
+              <span className="font-mono font-bold text-amber-700">{formatEGP(Number(invData.total) - Number(invData.paid_amount))} ج</span>
             </div>
           )}
           {invData.notes && !editing && <div className="text-xs text-gray-600 pt-2 border-t">📝 {invData.notes}</div>}
