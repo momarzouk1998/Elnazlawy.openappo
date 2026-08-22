@@ -21,10 +21,12 @@ export function PdfDownloadButton({
   targetId = "statement",
   fileName = "كشف حساب",
   orientation = "portrait",
+  label = "📄 PDF",
 }: {
   targetId?: string;
   fileName?: string;
   orientation?: "portrait" | "landscape";
+  label?: string;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -200,7 +202,7 @@ export function PdfDownloadButton({
     <button
       onClick={handleDownloadPdf}
       disabled={loading}
-      className="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 disabled:cursor-not-allowed cursor-pointer"
+      className="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 disabled:cursor-not-allowed cursor-pointer"
     >
       {loading ? (
         <>
@@ -208,10 +210,7 @@ export function PdfDownloadButton({
           <span>جاري التحميل...</span>
         </>
       ) : (
-        <>
-          <span>📄</span>
-          <span>تحميل PDF</span>
-        </>
+        <span>{label}</span>
       )}
     </button>
   );

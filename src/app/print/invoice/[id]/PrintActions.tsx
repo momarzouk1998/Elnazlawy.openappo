@@ -7,7 +7,7 @@ import CustomerPaymentModal from "@/components/CustomerPaymentModal";
 export default function PrintActions({
   autoprint,
   backLink = "/sales",
-  backLabel = "↩️ العودة للفواتير",
+  backLabel = "↩️ عودة",
   fileName = "مستند",
   targetId = "statement",
   invoiceId,
@@ -36,35 +36,35 @@ export default function PrintActions({
 
   return (
     <>
-      <div className="no-print max-w-[720px] mx-auto mb-4 p-2.5 bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-2.5 justify-center items-center">
+      <div className="no-print max-w-[720px] mx-auto mb-4 p-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-2 justify-center items-center">
         {/* زر الطباعة */}
         <button
           onClick={() => window.print()}
-          className="bg-nazlawy-600 hover:bg-nazlawy-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+          className="bg-nazlawy-600 hover:bg-nazlawy-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
         >
           <span>🖨️</span>
           <span>طباعة</span>
         </button>
 
-        {/* زر تحميل PDF */}
-        <PdfDownloadButton targetId={targetId} fileName={fileName} />
+        {/* زر PDF */}
+        <PdfDownloadButton targetId={targetId} fileName={fileName} label="📄 PDF" />
 
-        {/* زر تسجيل تحصيل لو فيه عميل والفاتورة مش ملغاة */}
+        {/* زر تحصيل */}
         {customerId && !isCancelled && (
           <button
             onClick={() => setShowPaymentModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
             title="تسجيل دفعة جديدة من العميل"
           >
             <span>💳</span>
-            <span>تسجيل تحصيل</span>
+            <span>تحصيل</span>
           </button>
         )}
 
-        {/* زر العودة */}
+        {/* زر عودة */}
         <Link
           href={backLink}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1"
+          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 cursor-pointer"
         >
           {backLabel}
         </Link>
