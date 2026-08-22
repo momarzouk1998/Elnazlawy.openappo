@@ -422,6 +422,8 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
   const [invoiceType, setInvoiceType] = useState("");
   const [notes, setNotes] = useState("");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (inv && !editing) {
@@ -481,11 +483,16 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
     if (error) { alert("❌ " + error); return; }
     alert("✅ تم حفظ التعديلات"); setEditing(false); refetch(); onChanged();
   }
-  async function cancelInvoice() {
-    if (!confirm(isAdmin ? "⚠️ كمدير عام: سيتم إلغاء الفاتورة وإرجاع المخزون.\n\nهل أنت متأكد؟" : "هل تريد إلغاء هذه الفاتورة؟")) return;
+  function askCancelInvoice() {
+    setShowCancelConfirm(true);
+  }
+  async function confirmCancelInvoice() {
+    setCancelling(true);
     const { error } = await mutate("DELETE", `/api/sales/invoices/${invoiceId}`);
+    setCancelling(false);
+    setShowCancelConfirm(false);
     if (error) { alert("❌ " + error); return; }
-    alert("✅ تم إلغاء الفاتورة وإرجاع المخزون"); onClose(); onChanged();
+    onClose(); onChanged();
   }
   async function deleteInvoice() {
     if (!confirm("⚠️ حذف نهائي لا يمكن التراجع عنه. هل أنت متأكد؟")) return;
@@ -659,10 +666,10 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
                   <button onClick={() => { setEditing(false); setItems(invData.items || []); setDiscount(Number(invData.discount || 0)); setStatus(invData.status); setInvoiceType(invData.invoice_type); setNotes(invData.notes || ""); }} className="btn-secondary text-sm">إلغاء التعديل</button>
                 </>
               )}
-              <button onClick={cancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء الفاتورة</button>
+              <button onClick={askCancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء الفاتورة</button>
             </>
           )}
-          {isCompleted && !isQuotation && <button onClick={cancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء (إرجاع مخزون)</button>}
+          {isCompleted && !isQuotation && <button onClick={askCancelInvoice} className="text-sm px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">❌ إلغاء (إرجاع مخزون)</button>}
           {isCancelled && <span className="text-sm text-red-700 font-bold self-center">🚫 ملغاة</span>}
           {isAdmin && <button onClick={deleteInvoice} className="text-sm px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black ml-auto">🗑️ حذف نهائي</button>}
           <button onClick={onClose} className="btn-secondary text-sm">إغلاق</button>
@@ -681,6 +688,60 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
             onChanged();
           }}
         />
+      )}
+
+      {/* مودال تأكيد الإلغاء مع تفاصيل المدفوعات */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+            <div className="text-center">
+              <div className="text-5xl mb-2">⚠️</div>
+              <h3 className="text-lg font-extrabold text-red-700">تأكيد إلغاء الفاتورة</h3>
+              <p className="text-sm text-gray-500 mt-1">فاتورة #{invData.invoice_number}</p>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2 text-sm">
+              <p className="font-bold text-red-800">سيتم تلقائياً:</p>
+              <ul className="space-y-1 text-red-700 text-xs">
+                <li>📦 إرجاع المخزون لجميع الأصناف ({invData.items?.length || 0} صنف)</li>
+                {Number(invData.paid_amount) > 0 && (
+                  <>
+                    <li>💳 حذف سندات التحصيل المرتبطة بهذه الفاتورة</li>
+                    <li className="font-extrabold text-red-900 bg-red-100 px-2 py-1 rounded">
+                      🏦 خصم {formatEGP(Number(invData.paid_amount))} ج من الخزينة
+                    </li>
+                  </>
+                )}
+                {invData.customer && (
+                  <li>👤 تصحيح رصيد العميل "{invData.customer.name}"</li>
+                )}
+              </ul>
+            </div>
+
+            {Number(invData.paid_amount) === 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-700 text-center">
+                ℹ️ لا يوجد مبالغ مدفوعة مرتبطة بهذه الفاتورة
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={confirmCancelInvoice}
+                disabled={cancelling}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-extrabold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-60"
+              >
+                {cancelling ? "⏳ جاري الإلغاء..." : "✅ نعم، إلغاء الفاتورة"}
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={cancelling}
+                className="flex-1 btn-secondary text-sm"
+              >
+                رجوع
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showProductPicker && (

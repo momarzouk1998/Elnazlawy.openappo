@@ -395,14 +395,7 @@ export default function POSPage() {
                     </strong>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow flex items-center gap-1.5 transition-all"
-                  title="تسجيل سند تحصيل منفصل للعميل"
-                >
-                  <span>+ تسجيل تحصيل 💳</span>
-                </button>
+
               </div>
             )}
           </div>
@@ -515,8 +508,8 @@ export default function POSPage() {
             <span>صافي الفاتورة:</span><span className="text-nazlawy-600 font-mono">{formatEGP(total)} ج</span>
           </div>
 
-          {/* حقول الدفع الفوري */}
-          {invoiceType !== 'عرض سعر' && (
+          {/* حقول الدفع الفوري — فقط لو مكتملة (قيد التنفيذ لا يسجل مدفوعات حقيقية) */}
+          {invoiceType !== 'عرض سعر' && status === 'مكتملة' && (
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 space-y-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-bold text-emerald-950">المبلغ المدفوع (ج):</span>
