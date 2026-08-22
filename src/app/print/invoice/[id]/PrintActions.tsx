@@ -34,6 +34,15 @@ export default function PrintActions({
     }
   }, [autoprint]);
 
+  function handleClose() {
+    try {
+      window.close();
+    } catch {}
+    setTimeout(() => {
+      window.location.href = backLink;
+    }, 150);
+  }
+
   return (
     <>
       <div className="no-print max-w-[720px] mx-auto mb-4 p-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-2 justify-center items-center">
@@ -61,13 +70,15 @@ export default function PrintActions({
           </button>
         )}
 
-        {/* زر عودة */}
-        <Link
-          href={backLink}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 cursor-pointer"
+        {/* زر إغلاق التبويب */}
+        <button
+          onClick={handleClose}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+          title="إغلاق هذا التبويب"
         >
-          {backLabel}
-        </Link>
+          <span>✕</span>
+          <span>إغلاق</span>
+        </button>
       </div>
 
       {showPaymentModal && customerId && (
