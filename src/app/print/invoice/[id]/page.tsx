@@ -386,7 +386,7 @@ export default async function InvoicePrintPage({
             >
               <div>الحساب السابق</div>
               {!isCancelled && <div>+ الفاتورة الحالية</div>}
-              {!isCancelled && paidOnDate > 0 && <div style={{ color: C.green }}>- المدفوع بتاريخ الفاتورة</div>}
+              {!isCancelled && paidOnDate > 0 && <div style={{ color: C.green }}>- المدفوع</div>}
               <div style={{ color: C.dark }}>{isCancelled ? 'رصيد العميل' : '= المتبقي على العميل'}</div>
             </div>
             <div
