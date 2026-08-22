@@ -50,34 +50,19 @@ export default async function InvoicePrintPage({
   const isCancelled = invoice.status === 'ملغاة';
   const hasCustomer = !!invoice.customer;
 
-  // 1. حساب المدفوع المرتبط بالفاتورة بدقة تامة
-  let paidOnDate = Number(invoice.paid_amount || 0);
+  // 1. حساب المدفوع المرتبط بالفاتورة — بالاعتماد على invoice_id فقط (دقيق 100% بغض النظر عن التاريخ)
+  let paidOnDate = 0;
   if (hasCustomer && invoice.customer) {
     const linkedPayments = await prisma.customer_payments.findMany({
       where: { invoice_id: invoice.id },
       select: { amount: true },
     });
-    const linkedTotal = linkedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-    paidOnDate = Math.max(paidOnDate, linkedTotal);
+    paidOnDate = linkedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
-    // إذا لم يكن هناك دفع مسجل على الفاتورة، نبحث عن مدفوعات في نفس تاريخ الفاتورة
+    // Fallback: لو مفيش مدفوعات مربوطة بـ invoice_id (فواتير قديمة قبل التحديث)
+    // نستخدم الـ paid_amount المحفوظ على الفاتورة نفسها
     if (paidOnDate === 0) {
-      const invDateOnly = new Date(invoice.invoice_date);
-      invDateOnly.setUTCHours(0, 0, 0, 0);
-      const nextDay = new Date(invDateOnly);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-
-      const sameDatePayments = await prisma.customer_payments.findMany({
-        where: {
-          customer_id: invoice.customer.id,
-          payment_date: {
-            gte: invDateOnly,
-            lt: nextDay,
-          },
-        },
-        select: { amount: true },
-      });
-      paidOnDate = sameDatePayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      paidOnDate = Number(invoice.paid_amount || 0);
     }
   }
 

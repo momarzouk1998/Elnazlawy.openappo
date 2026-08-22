@@ -599,34 +599,42 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
         <div className="border-t pt-3 space-y-1 text-sm bg-slate-50 p-3 rounded-xl border border-slate-200">
           <div className="flex justify-between text-gray-600"><span>الإجمالي قبل الخصم:</span><span className="font-mono font-bold">{formatEGP(Number(invData.subtotal))} ج</span></div>
           {Number(invData.discount) > 0 && <div className="flex justify-between text-yellow-700"><span>الخصم:</span><span className="font-mono font-bold">- {formatEGP(Number(invData.discount))} ج</span></div>}
-          <div className="flex justify-between text-base font-extrabold border-t pt-1.5 text-slate-800">
-            <span>إجمالي الفاتورة:</span><span className="font-mono">{formatEGP(Number(invData.total))} ج</span>
+          <div className="border-t pt-2 mt-1 space-y-1.5">
+            {/* الترتيب المحاسبي الصحيح: حساب سابق ← الفاتورة ← المدفوع ← المتبقي */}
+            {invData.customer && invData.customer_prev_balance !== null && invData.customer_prev_balance !== undefined && (
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>الحساب السابق:</span>
+                <span className={`font-mono font-bold ${Number(invData.customer_prev_balance) > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {formatEGP(Number(invData.customer_prev_balance))} ج
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-sm font-extrabold text-slate-800">
+              <span>+ الفاتورة الحالية:</span>
+              <span className="font-mono">{formatEGP(Number(invData.total))} ج</span>
+            </div>
+            {Number(invData.paid_amount) > 0 && (
+              <div className="flex justify-between text-emerald-700 font-bold bg-emerald-100/70 px-2 py-1 rounded-md text-xs">
+                <span>- المبلغ المدفوع:</span>
+                <span className="font-mono">{formatEGP(Number(invData.paid_amount))} ج</span>
+              </div>
+            )}
+            {invData.customer && (
+              <div className="flex justify-between text-sm font-extrabold border-t pt-1.5 mt-1">
+                <span>= المتبقي على العميل:</span>
+                <span className={`font-mono ${
+                  (Number(invData.customer_prev_balance || 0) + Number(invData.total || 0) - Number(invData.paid_amount || 0)) > 0
+                    ? 'text-red-600' : 'text-emerald-600'
+                }`}>
+                  {formatEGP(
+                    Number(invData.customer_prev_balance || 0) +
+                    Number(invData.total || 0) -
+                    Number(invData.paid_amount || 0)
+                  )} ج
+                </span>
+              </div>
+            )}
           </div>
-          {Number(invData.paid_amount) > 0 && (
-            <div className="flex justify-between text-emerald-700 font-bold bg-emerald-100/70 px-2 py-1 rounded-md text-xs">
-              <span>المبلغ المدفوع (تحصيل فوري):</span>
-              <span className="font-mono">{formatEGP(Number(invData.paid_amount))} ج</span>
-            </div>
-          )}
-          {invData.customer_prev_balance !== null && invData.customer_prev_balance !== undefined && (
-            <div className="flex justify-between text-xs text-gray-600 pt-1">
-              <span>رصيد العميل السابق:</span>
-              <span className="font-mono font-bold">{formatEGP(Number(invData.customer_prev_balance))} ج</span>
-            </div>
-          )}
-          {invData.customer && (
-            <div className="flex justify-between text-sm font-extrabold border-t pt-1.5 text-nazlawy-700">
-              <span>المتبقي على العميل:</span>
-              <span className="font-mono text-red-600">
-                {formatEGP(
-                  Number(
-                    invData.customer_new_balance ??
-                    (Number(invData.customer_prev_balance || 0) + Number(invData.total || 0) - Number(invData.paid_amount || 0))
-                  )
-                )} ج
-              </span>
-            </div>
-          )}
           {invData.notes && !editing && <div className="text-xs text-gray-600 pt-2 border-t">📝 {invData.notes}</div>}
         </div>
 
