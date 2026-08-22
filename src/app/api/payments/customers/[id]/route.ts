@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
 
-      // 5. إعادة حساب المبلغ المدفوع على الفاتورة من سندات التحصيل الفعلية
+      // 5. إعادة حساب المبلغ المدفوع والرصيد الجديد على الفاتورة من سندات التحصيل الفعلية
       if (existing.invoice_id) {
         const allPaid = await tx.customer_payments.aggregate({
           where: { invoice_id: existing.invoice_id },
@@ -104,9 +104,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
         const invoiceTotal = Number(existing.invoice?.total || 0);
         const newPaid = Math.min(invoiceTotal, Number(allPaid._sum.amount || 0));
+        const updatedNewBal = existing.invoice?.customer_prev_balance !== null && existing.invoice?.customer_prev_balance !== undefined
+          ? Number(existing.invoice.customer_prev_balance) + invoiceTotal - newPaid
+          : null;
         await tx.sales_invoices.update({
           where: { id: existing.invoice_id },
-          data: { paid_amount: newPaid },
+          data: {
+            paid_amount: newPaid,
+            ...(updatedNewBal !== null ? { customer_new_balance: updatedNewBal } : {}),
+          },
         });
       }
 
@@ -178,19 +184,26 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
         });
       }
 
-      // 3. إعادة حساب المبلغ المدفوع على الفاتورة من سندات التحصيل الفعلية (بدلاً من الطرح من الـ snapshot)
+      // 3. إعادة حساب المبلغ المدفوع والرصيد الجديد على الفاتورة من سندات التحصيل الفعلية
       if (payment.invoice_id) {
         const remaining = await tx.customer_payments.aggregate({
           where: { invoice_id: payment.invoice_id, id: { not: id } },
           _sum: { amount: true },
         });
+        const invoiceTotal = Number(payment.invoice?.total || 0);
         const newPaid = Math.min(
-          Number(payment.invoice?.total || 0),
+          invoiceTotal,
           Number(remaining._sum.amount || 0)
         );
+        const updatedNewBal = payment.invoice?.customer_prev_balance !== null && payment.invoice?.customer_prev_balance !== undefined
+          ? Number(payment.invoice.customer_prev_balance) + invoiceTotal - newPaid
+          : null;
         await tx.sales_invoices.update({
           where: { id: payment.invoice_id },
-          data: { paid_amount: newPaid },
+          data: {
+            paid_amount: newPaid,
+            ...(updatedNewBal !== null ? { customer_new_balance: updatedNewBal } : {}),
+          },
         });
       }
 

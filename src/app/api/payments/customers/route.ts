@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         data: { balance: { decrement: amt } },
       });
 
-      // 5. إعادة حساب المبلغ المدفوع على الفاتورة من سندات التحصيل الفعلية
+      // 5. إعادة حساب المبلغ المدفوع والرصيد الجديد على الفاتورة من سندات التحصيل الفعلية
       if (invoice_id) {
         const invoice = await tx.sales_invoices.findUnique({ where: { id: invoice_id } });
         if (invoice) {
@@ -116,9 +116,15 @@ export async function POST(request: NextRequest) {
             _sum: { amount: true },
           });
           const newPaid = Math.min(Number(invoice.total), Number(allPaid._sum.amount || 0));
+          const updatedNewBal = invoice.customer_prev_balance !== null
+            ? Number(invoice.customer_prev_balance) + Number(invoice.total) - newPaid
+            : null;
           await tx.sales_invoices.update({
             where: { id: invoice_id },
-            data: { paid_amount: newPaid },
+            data: {
+              paid_amount: newPaid,
+              ...(updatedNewBal !== null ? { customer_new_balance: updatedNewBal } : {}),
+            },
           });
         }
       }

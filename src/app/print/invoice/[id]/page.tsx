@@ -93,9 +93,7 @@ export default async function InvoicePrintPage({
       prevBalance = Number(invoice.customer_prev_balance);
       newBalance = isCancelled
         ? prevBalance
-        : invoice.customer_new_balance !== null && invoice.customer_new_balance !== undefined
-          ? Number(invoice.customer_new_balance)
-          : prevBalance + (Number(invoice.total) - paidOnDate);
+        : prevBalance + (Number(invoice.total) - paidOnDate);
     } else {
       // 2. Fallback للفواتير القديمة بالتسلسل الرقمي
       const custId = invoice.customer.id;
