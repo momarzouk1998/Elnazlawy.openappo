@@ -562,14 +562,6 @@ export default function POSPage() {
                 </div>
               )}
 
-              {paidAmount > 0 && total > 0 && (
-                <div className="flex justify-between text-xs font-semibold pt-1 border-t border-emerald-200">
-                  <span className="text-gray-600">المتبقي من الفاتورة:</span>
-                  <span className={`font-mono font-bold ${total - paidAmount > 0 ? 'text-amber-800' : 'text-emerald-800'}`}>
-                    {formatEGP(Math.max(0, total - paidAmount))} ج
-                  </span>
-                </div>
-              )}
             </div>
           )}
 
