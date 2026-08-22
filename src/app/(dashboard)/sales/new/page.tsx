@@ -582,7 +582,7 @@ export default function POSPage() {
                 </strong>
               </div>
               <div className="flex justify-between items-center text-gray-700 font-bold pt-1.5 border-t border-slate-200">
-                <span>الرصيد بعد إضافة الفاتورة والتحصيل:</span>
+                <span>المتبقي على العميل:</span>
                 <span className="font-mono text-nazlawy-700 font-extrabold text-sm">
                   {formatEGP(Number(selectedCustomer.balance || 0) + (Number(total || 0) - Number(paidAmount || 0)))} ج
                 </span>
