@@ -13,7 +13,8 @@ import Pagination from "@/components/Pagination";
 interface Invoice {
   id: string; invoice_number: number; invoice_date: string;
   invoice_type: string; status: string; total: number;
-  customer: { name: string } | null; store: { name: string } | null;
+  customer_id?: string | null;
+  customer: { id?: string; name: string } | null; store: { name: string } | null;
   creator?: { full_name: string } | null;
   _count: { items: number }; subtotal?: number; discount?: number; paid_amount?: number;
 }
@@ -85,6 +86,7 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [openInvoice, setOpenInvoice] = useState<Invoice | string | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -160,9 +162,17 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
                     <div className="font-bold text-nazlawy-600 text-base shrink-0 ml-2">{formatEGP(inv.total)} ج</div>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-2 pt-2 border-t">
-                  <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200">🖨️ طباعة</button>
-                  <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">📄 PDF</button>
+                <div className="flex gap-2 mt-2 pt-2 border-t" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="flex-1 text-xs px-2 py-1.5 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200 font-medium flex items-center justify-center gap-1">
+                    <span>🖨️</span>
+                    <span>طباعة</span>
+                  </button>
+                  {inv.customer && inv.status !== 'ملغاة' && (
+                    <button onClick={() => setPaymentInvoice(inv)} className="flex-1 text-xs px-2 py-1.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 font-bold flex items-center justify-center gap-1">
+                      <span>💳</span>
+                      <span>تحصيل</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -193,9 +203,17 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
                     <td className="p-3 font-bold text-nazlawy-600">{formatEGP(inv.total)}</td>
                     <td className="p-3"><span className={`badge ${statusColor(inv.status)}`}>{inv.status}</span></td>
                     <td className="p-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex gap-1">
-                        <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="text-xs px-2 py-1 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200" title="طباعة مباشرة">🖨️</button>
-                        <button onClick={() => window.open(`/print/invoice/${inv.id}?format=pdf`, "_blank")} className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200" title="PDF">📄</button>
+                      <div className="flex gap-1.5 items-center">
+                        <button onClick={() => window.open(`/print/invoice/${inv.id}?autoprint=1`, "_blank")} className="text-xs px-2.5 py-1 rounded bg-nazlawy-50 text-nazlawy-700 hover:bg-nazlawy-100 border border-nazlawy-200 font-medium flex items-center gap-1" title="طباعة الفاتورة">
+                          <span>🖨️</span>
+                          <span>طباعة</span>
+                        </button>
+                        {inv.customer && inv.status !== 'ملغاة' && (
+                          <button onClick={() => setPaymentInvoice(inv)} className="text-xs px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 font-bold flex items-center gap-1 shadow-sm" title="تسجيل تحصيل لهذه الفاتورة">
+                            <span>💳</span>
+                            <span>تحصيل</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -223,6 +241,20 @@ function SalesTab({ isAdmin }: { isAdmin: boolean }) {
           isAdmin={isAdmin}
           onClose={() => setOpenInvoice(null)}
           onChanged={refetch}
+        />
+      )}
+
+      {paymentInvoice && (
+        <CustomerPaymentModal
+          isOpen={!!paymentInvoice}
+          onClose={() => setPaymentInvoice(null)}
+          defaultCustomerId={paymentInvoice.customer_id || paymentInvoice.customer?.id}
+          defaultCustomerName={paymentInvoice.customer?.name}
+          defaultInvoiceId={paymentInvoice.id}
+          onSuccess={() => {
+            setPaymentInvoice(null);
+            refetch();
+          }}
         />
       )}
     </div>
