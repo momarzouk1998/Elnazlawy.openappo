@@ -147,6 +147,10 @@ export default async function InvoicePrintPage({
         autoprint={autoprint}
         fileName={`فاتورة ${invoice.invoice_type} - ${invoice.invoice_number}`}
         targetId="statement"
+        invoiceId={invoice.id}
+        customerId={invoice.customer?.id}
+        customerName={invoice.customer?.name}
+        isCancelled={isCancelled}
       />
 
       <div

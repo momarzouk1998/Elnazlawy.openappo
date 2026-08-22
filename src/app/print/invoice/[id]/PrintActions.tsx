@@ -1,7 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PdfDownloadButton } from "@/components/PdfDownloadButton";
+import CustomerPaymentModal from "@/components/CustomerPaymentModal";
 
 export default function PrintActions({
   autoprint,
@@ -9,13 +10,23 @@ export default function PrintActions({
   backLabel = "↩️ العودة للفواتير",
   fileName = "مستند",
   targetId = "statement",
+  invoiceId,
+  customerId,
+  customerName,
+  isCancelled,
 }: {
   autoprint?: boolean;
   backLink?: string;
   backLabel?: string;
   fileName?: string;
   targetId?: string;
+  invoiceId?: string;
+  customerId?: string;
+  customerName?: string;
+  isCancelled?: boolean;
 }) {
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
   useEffect(() => {
     if (autoprint) {
       const t = setTimeout(() => window.print(), 600);
@@ -23,17 +34,57 @@ export default function PrintActions({
     }
   }, [autoprint]);
 
-  function closeWindow() {
-    try { window.close(); } catch {}
-    setTimeout(() => { window.location.href = "/"; }, 200);
-  }
-
   return (
-    <div className="no-print max-w-[720px] mx-auto mb-4 flex flex-wrap gap-3 justify-center">
-      <button onClick={() => window.print()} className="bg-button-orange text-white px-6 py-2.5 rounded-full font-bold">🖨️ طباعة</button>
-      <PdfDownloadButton targetId={targetId} fileName={fileName} />
-      <Link href={backLink} className="bg-nazlawy-500 text-white px-6 py-2.5 rounded-full font-bold hover:bg-nazlawy-600">{backLabel}</Link>
-      <button onClick={closeWindow} className="bg-button-gray text-white px-6 py-2.5 rounded-full font-bold">✕ إغلاق التبويب</button>
-    </div>
+    <>
+      <div className="no-print max-w-[720px] mx-auto mb-4 p-2.5 bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-2.5 justify-center items-center">
+        {/* زر الطباعة */}
+        <button
+          onClick={() => window.print()}
+          className="bg-nazlawy-600 hover:bg-nazlawy-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+        >
+          <span>🖨️</span>
+          <span>طباعة</span>
+        </button>
+
+        {/* زر تحميل PDF */}
+        <PdfDownloadButton targetId={targetId} fileName={fileName} />
+
+        {/* زر تسجيل تحصيل لو فيه عميل والفاتورة مش ملغاة */}
+        {customerId && !isCancelled && (
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
+            title="تسجيل دفعة جديدة من العميل"
+          >
+            <span>💳</span>
+            <span>تسجيل تحصيل</span>
+          </button>
+        )}
+
+        {/* زر العودة */}
+        <Link
+          href={backLink}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1"
+        >
+          {backLabel}
+        </Link>
+      </div>
+
+      {showPaymentModal && customerId && (
+        <CustomerPaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          defaultCustomerId={customerId}
+          defaultCustomerName={customerName}
+          defaultInvoiceId={invoiceId}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            // تحديث الصفحة تلقائياً لتنعكس بيانات التحصيل فوراً في الطباعة
+            window.location.reload();
+          }}
+        />
+      )}
+    </>
   );
 }
+

@@ -200,54 +200,19 @@ export function PdfDownloadButton({
     <button
       onClick={handleDownloadPdf}
       disabled={loading}
-      style={{
-        background: loading ? "#999" : "linear-gradient(135deg, #f56226, #d9531e)",
-        border: "none",
-        color: "white",
-        fontWeight: 700,
-        fontSize: "0.95rem",
-        padding: "0.6rem 1.8rem",
-        borderRadius: "40px",
-        cursor: loading ? "not-allowed" : "pointer",
-        boxShadow: "0 4px 12px rgba(245, 98, 38, 0.3)",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "8px",
-        fontFamily: "inherit",
-        transition: "all 0.3s ease",
-      }}
+      className="bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 disabled:cursor-not-allowed cursor-pointer"
     >
       {loading ? (
         <>
-          <span
-            style={{
-              border: "3px solid rgba(255,255,255,0.3)",
-              borderRadius: "50%",
-              borderTop: "3px solid white",
-              width: "18px",
-              height: "18px",
-              animation: "spin 1s linear infinite",
-              display: "inline-block",
-            }}
-          />
-          جاري التحميل...
+          <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+          <span>جاري التحميل...</span>
         </>
       ) : (
         <>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            fill="currentColor"
-            viewBox="0 0 16 16"
-            style={{ verticalAlign: "middle" }}
-          >
-            <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1m-1 4v3.793l1.146-1.147a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 .708-.708L7.5 11.293V7.5a.5.5 0 0 1 1 0" />
-          </svg>
-          تحميل PDF
+          <span>📄</span>
+          <span>تحميل PDF</span>
         </>
       )}
-      <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
     </button>
   );
 }
