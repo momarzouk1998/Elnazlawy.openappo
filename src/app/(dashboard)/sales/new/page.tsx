@@ -88,22 +88,10 @@ export default function POSPage() {
       return;
     }
 
-    // المخزن المستهدف: افتراضياً المخزن الرئيسي إذا كان به متاح، أو أول مخزن به كمية متوفرة لهذا الصنف
-    let targetStore = stores.items.find(s => s.id === primaryStoreId) || stores.items[0];
-    let available = stockFor(p, targetStore.id);
-
-    // لو المتاح 0 في المخزن المختار، ابحث عن أول مخزن آخر به كمية متوفرة > 0
-    if (available <= 0) {
-      const bestBreakdown = storeBreakdown(p);
-      if (bestBreakdown.length > 0) {
-        const found = stores.items.find(s => s.id === bestBreakdown[0].id);
-        if (found) {
-          targetStore = found;
-          available = bestBreakdown[0].available;
-        }
-      }
-    }
-
+    // المخزن المستهدف: المخزن المختار بالرئيسي، أو أول مخزن
+    const chosenStoreId = primaryStoreId || stores.items[0].id;
+    const targetStore = stores.items.find(s => s.id === chosenStoreId) || stores.items[0];
+    const available = stockFor(p, targetStore.id);
     const existing = cart.find(c => c.product_id === p.id && c.store_id === targetStore.id);
 
     if (existing) {
@@ -332,7 +320,6 @@ export default function POSPage() {
           ) : (productsData?.items || []).length > 0 ? (
             productsData?.items.map(p => {
               const breakdown = storeBreakdown(p);
-              const totalStock = Number(p.total_stock ?? p.inventory_items?.reduce((s, i) => s + Number(i.current_stock), 0) ?? breakdown.reduce((s, b) => s + b.available, 0));
               const selectedStoreStock = stockFor(p, primaryStoreId);
               return (
                 <button
@@ -343,18 +330,13 @@ export default function POSPage() {
                 >
                   <div className="font-bold text-sm text-gray-800 line-clamp-2">{p.name}</div>
                   <div className="mt-2 space-y-0.5">
-                    <div className="text-xs flex justify-between items-center">
-                      <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${totalStock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        إجمالي المتاح: {formatQty(totalStock)}
+                    <div className="text-xs flex justify-end items-center">
+                      <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${selectedStoreStock > 0 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        المتاح: {formatQty(selectedStoreStock)}
                       </span>
-                      {primaryStoreId && (
-                        <span className="text-[10px] text-gray-500 font-mono">
-                          المختار: {formatQty(selectedStoreStock)}
-                        </span>
-                      )}
                     </div>
                     {breakdown.length > 0 && (
-                      <div className="text-[10px] text-gray-600 font-mono truncate">
+                      <div className="text-[10px] text-gray-500 font-mono truncate">
                         {breakdown.map(s => `${s.name}: ${formatQty(s.available)}`).join(' • ')}
                       </div>
                     )}
@@ -591,19 +573,18 @@ export default function POSPage() {
             </div>
           )}
 
-          {/* رصيد العميل وملخص الحساب */}
           {selectedCustomer && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5">
               <div className="flex justify-between items-center text-gray-600">
-                <span>رصيد العميل السابق (قبل الفاتورة):</span>
-                <strong className={`font-mono ${Number(selectedCustomer.balance) > 0 ? 'text-amber-700 font-bold' : 'text-emerald-700'}`}>
+                <span>رصيد العميل السابق:</span>
+                <strong className={`font-mono ${Number(selectedCustomer.balance || 0) > 0 ? 'text-amber-700 font-bold' : 'text-emerald-700'}`}>
                   {formatEGP(Number(selectedCustomer.balance || 0))} ج
                 </strong>
               </div>
               <div className="flex justify-between items-center text-gray-700 font-bold pt-1.5 border-t border-slate-200">
-                <span>الرصيد النهائي المتوقع بعد الفاتورة:</span>
+                <span>الرصيد بعد إضافة الفاتورة والتحصيل:</span>
                 <span className="font-mono text-nazlawy-700 font-extrabold text-sm">
-                  {formatEGP(Number(selectedCustomer.balance || 0) + (total - paidAmount))} ج
+                  {formatEGP(Number(selectedCustomer.balance || 0) + (Number(total || 0) - Number(paidAmount || 0)))} ج
                 </span>
               </div>
             </div>

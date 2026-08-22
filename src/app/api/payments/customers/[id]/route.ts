@@ -149,9 +149,9 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
     if (!payment) return NextResponse.json({ ok: false, error: { code: "NOT_FOUND" } }, { status: 404 });
 
-    // فقط المنشئ أو admin
-    if (payment.created_by !== profile.id && profile.role !== 'admin') {
-      return NextResponse.json({ ok: false, error: { code: "FORBIDDEN" } }, { status: 403 });
+    // المصرح لهم: المدير، المحاسب، المنشئ، أو الأدمن
+    if (payment.created_by && payment.created_by !== profile.id && !['admin', 'manager', 'accountant'].includes(profile.role)) {
+      return NextResponse.json({ ok: false, error: { code: "FORBIDDEN", message: "غير مصرح لك بحذف هذه المدفوعة" } }, { status: 403 });
     }
 
     const result = await prisma.$transaction(async (tx) => {

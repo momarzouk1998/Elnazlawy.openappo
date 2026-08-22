@@ -16,6 +16,22 @@ export default function SupplierPaymentsPage() {
   const [show, setShow] = useState(false);
   const { data, loading, refetch } = useApi<ApiResponse>("/api/payments/suppliers?limit=200");
 
+  async function handleDelete(p: Payment) {
+    if (!confirm(`⚠️ هل أنت متأكد من حذف سند السداد بمبلغ ${formatEGP(p.amount)} ج للمورد "${p.supplier?.name || 'غير محدد'}"؟\n\nسيتم إرجاع المبلغ لحساب المورد وإعادة إيداعه في الخزينة.`)) return;
+    try {
+      const res = await fetch(`/api/payments/suppliers/${p.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) {
+        alert("❌ " + (json?.error?.message || json?.error?.code || "فشل في الحذف"));
+        return;
+      }
+      alert("✅ تم حذف سند السداد وإرجاع المبلغ لحساب المورد والتحديث بنجاح");
+      refetch();
+    } catch {
+      alert("❌ حدث خطأ أثناء الحذف");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -37,6 +53,7 @@ export default function SupplierPaymentsPage() {
                 <th className="p-3 text-right">طريقة الدفع</th>
                 <th className="p-3 text-right">المبلغ</th>
                 <th className="p-3 text-right">ملاحظات</th>
+                <th className="p-3 text-center">إجراء</th>
               </tr>
             </thead>
             <tbody>
@@ -48,9 +65,18 @@ export default function SupplierPaymentsPage() {
                   <td className="p-3 text-xs">{p.payment_method}</td>
                   <td className="p-3 font-mono font-bold text-red-700">{formatEGP(p.amount)}</td>
                   <td className="p-3 text-xs text-gray-500">{p.notes || '—'}</td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => handleDelete(p)}
+                      className="text-xs px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded font-bold"
+                      title="حذف سند السداد وإرجاع المبلغ لحساب المورد"
+                    >
+                      🗑️ حذف
+                    </button>
+                  </td>
                 </tr>
               ))}
-              {data?.items.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400">لا توجد مدفوعات</td></tr>}
+              {data?.items.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-gray-400">لا توجد مدفوعات</td></tr>}
             </tbody>
           </table>
         </div>
