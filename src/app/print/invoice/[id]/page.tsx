@@ -143,16 +143,6 @@ export default async function InvoicePrintPage({
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '0.75rem', fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif" }}>
-      <PrintActions
-        autoprint={autoprint}
-        fileName={`فاتورة ${invoice.invoice_type} - ${invoice.invoice_number}`}
-        targetId="statement"
-        invoiceId={invoice.id}
-        customerId={invoice.customer?.id}
-        customerName={invoice.customer?.name}
-        isCancelled={isCancelled}
-      />
-
       <div
         id="statement"
         className="print-page"
@@ -456,6 +446,16 @@ export default async function InvoicePrintPage({
           )}
         </div>
       </div>
+
+      <PrintActions
+        autoprint={autoprint}
+        fileName={`فاتورة ${invoice.invoice_type} - ${invoice.invoice_number}`}
+        targetId="statement"
+        invoiceId={invoice.id}
+        customerId={invoice.customer?.id}
+        customerName={invoice.customer?.name}
+        isCancelled={isCancelled}
+      />
     </div>
   );
 }

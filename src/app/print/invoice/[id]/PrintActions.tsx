@@ -45,11 +45,11 @@ export default function PrintActions({
 
   return (
     <>
-      <div className="no-print max-w-[720px] mx-auto mb-4 p-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-2 justify-center items-center">
+      <div className="no-print max-w-[620px] mx-auto mt-4 mb-8 flex flex-wrap gap-2.5 justify-center items-center">
         {/* زر الطباعة */}
         <button
           onClick={() => window.print()}
-          className="bg-nazlawy-600 hover:bg-nazlawy-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+          className="bg-nazlawy-600 hover:bg-nazlawy-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
         >
           <span>🖨️</span>
           <span>طباعة</span>
@@ -62,7 +62,7 @@ export default function PrintActions({
         {customerId && !isCancelled && (
           <button
             onClick={() => setShowPaymentModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
             title="تسجيل دفعة جديدة من العميل"
           >
             <span>💳</span>
@@ -73,7 +73,7 @@ export default function PrintActions({
         {/* زر إغلاق التبويب */}
         <button
           onClick={handleClose}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+          className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-1 cursor-pointer active:scale-95"
           title="إغلاق هذا التبويب"
         >
           <span>✕</span>
