@@ -110,7 +110,7 @@ export default function POSPage() {
         store_id: targetStore.id,
         store_name: targetStore.name,
         quantity: '1',
-        unit_price: String(p.default_sale_price || 0),
+        unit_price: p.default_sale_price && Number(p.default_sale_price) > 0 ? String(p.default_sale_price) : '',
         available,
         product_ref: p
       }]);
@@ -455,7 +455,15 @@ export default function POSPage() {
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">سعر الوحدة (ج)</label>
-                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_price} onChange={(e) => updateItem(i, 'unit_price', e.target.value)} />
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        className="input-field text-xs p-1"
+                        value={c.unit_price}
+                        onChange={(e) => updateItem(i, 'unit_price', e.target.value)}
+                        placeholder="0"
+                      />
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">الإجمالي</label>
@@ -502,7 +510,15 @@ export default function POSPage() {
           <div className="flex justify-between text-sm"><span>الإجمالي قبل الخصم:</span><span className="font-bold">{formatEGP(subtotal)} ج</span></div>
           <div className="flex justify-between items-center text-sm">
             <span>الخصم:</span>
-            <input type="number" min={0} step={0.01} className="w-24 input-field text-sm p-1" value={discount} onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              className="w-24 input-field text-sm p-1"
+              value={discount === 0 ? '' : discount}
+              onChange={(e) => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+              placeholder="0"
+            />
           </div>
           <div className="flex justify-between text-base font-extrabold border-t pt-1.5 text-slate-800">
             <span>صافي الفاتورة:</span><span className="text-nazlawy-600 font-mono">{formatEGP(total)} ج</span>
@@ -518,7 +534,7 @@ export default function POSPage() {
                   min={0}
                   step={0.01}
                   className="w-28 input-field text-sm p-1 text-center font-mono font-extrabold border-emerald-300"
-                  value={paidAmount}
+                  value={paidAmount === 0 ? '' : paidAmount}
                   onChange={(e) => setPaidAmount(Math.max(0, parseFloat(e.target.value) || 0))}
                   placeholder="0"
                 />
@@ -640,11 +656,11 @@ function NewProductModal({ initialName, onClose, onAdded }: { initialName: strin
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">سعر البيع *</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={f.default_sale_price} onChange={(e) => setF({ ...f, default_sale_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={f.default_sale_price === 0 ? '' : f.default_sale_price} onChange={(e) => setF({ ...f, default_sale_price: parseFloat(e.target.value) || 0 })} placeholder="0" />
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">سعر الشراء *</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price === 0 ? '' : f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} placeholder="0" />
           </div>
         </div>
         <div>

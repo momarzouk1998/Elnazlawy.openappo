@@ -121,7 +121,7 @@ function EditForm({ expense, onClose, onSaved }: { expense: Expense; onClose: ()
         </div>
         <div><label className="text-sm font-medium block mb-1">البيان *</label><input className="input-field" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} autoFocus /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount === 0 ? '' : f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} placeholder="0" /></div>
           <div><label className="text-sm font-medium block mb-1">التاريخ</label><input type="date" className="input-field" value={f.expense_date} onChange={(e) => setF({ ...f, expense_date: e.target.value })} /></div>
         </div>
         <div><label className="text-sm font-medium block mb-1">ملاحظات</label><input className="input-field" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></div>
@@ -169,7 +169,7 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
         </div>
         <div><label className="text-sm font-medium block mb-1">البيان *</label><input className="input-field" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} autoFocus /></div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount === 0 ? '' : f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} placeholder="0" /></div>
           <div><label className="text-sm font-medium block mb-1">الخزينة *</label>
             <select className="input-field" value={f.treasury_id} onChange={(e) => setF({ ...f, treasury_id: e.target.value })}>
               <option value="">اختر...</option>

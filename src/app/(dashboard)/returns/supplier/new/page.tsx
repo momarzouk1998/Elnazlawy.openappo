@@ -259,8 +259,9 @@ export default function NewSupplierReturnPage() {
                         min={0}
                         step="any"
                         className="input-field text-xs p-1"
-                        value={c.unit_cost}
+                        value={c.unit_cost === 0 ? '' : c.unit_cost}
                         onChange={e => updateItem(i, "unit_cost", parseFloat(e.target.value) || 0)}
+                        placeholder="0"
                       />
                     </div>
                     <div>

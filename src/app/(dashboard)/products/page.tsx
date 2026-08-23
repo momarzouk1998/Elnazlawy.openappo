@@ -377,11 +377,11 @@ function ProductFormModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
           )}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price === 0 ? '' : form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} placeholder="0" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
-            <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
+            <input type="number" min={0} className="input-field" value={form.reorder_level === 0 ? '' : form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} placeholder="0" />
           </div>
         </div>
 
@@ -495,11 +495,11 @@ function ProductEditModal({ product, onClose, onSaved }: { product: Product; onC
           )}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">سعر الشراء</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={form.last_purchase_price === 0 ? '' : form.last_purchase_price} onChange={(e) => setForm({ ...form, last_purchase_price: parseFloat(e.target.value) || 0 })} placeholder="0" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">الحد الأدنى للتنبيه</label>
-            <input type="number" min={0} className="input-field" value={form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} />
+            <input type="number" min={0} className="input-field" value={form.reorder_level === 0 ? '' : form.reorder_level} onChange={(e) => setForm({ ...form, reorder_level: parseInt(e.target.value) || 0 })} placeholder="0" />
           </div>
         </div>
 

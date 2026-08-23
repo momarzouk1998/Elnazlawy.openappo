@@ -49,7 +49,7 @@ export default function NewPurchasePage() {
         store_id: defaultStoreId,
         store_name: chosenStore?.name || '',
         quantity: 1,
-        unit_cost: Number(p.last_purchase_price) || 0,
+        unit_cost: p.last_purchase_price && Number(p.last_purchase_price) > 0 ? Number(p.last_purchase_price) : 0,
       }]);
     }
   }
@@ -232,7 +232,7 @@ export default function NewPurchasePage() {
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">سعر الشراء (ج)</label>
-                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_cost} onChange={(e) => updateItem(i, 'unit_cost', parseFloat(e.target.value) || 0)} />
+                      <input type="number" min={0} step="any" className="input-field text-xs p-1" value={c.unit_cost === 0 ? '' : c.unit_cost} onChange={(e) => updateItem(i, 'unit_cost', parseFloat(e.target.value) || 0)} placeholder="0" />
                     </div>
                     <div>
                       <label className="text-[10px] text-gray-500 block mb-0.5">الإجمالي</label>
@@ -310,7 +310,7 @@ function NewProductModal({ initialName, onClose, onAdded }: { initialName: strin
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-sm font-medium block mb-1">سعر الشراء</label>
-            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} />
+            <input type="number" step="0.01" min={0} className="input-field" value={f.last_purchase_price === 0 ? '' : f.last_purchase_price} onChange={(e) => setF({ ...f, last_purchase_price: parseFloat(e.target.value) || 0 })} placeholder="0" />
           </div>
           <div>
             <label className="text-sm font-medium block mb-1">الفئة</label>

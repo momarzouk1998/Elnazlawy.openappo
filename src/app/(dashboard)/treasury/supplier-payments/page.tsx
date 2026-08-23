@@ -120,7 +120,7 @@ function Form({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }
           </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} /></div>
+          <div><label className="text-sm font-medium block mb-1">المبلغ *</label><input type="number" step="0.01" className="input-field" value={f.amount === 0 ? '' : f.amount} onChange={(e) => setF({ ...f, amount: parseFloat(e.target.value) || 0 })} placeholder="0" /></div>
           <div>
             <label className="text-sm font-medium block mb-1">طريقة الدفع</label>
             <select className="input-field" value={f.payment_method} onChange={(e) => setF({ ...f, payment_method: e.target.value })}>

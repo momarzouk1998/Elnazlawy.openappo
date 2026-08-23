@@ -580,7 +580,7 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
                 <div key={i} className="bg-gray-50 rounded p-2 text-sm flex items-center gap-2 flex-wrap">
                   <div className="font-semibold flex-1 min-w-[150px]">{it.product_name}</div>
                   <input type="number" min={0} step="any" value={it.quantity} onChange={e => updateItem(i, "quantity", parseFloat(e.target.value) || 0)} className="input-field text-xs p-1 w-20" placeholder="الكمية" />
-                  <input type="number" min={0} step="any" value={it.unit_price} onChange={e => updateItem(i, "unit_price", parseFloat(e.target.value) || 0)} className="input-field text-xs p-1 w-24" placeholder="السعر" />
+                  <input type="number" min={0} step="any" value={it.unit_price === 0 ? '' : it.unit_price} onChange={e => updateItem(i, "unit_price", parseFloat(e.target.value) || 0)} className="input-field text-xs p-1 w-24" placeholder="السعر" />
                   <div className="text-xs font-bold w-24 text-left">{formatEGP(Number(it.quantity) * Number(it.unit_price))}</div>
                   <button onClick={() => removeItem(i)} className="text-red-500 text-xs">✕</button>
                 </div>
@@ -626,7 +626,7 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
             )}
             <div>
               <label className="text-xs text-gray-600 block mb-1">الخصم</label>
-              <input type="number" min={0} step={0.01} className="input-field text-sm" value={discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} />
+              <input type="number" min={0} step={0.01} className="input-field text-sm" value={discount === 0 ? '' : discount} onChange={e => setDiscount(Math.max(0, parseFloat(e.target.value) || 0))} placeholder="0" />
             </div>
             <div className="md:col-span-3">
               <label className="text-xs text-gray-600 block mb-1">ملاحظات</label>
