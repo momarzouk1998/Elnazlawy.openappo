@@ -134,18 +134,37 @@ export default function SupplierDetailPage() {
   );
 }
 
-// حذف المورد (آمن)
+// حذف المورد (مع تأكيد الحذف الشامل للفواتير والمدفوعات إن وجدت)
 async function deleteSupplier(supplier: SupplierDetail, router: ReturnType<typeof useRouter>) {
-  if (!confirm(`حذف المورد "${supplier.name}"؟`)) return;
+  if (!confirm(`هل تريد بالتأكيد حذف المورد "${supplier.name}"؟`)) return;
+
   const res = await fetch(`/api/suppliers/${supplier.id}`, { method: 'DELETE', cache: 'no-store' });
   const json = await res.json();
+
   if (!res.ok) {
+    if (json?.requires_confirmation) {
+      const confirmed = confirm(json.message);
+      if (confirmed) {
+        const forceRes = await fetch(`/api/suppliers/${supplier.id}?force=true`, { method: 'DELETE', cache: 'no-store' });
+        const forceJson = await forceRes.json();
+        if (!forceRes.ok) {
+          alert('❌ ' + (forceJson?.error?.message || 'تعذّر حذف المورد'));
+          return;
+        }
+        alert('✅ تم حذف المورد وجميع معاملاته وفواتيره بنجاح');
+        router.push('/suppliers');
+        router.refresh();
+        return;
+      }
+      return;
+    }
     alert('❌ ' + (json?.error?.message || json?.error?.code || 'تعذّر الحذف'));
     return;
   }
-  alert('✅ تم حذف المورد');
+
+  alert('✅ تم حذف المورد بنجاح');
   router.push('/suppliers');
-  router.refresh(); // إجبار تحديث البيانات
+  router.refresh();
 }
 
 /* ============================================
