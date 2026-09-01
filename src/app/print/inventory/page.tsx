@@ -122,7 +122,7 @@ export default async function PrintInventoryReportPage() {
           gap: '1rem',
         }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>معرض النزلاوي</h1>
+            <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>النزلاوي لتجارة وتوزيع الأدوات الكهربائية</h1>
             <p style={{ margin: '4px 0 0', opacity: 0.9, fontSize: '1rem', fontWeight: 600 }}>
               📦 تقرير جرد وإحصائيات المخازن الشامل
             </p>
@@ -326,7 +326,7 @@ export default async function PrintInventoryReportPage() {
           color: '#666',
           fontSize: '0.82rem',
         }}>
-          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>شكراً لتعاملكم معنا في معرض النزلاوي</p>
+          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>شكراً لتعاملكم معنا في النزلاوي</p>
           <p style={{ marginBottom: '4px' }}>📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة</p>
           <p style={{ margin: 0, display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
             <span>رقم الحاج: <span style={{ fontWeight: 700, color: C.orange }}>01006172668</span></span>

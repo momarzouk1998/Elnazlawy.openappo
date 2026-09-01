@@ -197,8 +197,8 @@ export default async function InvoicePrintPage({
               />
             </div>
             <div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: C.dark, lineHeight: 1.1 }}>
-                معرض النزلاوي
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: C.dark, lineHeight: 1.2 }}>
+                النزلاوي لتجارة وتوزيع الأدوات الكهربائية
               </div>
               <div style={{ fontSize: '0.7rem', color: C.muted, marginTop: '2px' }}>
                 للأجهزة الكهربائية والإضاءة الحديثة
@@ -432,7 +432,7 @@ export default async function InvoicePrintPage({
           }}
         >
           <div style={{ fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
-            شكراً لتعاملكم معنا في معرض النزلاوي • 📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة
+            شكراً لتعاملكم معنا في النزلاوي • 📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', fontWeight: 600 }}>
             <span>📞 الحاج: <strong style={{ color: C.orange }}>01006172668</strong></span>

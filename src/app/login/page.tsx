@@ -59,8 +59,8 @@ function LoginForm() {
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-2xl bg-white shadow-lg mb-4 border-2 border-nazlawy-500 p-2">
             <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={88} height={88} className="rounded-xl" priority />
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-650">معرض النزلاوي</h1>
-          <p className="text-sm text-nazlawy-600 font-medium mt-1">ElNazlawy Showroom</p>
+          <h1 className="text-2xl font-extrabold text-slate-650">النزلاوي لتجارة وتوزيع الأدوات الكهربائية</h1>
+          <p className="text-sm text-nazlawy-600 font-medium mt-1">ElNazlawy Electrical Trading</p>
           <p className="text-gray-600 mt-3 text-sm">لتجارة وتوزيع الأجهزة الكهربائية والإضاءة الحديثة</p>
         </div>
 

@@ -71,7 +71,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
           <div className="w-9 h-9 rounded-lg bg-white p-0.5 border-2 border-nazlawy-500 shrink-0">
             <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={32} height={32} className="rounded" />
           </div>
-          <div className="font-bold text-sm truncate">معرض النزلاوي</div>
+          <div className="font-bold text-sm truncate">النزلاوي</div>
         </div>
       </header>
 
@@ -91,7 +91,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
                   <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={36} height={36} className="rounded" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-extrabold text-sm leading-tight truncate">معرض النزلاوي</div>
+                  <div className="font-extrabold text-sm leading-tight truncate">النزلاوي</div>
                   <div className="text-[10px] text-nazlawy-300 font-medium truncate">{profile.full_name} • {ROLE_LABELS[profile.role]}</div>
                 </div>
               </div>
@@ -180,7 +180,7 @@ function SidebarContent({ visible, pathname, onNavigate, profile }: { visible: a
           <Image src="/elnazlawy-logo.webp" alt="النزلاوي" width={44} height={44} className="rounded" />
         </div>
         <div className="min-w-0">
-          <div className="font-extrabold text-base leading-tight">معرض النزلاوي</div>
+          <div className="font-extrabold text-base leading-tight">النزلاوي</div>
           <div className="text-[11px] text-nazlawy-300 font-medium truncate">
             {profile ? `${profile.full_name} • ${ROLE_LABELS[profile.role]}` : 'ElNazlawy'}
           </div>

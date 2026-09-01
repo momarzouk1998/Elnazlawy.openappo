@@ -17,8 +17,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "معرض النزلاوي - نظام الإدارة",
-  description: "نظام إدارة معرض النزلاوي للأجهزة الكهربائية والإضاءة - الفيوم. إدارة المخزون، المبيعات، الخزائن، والشيكات.",
+  title: "النزلاوي لتجارة وتوزيع الأدوات الكهربائية - نظام الإدارة",
+  description: "نظام إدارة النزلاوي لتجارة وتوزيع الأدوات الكهربائية والإضاءة - الفيوم. إدارة المخزون، المبيعات، الخزائن، والشيكات.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, title: "النزلاوي", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },

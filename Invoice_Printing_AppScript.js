@@ -223,7 +223,7 @@ function buildInvoiceHtml(header, details) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>فاتورة معرض النزلاوي</title>
+  <title>فاتورة النزلاوي لتجارة وتوزيع الأدوات الكهربائية</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
@@ -310,7 +310,7 @@ function buildInvoiceHtml(header, details) {
           <img src="https://files.catbox.moe/god7c4.png" alt="النزلاوي" id="elnazlawy-logo">
         </div>
         <div class="company-info">
-          <h1>معرض النزلاوي</h1>
+          <h1>النزلاوي لتجارة وتوزيع الأدوات الكهربائية</h1>
           <div class="subtitle">لتجارة وتوزيع الأجهزة الكهربائية والإضاءة الحديثة</div>
         </div>
       </div>
@@ -547,7 +547,7 @@ function buildStoreHtml(storeHeader, inventoryDetails) {
     <div class="container" id="report-container">
       <div class="header">
         <div class="company-info">
-          <h1>معرض النزلاوي</h1>
+          <h1>النزلاوي لتجارة وتوزيع الأدوات الكهربائية</h1>
           <div class="subtitle">تقرير جرد المخزون التفصيلي</div>
         </div>
       </div>
@@ -600,7 +600,7 @@ function buildStoreHtml(storeHeader, inventoryDetails) {
       </div>
       
       <div class="footer">
-        <p>معرض النزلاوي للأجهزة الكهربائية والإضاءة الحديثة</p>
+        <p>النزلاوي لتجارة وتوزيع الأدوات الكهربائية للأجهزة الكهربائية والإضاءة الحديثة</p>
       </div>
     </div>
 
@@ -836,7 +836,7 @@ function buildAllStoresHtml(allStores, allInventory) {
     <div class="container" id="report-container">
       <div class="header">
         <div class="company-info">
-          <h1>معرض النزلاوي</h1>
+          <h1>النزلاوي لتجارة وتوزيع الأدوات الكهربائية</h1>
           <div class="subtitle">تقرير جرد المخازن الشامل</div>
         </div>
       </div>
@@ -869,7 +869,7 @@ function buildAllStoresHtml(allStores, allInventory) {
       </div>
       
       <div class="footer">
-        <p>معرض النزلاوي للأجهزة الكهربائية والإضاءة الحديثة</p>
+        <p>النزلاوي لتجارة وتوزيع الأدوات الكهربائية للأجهزة الكهربائية والإضاءة الحديثة</p>
       </div>
     </div>
 

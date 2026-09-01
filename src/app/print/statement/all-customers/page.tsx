@@ -141,7 +141,7 @@ export default async function AllCustomersStatementPage() {
               <img src={LOGO_BASE64} alt="النزلاوي" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
             </div>
             <div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, color: C.gray, lineHeight: 1.2 }}>معرض النزلاوي</div>
+              <div style={{ fontSize: '1.2rem', fontWeight: 900, color: C.gray, lineHeight: 1.2 }}>النزلاوي لتجارة وتوزيع الأدوات الكهربائية</div>
               <div style={{ fontSize: '0.75rem', color: C.muted, fontWeight: 400 }}>لتجارة وتوزيع الأجهزة الكهربائية والإضاءة الحديثة</div>
             </div>
           </div>
@@ -251,7 +251,7 @@ export default async function AllCustomersStatementPage() {
           backgroundColor: C.lightBg, padding: '1rem', borderTop: `1px solid ${C.border}`,
           textAlign: 'center', color: '#666', fontSize: '0.82rem',
         }}>
-          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>شكراً لتعاملكم معنا في معرض النزلاوي</p>
+          <p style={{ fontWeight: 700, color: '#2c3e50', marginBottom: '4px' }}>شكراً لتعاملكم معنا في النزلاوي</p>
           <p style={{ marginBottom: '4px' }}>📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة</p>
           <p style={{ margin: 0, display: 'flex', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
             <span>رقم الحاج: <span style={{ fontWeight: 700, color: C.orange }}>01006172668</span></span>
