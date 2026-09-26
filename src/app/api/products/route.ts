@@ -4,6 +4,11 @@ import { getCurrentUser } from '@/lib/auth-server';
 import { hashPassword } from '@/lib/db/auth';
 import { Prisma } from '@prisma/client';
 
+// كاش قصير جداً (10 ثوانٍ) لحساب الإحصائيات (لو منخفض/قيمة المخزون) - عشان الـ polling
+// كل 30 ثانية من صفحات متعددة ما يعملش full scan على كل الأصناف في كل مرة
+const STATS_TTL_MS = 10_000;
+const statsCache = new Map<string, { data: any; ts: number }>();
+
 function buildArabicVariations(term: string): string[] {
   const vars = new Set<string>();
   vars.add(term);
@@ -53,50 +58,60 @@ export async function GET(request: NextRequest) {
   const lowStockOnly = searchParams.get('low_stock') === '1';
 
   if (lowStockOnly) {
-    // جلب كافة الأصناف وفلترة النواقص وتحت الحد الأدنى
-    const allProducts = await prisma.products.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: {
-        inventory_items: { select: { current_stock: true, store_id: true, store: { select: { name: true } } } },
-      },
-    });
+    const cacheKey = `lowstock:${JSON.stringify(where)}:${profile.can_see_cost}`;
+    const cached = statsCache.get(cacheKey);
+    let responseData: any;
+    if (cached && Date.now() - cached.ts < STATS_TTL_MS) {
+      responseData = cached.data;
+    } else {
+      // جلب كافة الأصناف وفلترة النواقص وتحت الحد الأدنى
+      const allProducts = await prisma.products.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        include: {
+          inventory_items: { select: { current_stock: true, store_id: true, store: { select: { name: true } } } },
+        },
+      });
 
-    const augmented = allProducts.map(p => ({
-      ...p,
-      total_stock: p.inventory_items.reduce((sum, i) => sum + Number(i.current_stock), 0),
-      last_purchase_price: profile.can_see_cost ? p.last_purchase_price : null,
-      last_purchase_date: profile.can_see_cost ? p.last_purchase_date : null,
-    }));
+      const augmented = allProducts.map(p => ({
+        ...p,
+        total_stock: p.inventory_items.reduce((sum, i) => sum + Number(i.current_stock), 0),
+        last_purchase_price: profile.can_see_cost ? p.last_purchase_price : null,
+        last_purchase_date: profile.can_see_cost ? p.last_purchase_date : null,
+      }));
 
-    const lowStockItems = augmented.filter(p => p.total_stock <= p.reorder_level);
+      const lowStockItems = augmented.filter(p => p.total_stock <= p.reorder_level);
 
-    let totalStockValue = 0;
-    for (const p of allProducts) {
-      const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
-      if (profile.can_see_cost) {
-        totalStockValue += pStock * Number(p.last_purchase_price || 0);
+      let totalStockValue = 0;
+      for (const p of allProducts) {
+        const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
+        if (profile.can_see_cost) {
+          totalStockValue += pStock * Number(p.last_purchase_price || 0);
+        }
       }
+
+      responseData = {
+        items: lowStockItems,
+        total: lowStockItems.length,
+        limit: lowStockItems.length,
+        page: 1,
+        stats: {
+          total_products: allProducts.length,
+          low_stock_count: lowStockItems.length,
+          total_stock_value: totalStockValue,
+        },
+      };
+      statsCache.set(cacheKey, { data: responseData, ts: Date.now() });
     }
 
     return NextResponse.json(
-      {
-        ok: true,
-        data: {
-          items: lowStockItems,
-          total: lowStockItems.length,
-          limit: lowStockItems.length,
-          page: 1,
-          stats: {
-            total_products: allProducts.length,
-            low_stock_count: lowStockItems.length,
-            total_stock_value: totalStockValue,
-          },
-        },
-      },
+      { ok: true, data: responseData },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
     );
   }
+
+  const statsCacheKey = `stats:${JSON.stringify(where)}:${profile.can_see_cost}`;
+  const cachedStats = statsCache.get(statsCacheKey);
 
   const [items, total, allProductsForStats] = await Promise.all([
     prisma.products.findMany({
@@ -109,27 +124,37 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.products.count({ where }),
-    prisma.products.findMany({
-      where,
-      select: {
-        reorder_level: true,
-        last_purchase_price: true,
-        inventory_items: { select: { current_stock: true } },
-      },
-    }),
+    cachedStats && Date.now() - cachedStats.ts < STATS_TTL_MS
+      ? Promise.resolve(null)
+      : prisma.products.findMany({
+          where,
+          select: {
+            reorder_level: true,
+            last_purchase_price: true,
+            inventory_items: { select: { current_stock: true } },
+          },
+        }),
   ]);
 
-  let totalStockValue = 0;
-  let lowStockCount = 0;
+  let totalStockValue: number;
+  let lowStockCount: number;
 
-  for (const p of allProductsForStats) {
-    const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
-    if (pStock <= Number(p.reorder_level || 0)) {
-      lowStockCount++;
+  if (allProductsForStats) {
+    totalStockValue = 0;
+    lowStockCount = 0;
+    for (const p of allProductsForStats) {
+      const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
+      if (pStock <= Number(p.reorder_level || 0)) {
+        lowStockCount++;
+      }
+      if (profile.can_see_cost) {
+        totalStockValue += pStock * Number(p.last_purchase_price || 0);
+      }
     }
-    if (profile.can_see_cost) {
-      totalStockValue += pStock * Number(p.last_purchase_price || 0);
-    }
+    statsCache.set(statsCacheKey, { data: { totalStockValue, lowStockCount }, ts: Date.now() });
+  } else {
+    // من الكاش (أحدث من 10 ثوانٍ)
+    ({ totalStockValue, lowStockCount } = cachedStats!.data);
   }
 
   // Augment with total stock

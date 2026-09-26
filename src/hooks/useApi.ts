@@ -189,13 +189,14 @@ export function useApi<T>(path: string | null) {
 
     function startPolling() {
       if (pollTimer) return
-      // كل 15 ثانية نعمل refetch صامت (silent)
+      // كل 30 ثانية نعمل refetch صامت (silent)
+      // (focus/visibilitychange بيعملوا refetch فوري لما اليوزر يرجع للتاب، فمفيش داعي لـ interval أقصر)
       pollTimer = setInterval(() => {
         if (!isMounted) return
         if (document.visibilityState === 'visible') {
           fetchData(false) // useCache=false عشان نضمن fetch حقيقي
         }
-      }, 15_000)
+      }, 30_000)
     }
 
     function stopPolling() {
