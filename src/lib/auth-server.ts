@@ -1,10 +1,11 @@
 // Server-only auth helpers
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import prisma from '@/lib/db/prisma';
 import { COOKIE_NAME, verifySession } from '@/lib/db/auth';
 import type { CurrentProfile, UserRole } from '@/lib/auth';
 
-export async function getCurrentUser(): Promise<CurrentProfile | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentProfile | null> => {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -30,7 +31,7 @@ export async function getCurrentUser(): Promise<CurrentProfile | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function requireUser(): Promise<CurrentProfile> {
   const u = await getCurrentUser();

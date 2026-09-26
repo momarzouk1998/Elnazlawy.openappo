@@ -13,9 +13,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
     serverActions: { bodySizeLimit: "10mb" },
-    // staleTimes: تصفير الكاش في المتصفح لضمان تحميل البيانات الطازجة دائماً
+    // staleTimes: كاش خفيف للتنقل في المتصفح (15 ثانية) لتفادي إعادة الجلب عند كل ضغطة سايد منيو
     staleTimes: {
-      dynamic: 0,
+      dynamic: 15,
       static: 0,
     },
   },
