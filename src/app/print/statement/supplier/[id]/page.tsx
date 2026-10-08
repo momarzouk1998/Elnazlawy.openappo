@@ -153,8 +153,12 @@ export default async function SupplierStatementPage({ params }: { params: Promis
             table-layout: fixed !important;
           }
           th, td {
+            white-space: normal !important;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
+          }
+          td.nowrap, th.nowrap {
+            white-space: nowrap !important;
           }
           tr {
             page-break-inside: avoid !important;
@@ -170,9 +174,9 @@ export default async function SupplierStatementPage({ params }: { params: Promis
       />
 
       <div id="statement" style={{
-        maxWidth: '800px', width: '100%', margin: '0 auto', background: C.white,
+        maxWidth: '860px', width: '100%', margin: '0 auto', background: C.white,
         borderRadius: '12px', boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
-        overflow: 'hidden', border: `1px solid ${C.border}`, fontFamily: "'Cairo', 'Segoe UI', sans-serif",
+        border: `1px solid ${C.border}`, fontFamily: "'Cairo', 'Segoe UI', sans-serif",
         direction: 'rtl', textAlign: 'right', color: C.text, boxSizing: 'border-box',
       }}>
 
@@ -250,50 +254,64 @@ export default async function SupplierStatementPage({ params }: { params: Promis
           </div>
 
           {/* Transactions table */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: C.gray, color: C.white }}>
-                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>التاريخ</th>
-                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>البيان</th>
-                <th style={{ padding: '10px', textAlign: 'right', border: `1px solid ${C.border}` }}>المرجع</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>مستحق (علينا)</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>مدفوع (له)</th>
-                <th style={{ padding: '10px', textAlign: 'center', border: `1px solid ${C.border}` }}>الرصيد</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e, i) => {
-                const bgColor = e.type === 'opening' ? '#f1f5f9' : i % 2 === 0 ? C.white : C.lightBg;
-                const balColor = e.balance > 0.01 ? C.danger : e.balance < -0.01 ? C.success : C.muted;
-                return (
-                  <tr key={i} style={{ backgroundColor: bgColor, fontWeight: e.type === 'opening' ? 700 : 400 }}>
-                    <td style={{ padding: '9px', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
-                      {e.date.getFullYear() === 1970 ? '—' : formatDate(e.date)}
-                    </td>
-                    <td style={{ padding: '9px', border: `1px solid ${C.border}` }}>
-                      <span style={{
-                        backgroundColor: e.type === 'invoice' ? '#dbeafe' : e.type === 'return' ? '#ffedd5' : e.type === 'payment' ? '#dcfce7' : '#f1f5f9',
-                        color: e.type === 'invoice' ? '#1e40af' : e.type === 'return' ? '#c2410c' : e.type === 'payment' ? '#166534' : C.gray,
-                        padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700,
-                      }}>
-                        {e.type === 'invoice' ? '📥 شراء' : e.type === 'return' ? '↩️ مرتجع' : e.type === 'payment' ? '💸 سداد' : '📂 افتتاحي'}
-                      </span>
-                      <span style={{ marginRight: '6px', fontWeight: 600 }}>{e.label}</span>
-                    </td>
-                    <td style={{ padding: '9px', border: `1px solid ${C.border}`, fontFamily: 'monospace', color: C.muted }}>{e.ref}</td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: e.debit > 0 ? C.danger : C.muted, border: `1px solid ${C.border}` }}>
-                      {e.debit > 0 ? n(e.debit) : '—'}
-                    </td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 700, color: e.credit > 0 ? C.success : C.muted, border: `1px solid ${C.border}` }}>
-                      {e.credit > 0 ? n(e.credit) : '—'}
-                    </td>
-                    <td style={{ padding: '9px', textAlign: 'center', fontWeight: 800, color: balColor, border: `1px solid ${C.border}`, fontFamily: 'monospace' }}>
-                      {n(e.balance)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
+          <div style={{ width: '100%', overflowX: 'auto' }}>
+            <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
+              <colgroup>
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '38%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '13%' }} />
+              </colgroup>
+              <thead>
+                <tr style={{ backgroundColor: C.gray, color: C.white }}>
+                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>التاريخ</th>
+                  <th style={{ padding: '10px 8px', textAlign: 'right', border: `1px solid ${C.border}` }}>البيان</th>
+                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>المرجع</th>
+                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>مستحق (علينا)</th>
+                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>مدفوع (له)</th>
+                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>الرصيد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e, i) => {
+                  const bgColor = e.type === 'opening' ? '#f1f5f9' : i % 2 === 0 ? C.white : C.lightBg;
+                  const balColor = e.balance > 0.01 ? C.danger : e.balance < -0.01 ? C.success : C.muted;
+                  return (
+                    <tr key={i} style={{ backgroundColor: bgColor, fontWeight: e.type === 'opening' ? 700 : 400 }}>
+                      <td className="nowrap" style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap', fontSize: '0.78rem' }}>
+                        {e.date.getFullYear() === 1970 ? '—' : formatDate(e.date)}
+                      </td>
+                      <td style={{ padding: '8px 10px', border: `1px solid ${C.border}`, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.45 }}>
+                        <span style={{
+                          backgroundColor: e.type === 'invoice' ? '#dbeafe' : e.type === 'return' ? '#ffedd5' : e.type === 'payment' ? '#dcfce7' : '#f1f5f9',
+                          color: e.type === 'invoice' ? '#1e40af' : e.type === 'return' ? '#c2410c' : e.type === 'payment' ? '#166534' : C.gray,
+                          padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700,
+                          display: 'inline-block', verticalAlign: 'middle', marginLeft: '6px', whiteSpace: 'nowrap',
+                        }}>
+                          {e.type === 'invoice' ? '📥 شراء' : e.type === 'return' ? '↩️ مرتجع' : e.type === 'payment' ? '💸 سداد' : '📂 افتتاحي'}
+                        </span>
+                        <span style={{ fontWeight: 600, fontSize: '0.82rem', verticalAlign: 'middle' }}>
+                          {e.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, fontFamily: 'monospace', color: C.muted, whiteSpace: 'normal', wordBreak: 'break-word', fontSize: '0.8rem' }}>
+                        {e.ref}
+                      </td>
+                      <td className="nowrap" style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700, color: e.debit > 0 ? C.danger : C.muted, border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
+                        {e.debit > 0 ? n(e.debit) : '—'}
+                      </td>
+                      <td className="nowrap" style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 700, color: e.credit > 0 ? C.success : C.muted, border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>
+                        {e.credit > 0 ? n(e.credit) : '—'}
+                      </td>
+                      <td className="nowrap" style={{ padding: '8px 4px', textAlign: 'center', fontWeight: 800, color: balColor, border: `1px solid ${C.border}`, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        {n(e.balance)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             <tfoot>
               <tr style={{ backgroundColor: C.orange, color: C.white, fontWeight: 700 }}>
                 <td colSpan={3} style={{ padding: '10px', border: `1px solid ${C.border}`, textAlign: 'center' }}>الإجماليات</td>
@@ -303,6 +321,7 @@ export default async function SupplierStatementPage({ params }: { params: Promis
               </tr>
             </tfoot>
           </table>
+        </div>
 
           {/* Summary cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.8rem', marginBottom: '1.5rem' }}>

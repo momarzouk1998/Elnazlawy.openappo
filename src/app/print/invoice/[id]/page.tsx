@@ -143,6 +143,44 @@ export default async function InvoicePrintPage({
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '0.75rem', fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif" }}>
+      <style>{`
+        @media print {
+          @page {
+            size: auto;
+            margin: 5mm;
+          }
+          body {
+            background: white !important;
+            padding: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          #statement {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+          }
+          table {
+            width: 100% !important;
+            table-layout: fixed !important;
+          }
+          th, td {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+          }
+          td.nowrap, th.nowrap {
+            white-space: nowrap !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
       <div
         id="statement"
         className="print-page"
@@ -267,14 +305,14 @@ export default async function InvoicePrintPage({
         </div>
 
         {/* Items Table */}
-        <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+        <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: C.tableHeader, color: C.white }}>
               <th style={{ padding: '6px 8px', textAlign: 'center', width: '32px' }}>م</th>
               <th style={{ padding: '6px 8px', textAlign: 'right' }}>الصنف</th>
-              <th style={{ padding: '6px 8px', textAlign: 'center', width: '45px' }}>الكمية</th>
-              <th style={{ padding: '6px 8px', textAlign: 'left', width: '70px' }}>السعر</th>
-              <th style={{ padding: '6px 8px', textAlign: 'left', width: '85px' }}>الإجمالي</th>
+              <th style={{ padding: '6px 8px', textAlign: 'center', width: '48px' }}>الكمية</th>
+              <th style={{ padding: '6px 8px', textAlign: 'left', width: '75px' }}>السعر</th>
+              <th style={{ padding: '6px 8px', textAlign: 'left', width: '90px' }}>الإجمالي</th>
             </tr>
           </thead>
           <tbody>
@@ -287,14 +325,16 @@ export default async function InvoicePrintPage({
                 }}
               >
                 <td style={{ padding: '5px 8px', textAlign: 'center', color: C.muted }}>{i + 1}</td>
-                <td style={{ padding: '5px 8px', fontWeight: 600 }}>{it.product_name}</td>
-                <td style={{ padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600 }}>
+                <td style={{ padding: '5px 8px', fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                  {it.product_name}
+                </td>
+                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   {Number(it.quantity)}
                 </td>
-                <td style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace' }}>
+                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                   {formatEGP(Number(it.unit_price))}
                 </td>
-                <td style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace', fontWeight: 800 }}>
+                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace', fontWeight: 800, whiteSpace: 'nowrap' }}>
                   {formatEGP(Number(it.line_total))}
                 </td>
               </tr>

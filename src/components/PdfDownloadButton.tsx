@@ -72,6 +72,16 @@ export function PdfDownloadButton({
             }
           });
 
+          // 1.1. تأمين التفاف النصوص في خلايا الجداول المستنسخة لمنع أي تداخل
+          const clonedCells = clonedDoc.querySelectorAll("th, td");
+          clonedCells.forEach((cell: any) => {
+            if (!cell.classList.contains("nowrap")) {
+              cell.style.whiteSpace = "normal";
+              cell.style.wordBreak = "break-word";
+              cell.style.overflowWrap = "break-word";
+            }
+          });
+
           // 2. فحص جميع عناصر المستند المستنسخ وتحويل ألوانها المحسوبة إلى RGB صريح
           const origAll = [
             statementElement,

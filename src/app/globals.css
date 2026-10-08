@@ -88,9 +88,21 @@ body {
     @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border;
   }
 
-  /* ===== Table nowrap: تفادي كسر النص في الجداول (خاصة الموبايل) ===== */
-  table td, table th {
+  /* ===== Table nowrap: تفادي كسر النص في جداول لوحة التحكم العامة مع استثناء صفحات الطباعة ===== */
+  table:not(.print-table) td, table:not(.print-table) th {
     white-space: nowrap;
+  }
+
+  /* استثناء صريح لصفحات الطباعة وكشوف الحساب لمنع تداخل النصوص والكلمات */
+  #statement table td,
+  #statement table th,
+  .print-page table td,
+  .print-page table th,
+  table.print-table td,
+  table.print-table th {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 }
 
@@ -105,7 +117,18 @@ body {
 @media print {
   body { background: white; padding: 0; }
   .no-print { display: none !important; }
-  .print-page { box-shadow: none !important; border: none !important; }
+  .print-page { box-shadow: none !important; border: none !important; width: 100% !important; }
+
+  /* تفادي تداخل واختناق النصوص في الطباعة نهائياً */
+  table td, table th {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .nowrap, .num-cell {
+    white-space: nowrap !important;
+  }
 }
 
 @media print and (max-width: 80mm) {

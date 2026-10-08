@@ -100,8 +100,12 @@ export default async function AllCustomersStatementPage() {
             table-layout: fixed !important;
           }
           th, td {
+            white-space: normal !important;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
+          }
+          td.nowrap, th.nowrap {
+            white-space: nowrap !important;
           }
           tr {
             page-break-inside: avoid !important;
@@ -182,7 +186,7 @@ export default async function AllCustomersStatementPage() {
           </div>
 
           {/* Customers table */}
-          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
+          <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ backgroundColor: C.gray, color: C.white }}>
                 <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '6%' }}>#</th>

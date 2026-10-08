@@ -90,8 +90,16 @@ export default async function PrintInventoryReportPage() {
             margin: 0 !important;
           }
           .table-container { overflow: visible !important; }
-          table { width: 100% !important; font-size: 11px !important; }
-          th, td { padding: 5px 6px !important; }
+          table { width: 100% !important; font-size: 11px !important; table-layout: fixed !important; }
+          th, td {
+            padding: 5px 6px !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+          }
+          td.nowrap, th.nowrap {
+            white-space: nowrap !important;
+          }
         }
       `}</style>
       <PrintActions
@@ -191,7 +199,7 @@ export default async function PrintInventoryReportPage() {
 
               {/* Items Table Container */}
               <div className="table-container" style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: C.lightBg, color: C.muted, fontWeight: 700, borderBottom: `2px solid ${C.border}` }}>
                       <th style={{ padding: '8px 6px', textAlign: 'center', width: '35px' }}>#</th>
