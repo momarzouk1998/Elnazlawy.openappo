@@ -91,6 +91,7 @@ jobs:
               docker service create \
                 --name elnazlawy-x9y8z7 \
                 --replicas 1 \
+                --limit-memory 700m \
                 --network host \
                 --env-file "$ENV_FILE" \
                 "${ENV_FLAGS[@]}" \
