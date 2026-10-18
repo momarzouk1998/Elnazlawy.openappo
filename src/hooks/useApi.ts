@@ -146,6 +146,12 @@ export function useApi<T>(path: string | null) {
       const res = await fetch(path, { signal: controller.signal, cache: 'no-store' })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (res.status === 401 || json?.error?.code === 'UNAUTHORIZED') {
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+          }
+          throw new Error('انتهت جلسة تسجيل الدخول');
+        }
         const errObj = json?.error;
         const msg = (typeof errObj === 'string' ? errObj : errObj?.message || errObj?.code) || `HTTP ${res.status}`;
         throw new Error(msg)
@@ -263,6 +269,13 @@ export function useApiMutation() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
+        if (res.status === 401 || json?.error?.code === 'UNAUTHORIZED') {
+          if (typeof window !== 'undefined') {
+            alert('⚠️ انتهت جلسة تسجيل الدخول، يرجى تسجيل الدخول مجدداً.');
+            window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+          }
+          return { error: 'انتهت جلسة تسجيل الدخول', data: null };
+        }
         const errObj = json?.error;
         const msg = (typeof errObj === 'string' ? errObj : errObj?.message || errObj?.code) || `HTTP ${res.status}`;
         return { error: msg, data: null }
