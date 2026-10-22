@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useApi, useApiMutation } from "@/hooks/useApi";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
 import { formatEGP, formatQty, formatDate } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import Pagination from "@/components/Pagination";
@@ -95,16 +95,12 @@ function StockTab({ profile }: { profile: any }) {
   const [category, setCategory] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useSmartSearch(search);
   const [showBulkAdd, setShowBulkAdd] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+    setPage(1);
+  }, [debouncedSearch]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inlineForm, setInlineForm] = useState<{
     name: string;

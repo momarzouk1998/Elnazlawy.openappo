@@ -254,6 +254,38 @@ export function useApi<T>(path: string | null) {
   return { ...state, refetch: () => fetchData(false) }
 }
 
+/**
+ * بحث ذكي وسريع يبدأ فوراً بعد أول حرفين:
+ * - أقل من حرفين (0 أو حرف واحد): لا يرسل طلب للسيرفر (يعيد "") لمنع التهنيج على حرف واحد.
+ * - عند كتابة أول حرفين: ينطلق البحث فوراً بدون أي انتظار (0ms).
+ * - مع الحروف التالية (الثالث فأكثر): تحديث فائق السرعة (100ms) مع إلغاء أي طلب سابق تلقائياً.
+ */
+export function useSmartSearch(search: string, minChars = 2, delayMs = 100): string {
+  const [effective, setEffective] = useState(() => {
+    const t = search.trim();
+    return t.length >= minChars ? t : '';
+  });
+
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed.length < minChars) {
+      setEffective('');
+      return;
+    }
+    // أول ما يكمل حرفين (أو ينتقل من حالة بدون بحث): نفّذ في نفس اللحظة (0ms)
+    if (effective === '' || trimmed.length === minChars) {
+      setEffective(trimmed);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setEffective(trimmed);
+    }, delayMs);
+    return () => clearTimeout(timer);
+  }, [search, minChars, delayMs, effective]);
+
+  return effective;
+}
+
 export function useApiMutation() {
   const [loading, setLoading] = useState(false)
   const abortRef = useRef<AbortController | null>(null)

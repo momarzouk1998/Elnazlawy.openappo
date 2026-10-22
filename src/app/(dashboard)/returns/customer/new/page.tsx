@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useApi, useApiMutation } from "@/hooks/useApi";
-import { formatEGP, formatQty } from "@/lib/format";
+import { useState } from "react";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
+import { formatEGP, formatQty, matchesArabicSearch } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 
@@ -27,19 +27,19 @@ interface CartItem {
 export default function NewCustomerReturnPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useSmartSearch(search);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [originalInvoiceId, setOriginalInvoiceId] = useState("");
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=30&skip_stats=1`);
+  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=100&skip_stats=1`);
+  const loadedProducts = productsData?.items || [];
+  const filteredProducts = search.trim().length >= 2
+    ? loadedProducts.filter(p => matchesArabicSearch(p.name, search))
+    : loadedProducts;
+  const visibleProducts = filteredProducts.length > 0 ? filteredProducts : loadedProducts;
   const { data: customersData } = useApi<{ items: Customer[] }>("/api/customers?limit=5000&compact=1");
   const { data: storesData } = useApi<{ items: Store[] }>("/api/stores");
 
@@ -164,7 +164,7 @@ export default function NewCustomerReturnPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[500px] overflow-y-auto">
-          {productsData?.items.map(p => (
+          {visibleProducts.map(p => (
             <button
               key={p.id}
               onClick={() => addToCart(p)}

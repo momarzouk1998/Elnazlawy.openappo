@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { useApi, useApiMutation } from "@/hooks/useApi";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { getCurrentUserClient } from "@/hooks/useCurrentUser";
 import Pagination from "@/components/Pagination";
@@ -23,7 +23,7 @@ interface Product {
 export default function ProductsPage() {
   const [tab, setTab] = useState<'all' | 'low_stock'>('all');
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useSmartSearch(search);
   const [category, setCategory] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -53,9 +53,8 @@ export default function ProductsPage() {
   ) as string[];
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+    setPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => { getCurrentUserClient().then(setProfile); }, []);
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useApi, useApiMutation } from "@/hooks/useApi";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
 import { formatEGP, formatDate, statusColor, matchesArabicSearch } from "@/lib/format";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -441,11 +441,7 @@ function InvoiceDetailsModal({ invoice, invoiceId, isAdmin, onClose, onChanged }
   const { data: storesData } = useApi<{ items: { id: string; name: string }[] }>("/api/stores");
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [productSearch, setProductSearch] = useState("");
-  const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedProductSearch(productSearch), 250);
-    return () => clearTimeout(timer);
-  }, [productSearch]);
+  const debouncedProductSearch = useSmartSearch(productSearch);
   const { data: searchProductsData, loading: searchingProducts } = useApi<{ items: { id: string; name: string; default_sale_price: number; total_stock: number }[] }>(
     showProductPicker ? `/api/products?search=${encodeURIComponent(debouncedProductSearch)}&limit=100&skip_stats=1` : null
   );

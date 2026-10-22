@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useApi, useApiMutation } from "@/hooks/useApi";
-import { formatEGP, formatQty } from "@/lib/format";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
+import { formatEGP, formatQty, matchesArabicSearch } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import SearchableSelect, { type SearchOption } from "@/components/SearchableSelect";
 import CustomerPaymentModal from "@/components/CustomerPaymentModal";
@@ -29,7 +29,7 @@ interface CartItem {
 export default function POSPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useSmartSearch(search);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [primaryStoreId, setPrimaryStoreId] = useState("");
@@ -44,13 +44,12 @@ export default function POSPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
-
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=100&skip_stats=1`);
+  const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=150&skip_stats=1`);
+  const loadedProducts = productsData?.items || [];
+  const visibleProducts = search.trim().length >= 2
+    ? loadedProducts.filter(p => matchesArabicSearch(p.name, search))
+    : loadedProducts;
   const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000&compact=1');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
   const { data: treasuriesData } = useApi<{ items: { id: string; name: string; current_balance: number }[] }>('/api/treasury');
@@ -324,8 +323,8 @@ export default function POSPage() {
             <div className="col-span-full card text-center py-12 text-gray-500 font-bold">
               ⏳ جاري تحميل قائمة الأصناف...
             </div>
-          ) : (productsData?.items || []).length > 0 ? (
-            productsData?.items.map(p => {
+          ) : (visibleProducts.length > 0 ? visibleProducts : loadedProducts).length > 0 ? (
+            (visibleProducts.length > 0 ? visibleProducts : loadedProducts).map(p => {
               const breakdown = storeBreakdown(p);
               const selectedStoreStock = stockFor(p, primaryStoreId);
               return (

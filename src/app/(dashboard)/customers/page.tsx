@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useApi, useApiMutation } from "@/hooks/useApi";
+import { useApi, useApiMutation, useSmartSearch } from "@/hooks/useApi";
 import { formatEGP, formatDate } from "@/lib/format";
 import Pagination from "@/components/Pagination";
 
@@ -60,7 +60,7 @@ export default function CustomersPage() {
 ============================================ */
 function CustomersTab() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useSmartSearch(search);
   const [statusFilter, setStatusFilter] = useState("all");
   const [show, setShow] = useState(false);
   const [page, setPage] = useState(1);
@@ -68,12 +68,8 @@ function CustomersTab() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+    setPage(1);
+  }, [debouncedSearch]);
 
   const { data, loading, refetch } = useApi<{ items: Customer[]; total: number; limit: number; page: number }>(
     `/api/customers?search=${encodeURIComponent(debouncedSearch)}&limit=50&page=${page}`
