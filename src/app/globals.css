@@ -14,7 +14,7 @@
   --color-nazlawy-900: #5c1f0c;
   --color-slate-650:  #677077;
 
-  --font-family-sans: var(--font-cairo, "Cairo", "Segoe UI", Tahoma, sans-serif);
+  --font-family-sans: "Cairo", "Segoe UI", Tahoma, sans-serif;
 
   /* ====== Mobile animations ====== */
   --animate-slide-in: slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
