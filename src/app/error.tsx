@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import { reportClientError, reloadOnceForChunkError, isChunkError } from "@/lib/clientErrors";
 
 export default function Error({
   error,
@@ -9,22 +10,42 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("[GlobalError]", error);
+    console.error("[PageError]", error);
+    if (isChunkError(error)) {
+      reloadOnceForChunkError();
+    } else {
+      reportClientError(error, "error.tsx", { digest: error?.digest });
+    }
   }, [error]);
 
   return (
-    <html lang="ar" dir="rtl">
-      <body className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <div className="max-w-xl w-full bg-white rounded-2xl shadow-lg p-8 border border-red-200">
-          <div className="text-5xl mb-3">⚠️</div>
-          <h1 className="text-2xl font-bold text-red-700 mb-2">حدث خطأ في الصفحة</h1>
-          <p className="text-gray-700 mb-4">{error.message || "خطأ غير معروف"}</p>
-          {error.digest && <p className="text-xs text-gray-500 mb-4">Digest: <code>{error.digest}</code></p>}
-          <button onClick={() => reset()} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2.5 px-4 rounded-xl transition">
-            حاول مرة أخرى
+    <div className="min-h-[60vh] flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 border border-red-200 text-center">
+        <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center text-2xl">
+          ⚠️
+        </div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">حدث خطأ في هذه الصفحة</h1>
+        <p className="text-sm text-gray-600 mb-4">
+          {error?.message || "حدث خطأ غير متوقع أثناء معالجة الصفحة."}
+        </p>
+        {error?.digest && (
+          <p className="text-[11px] text-gray-400 font-mono mb-4">كود الخطأ: {error.digest}</p>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => reset()}
+            className="flex-1 bg-nazlawy-500 hover:bg-nazlawy-600 text-white font-bold py-2.5 px-4 rounded-xl transition cursor-pointer text-sm shadow"
+          >
+            إعادة المحاولة
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-bold hover:bg-gray-50 text-sm transition cursor-pointer"
+          >
+            تحديث
           </button>
         </div>
-      </body>
-    </html>
+      </div>
+    </div>
   );
 }

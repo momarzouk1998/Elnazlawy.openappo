@@ -8,6 +8,7 @@ export interface CurrentProfile {
   id: number;
   username: string;
   full_name: string;
+  phone?: string | null;
   role: UserRole;
   can_see_cost: boolean;
   is_active: boolean;

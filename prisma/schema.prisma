@@ -251,6 +251,9 @@ model sales_invoices {
   original sales_invoices?       @relation("InvoiceVoid", fields: [original_invoice_id], references: [id])
   voids    sales_invoices[]      @relation("InvoiceVoid")
 
+  @@index([invoice_date])
+  @@index([customer_id])
+  @@index([status])
   @@map("sales_invoices")
   @@schema("elnazlawy")
 }
@@ -310,6 +313,9 @@ model purchase_invoices {
   items    purchase_invoice_items[]
   payments supplier_payments[]
 
+  @@index([purchase_date])
+  @@index([supplier_id])
+  @@index([status])
   @@map("purchase_invoices")
   @@schema("elnazlawy")
 }
@@ -484,6 +490,8 @@ model customer_payments {
   check    checks?         @relation(fields: [check_id], references: [id])
   creator  users?          @relation(fields: [created_by], references: [id])
 
+  @@index([payment_date])
+  @@index([customer_id])
   @@map("customer_payments")
   @@schema("elnazlawy")
 }
@@ -510,6 +518,8 @@ model supplier_payments {
   check    checks?            @relation(fields: [check_id], references: [id])
   creator  users?             @relation(fields: [created_by], references: [id])
 
+  @@index([payment_date])
+  @@index([supplier_id])
   @@map("supplier_payments")
   @@schema("elnazlawy")
 }
@@ -549,6 +559,8 @@ model checks {
   supplier_payments supplier_payments[]
   treasury          treasuries?         @relation(fields: [treasury_id], references: [id])
 
+  @@index([status])
+  @@index([due_date])
   @@map("checks")
   @@schema("elnazlawy")
 }
@@ -571,6 +583,8 @@ model expenses {
   creator  users?      @relation(fields: [created_by], references: [id])
   treasury treasuries? @relation(fields: [treasury_id], references: [id])
 
+  @@index([expense_date])
+  @@index([category])
   @@map("expenses")
   @@schema("elnazlawy")
 }
@@ -630,6 +644,8 @@ model treasury_transactions {
   treasury treasuries @relation(fields: [treasury_id], references: [id])
   by_user  users?     @relation(fields: [by_user_id], references: [id])
 
+  @@index([treasury_id])
+  @@index([transaction_date])
   @@map("treasury_transactions")
   @@schema("elnazlawy")
 }

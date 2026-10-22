@@ -48,11 +48,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// DELETE /api/users/[id] - حذف مستخدم نهائياً (admin only)
+// DELETE /api/users/[id] - حذف مستخدم نهائياً (OpenAppo creator only)
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const profile = await getCurrentUser();
   if (!profile || profile.role !== 'admin') {
     return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
+  }
+
+  const isCreator = profile.phone === '01558282760' || profile.username === 'openappo';
+  if (!isCreator) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'FORBIDDEN', message: 'حذف المستخدمين مقتصر على الدعم الفني لشركة OpenAppo (01558282760)' } },
+      { status: 403 }
+    );
   }
 
   try {

@@ -163,35 +163,21 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* KPIs — المعلقات (اللي مفيش في الحسابات أعلاه) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* KPIs — المعلقات المالية */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <KpiCard
           icon="⏳"
           label="فواتير لم تُحصّل"
           value={formatEGP(pendingSalesAmount)}
-          subValue="مكتملة ورصيد متبقي"
+          subValue="مكتملة ومتبقي لها رصيد"
           color="red"
         />
         <KpiCard
           icon="📋"
           label="مشتريات لم تُسدّد"
           value={formatEGP(pendingPurchasesAmount)}
-          subValue="مكتملة ورصيد متبقي"
+          subValue="مكتملة ومتبقي لها رصيد"
           color="yellow"
-        />
-        <KpiCard
-          icon="📊"
-          label="إجمالي المنتجات"
-          value={String(totalProducts)}
-          subValue={`في ${totalStores} مخزن`}
-          color="blue"
-        />
-        <KpiCard
-          icon="👥"
-          label="إجمالي العملاء"
-          value={String(totalCustomers)}
-          subValue={`+ ${totalSuppliers} مورد`}
-          color="green"
         />
       </div>
 

@@ -25,7 +25,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentProfile | null> => 
     const user = await prisma.users.findFirst({
       where: { id: payload.sub, is_active: true },
       select: {
-        id: true, username: true, full_name: true, role: true,
+        id: true, username: true, full_name: true, phone: true, role: true,
         can_see_cost: true, is_active: true,
       },
     });
@@ -37,6 +37,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentProfile | null> => 
       id: user.id,
       username: user.username,
       full_name: user.full_name,
+      phone: user.phone || null,
       role: user.role as UserRole,
       can_see_cost: user.can_see_cost,
       is_active: user.is_active,

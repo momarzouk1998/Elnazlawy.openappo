@@ -3,12 +3,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ALL_MODULES, canSeeModule, type CurrentProfile, ROLE_LABELS } from "@/lib/auth";
+import { useCurrentUser, clearProfileCache } from "@/hooks/useCurrentUser";
 import Image from "next/image";
 
-export default function Sidebar({ profile }: { profile: CurrentProfile }) {
+export default function Sidebar({ profile: propProfile }: { profile?: CurrentProfile }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { profile: clientProfile } = useCurrentUser();
+  const profile = propProfile || clientProfile;
 
   // أغلق الـ drawer عند تغيير الصفحة
   useEffect(() => {
@@ -35,6 +38,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
   }, [open]);
 
   async function logout() {
+    clearProfileCache();
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
     router.refresh();
@@ -54,7 +58,10 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
     }
   }
 
-  const visible = ALL_MODULES.filter(m => canSeeModule(profile, m.key));
+  const visible = ALL_MODULES.filter(m => {
+    if (!profile) return !m.adminOnly;
+    return canSeeModule(profile, m.key);
+  });
 
   return (
     <>
@@ -92,7 +99,9 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
                 </div>
                 <div className="min-w-0">
                   <div className="font-extrabold text-sm leading-tight truncate">النزلاوي</div>
-                  <div className="text-[10px] text-nazlawy-300 font-medium truncate">{profile.full_name} • {ROLE_LABELS[profile.role]}</div>
+                  <div className="text-[10px] text-nazlawy-300 font-medium truncate">
+                    {profile ? `${profile.full_name} • ${ROLE_LABELS[profile.role] || profile.role}` : 'النزلاوي'}
+                  </div>
                 </div>
               </div>
               <button
@@ -102,7 +111,7 @@ export default function Sidebar({ profile }: { profile: CurrentProfile }) {
               >✕</button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <SidebarContent visible={visible} pathname={pathname} onNavigate={() => setOpen(false)} />
+              <SidebarContent visible={visible} pathname={pathname} onNavigate={() => setOpen(false)} profile={profile} />
             </div>
             <div className="p-3 border-t border-white/10 flex items-center gap-2">
               <Link

@@ -9,6 +9,7 @@ export async function GET() {
   if (!profile || profile.role !== 'admin') {
     return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
   }
+  const isCreator = profile.phone === '01558282760' || profile.username === 'openappo';
   const users = await prisma.users.findMany({
     orderBy: { full_name: 'asc' },
     select: {
@@ -17,7 +18,7 @@ export async function GET() {
       default_store: { select: { id: true, name: true } },
     },
   });
-  return NextResponse.json({ ok: true, data: { items: users, total: users.length } });
+  return NextResponse.json({ ok: true, data: { items: users, total: users.length, canAdd: isCreator } });
 }
 
 // POST /api/users - إنشاء مستخدم جديد
@@ -25,6 +26,15 @@ export async function POST(request: NextRequest) {
   const profile = await getCurrentUser();
   if (!profile || profile.role !== 'admin') {
     return NextResponse.json({ ok: false, error: { code: 'FORBIDDEN' } }, { status: 403 });
+  }
+
+  // حصر إضافة المستخدمين على الدعم الفني لشركة OpenAppo
+  const isCreator = profile.phone === '01558282760' || profile.username === 'openappo';
+  if (!isCreator) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'FORBIDDEN', message: 'إضافة المستخدمين مقتصرة على الدعم الفني لشركة OpenAppo (01558282760)' } },
+      { status: 403 }
+    );
   }
 
   try {
