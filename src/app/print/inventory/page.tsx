@@ -78,6 +78,11 @@ export default async function PrintInventoryReportPage() {
       direction: 'rtl',
     }}>
       <style>{`
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
         @media print {
           @page { size: A4 landscape; margin: 8mm; }
           body { background: #ffffff !important; padding: 0 !important; }
