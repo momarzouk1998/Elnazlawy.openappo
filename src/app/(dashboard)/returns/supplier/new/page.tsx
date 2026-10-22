@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApi, useApiMutation } from "@/hooks/useApi";
 import { formatEGP, formatQty } from "@/lib/format";
 import { useRouter } from "next/navigation";
@@ -28,13 +28,19 @@ interface CartItem {
 export default function NewSupplierReturnPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [originalPurchaseId, setOriginalPurchaseId] = useState("");
   const [notes, setNotes] = useState("");
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
+  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=30&skip_stats=1`);
   const { data: suppliersData } = useApi<{ items: Supplier[] }>("/api/suppliers?limit=200");
   const { data: storesData } = useApi<{ items: Store[] }>("/api/stores");
 

@@ -68,48 +68,80 @@ export async function POST(request: NextRequest) {
           created_by: profile.id,
         },
       });
+      // Batch fetch كل الأصناف في استعلام واحد بدلاً من N استعلام متتالي
+      const productIds = Array.from(new Set(items.map((it: any) => it.product_id)));
+      const products = await tx.products.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true, last_purchase_price: true },
+      });
+      const productMap = new Map(products.map(p => [p.id, p]));
+
+      const purchaseItemsToCreate: any[] = [];
+      const priceHistoryToCreate: any[] = [];
+      const productPriceUpdates = new Map<string, number>();
+      const inventoryIncrements = new Map<string, { product_id: string; store_id: string; qty: number }>();
+
       for (const it of items) {
-        const product = await tx.products.findUnique({ where: { id: it.product_id } });
+        const product = productMap.get(it.product_id);
         if (!product) continue;
-        await tx.purchase_invoice_items.create({
-          data: {
-            purchase_id: invoice.id,
-            product_id: it.product_id,
-            product_name: product.name,
-            row_type: 'شراء',
-            quantity: it.quantity,
-            unit_cost: it.unit_cost,
-            line_total: Number(it.quantity) * Number(it.unit_cost),
-            store_id: it.store_id,
-          },
+
+        purchaseItemsToCreate.push({
+          purchase_id: invoice.id,
+          product_id: it.product_id,
+          product_name: product.name,
+          row_type: 'شراء',
+          quantity: it.quantity,
+          unit_cost: it.unit_cost,
+          line_total: Number(it.quantity) * Number(it.unit_cost),
+          store_id: it.store_id,
         });
-        // Update product last_purchase_price (track history)
+
         if (willBeCompleted && Number(it.unit_cost) !== Number(product.last_purchase_price)) {
-          await tx.product_price_history.create({
-            data: {
-              product_id: it.product_id,
-              old_price: product.last_purchase_price,
-              new_price: it.unit_cost,
-              supplier_id: purchaseData.supplier_id,
-              purchase_id: invoice.id,
-            },
+          priceHistoryToCreate.push({
+            product_id: it.product_id,
+            old_price: product.last_purchase_price,
+            new_price: it.unit_cost,
+            supplier_id: purchaseData.supplier_id,
+            purchase_id: invoice.id,
           });
-          await tx.products.update({
-            where: { id: it.product_id },
-            data: {
-              last_purchase_price: it.unit_cost,
-              last_purchase_date: new Date(),
-            },
-          });
+          productPriceUpdates.set(it.product_id, it.unit_cost);
         }
-        // Increment inventory
-        if (willBeCompleted) {
-          await tx.inventory.upsert({
-            where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
-            create: { product_id: it.product_id, store_id: it.store_id, current_stock: it.quantity },
-            update: { current_stock: { increment: it.quantity } },
-          });
+
+        if (willBeCompleted && it.store_id) {
+          const key = `${it.product_id}::${it.store_id}`;
+          const prev = inventoryIncrements.get(key);
+          if (prev) prev.qty += Number(it.quantity);
+          else inventoryIncrements.set(key, { product_id: it.product_id, store_id: it.store_id, qty: Number(it.quantity) });
         }
+      }
+
+      if (purchaseItemsToCreate.length > 0) {
+        await tx.purchase_invoice_items.createMany({ data: purchaseItemsToCreate });
+      }
+      if (priceHistoryToCreate.length > 0) {
+        await tx.product_price_history.createMany({ data: priceHistoryToCreate });
+      }
+      if (productPriceUpdates.size > 0) {
+        const now = new Date();
+        await Promise.all(
+          Array.from(productPriceUpdates.entries()).map(([prodId, newCost]) =>
+            tx.products.update({
+              where: { id: prodId },
+              data: { last_purchase_price: newCost, last_purchase_date: now },
+            })
+          )
+        );
+      }
+      if (inventoryIncrements.size > 0) {
+        await Promise.all(
+          Array.from(inventoryIncrements.values()).map(inc =>
+            tx.inventory.upsert({
+              where: { product_id_store_id: { product_id: inc.product_id, store_id: inc.store_id } },
+              create: { product_id: inc.product_id, store_id: inc.store_id, current_stock: inc.qty },
+              update: { current_stock: { increment: inc.qty } },
+            })
+          )
+        );
       }
       // Update supplier balance
       if (willBeCompleted && purchaseData.supplier_id) {

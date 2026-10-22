@@ -11,10 +11,13 @@ interface ApiState<T> {
 // مخزن مؤقت في الذاكرة (داخل الجلسة)
 const sessionCache = new Map<string, { data: any; ts: number }>();
 
-// البيانات التحويلية (فواتير، مدفوعات، مخزون) تنتهي بعد 5 ثوانٍ فقط
-// البيانات الثابتة (عملاء، موردين، أصناف) تنتهي بعد 30 ثانية
-const TRANSACTIONAL_TTL_MS = 5_000;
-const STATIC_TTL_MS = 30_000;
+// البيانات التحويلية (فواتير، مدفوعات، مخزون) تنتهي بعد 10 ثوانٍ
+// البيانات الثابتة (عملاء، موردين، أصناف، مخازن) تنتهي بعد 60 ثانية
+// (مع العلم أن أي إضافة/تعديل يمسح الكاش المرتبط فوراً عبر invalidateCacheFor)
+const TRANSACTIONAL_TTL_MS = 10_000;
+const STATIC_TTL_MS = 60_000;
+const FRESH_SKIP_FETCH_MS = 4_000;
+const FOCUS_REFETCH_COOLDOWN_MS = 15_000;
 
 const TRANSACTIONAL_PREFIXES = [
   '/api/sales/invoices',
@@ -126,12 +129,15 @@ export function useApi<T>(path: string | null) {
   const fetchData = useCallback(async (useCache = true) => {
     if (!path) return
     // ✅ لو عندنا بيانات حديثة، اعرضها فوراً واعمل revalidate في الخلفية
-    //    (stale-while-revalidate: نعرض الـ cached فوراً، ونحدّث في الخلفية)
+    //    وإذا كانت طازجة جداً (< 4 ثوانٍ) نتخطى طلب الشبكة المكرر تماماً
     if (useCache) {
+      const entry = sessionCache.get(path);
       const c = getCached<T>(path);
       if (c) {
-        setState({ data: c, loading: false, error: null });
-        // ✅ نكمّل الـ fetch في الخلفية بدون spinner (stale-while-revalidate)
+        setState((prev) => (prev.data === c && !prev.loading && prev.error === null ? prev : { data: c, loading: false, error: null }));
+        if (entry && Date.now() - entry.ts < FRESH_SKIP_FETCH_MS) {
+          return c;
+        }
       }
     }
     abortRef.current?.abort()
@@ -139,7 +145,7 @@ export function useApi<T>(path: string | null) {
     abortRef.current = controller
     // ✅ لو عندنا data أصلاً، ما نغيرش loading لـ true (عشان مفيش spinner)
     setState((prev) => {
-      if (prev.data !== null) return { ...prev, error: null };
+      if (prev.data !== null) return prev.error === null ? prev : { ...prev, error: null };
       return { ...prev, loading: true, error: null };
     })
     try {
@@ -159,12 +165,10 @@ export function useApi<T>(path: string | null) {
       const data = json.data !== undefined ? json.data : json
       if (!controller.signal.aborted) {
         setCached(path, data);
-        // ✅ لو البيانات الجديدة مختلفة عن اللي معروضة، حدّث الـ state
+        // ✅ لو البيانات الجديدة مطابقة للمعروضة، نحتفظ بنفس الـ state لتجنب re-render غير ضروري
         setState((prev) => {
-          // قارن كـ JSON عشان نتجنب re-render لو البيانات نفسها
-          const sameData = JSON.stringify(prev.data) === JSON.stringify(data);
-          if (sameData) {
-            return { data, loading: false, error: null };
+          if (!prev.loading && prev.error === null && JSON.stringify(prev.data) === JSON.stringify(data)) {
+            return prev;
           }
           return { data, loading: false, error: null };
         })
@@ -185,22 +189,26 @@ export function useApi<T>(path: string | null) {
     return () => { abortRef.current?.abort() }
   }, [fetchData, path])
 
-  // ✅ Polling ذكي: نعمل refetch لما الصفحة تاخد focus أو ترجع visible
-  //    ده بيخلي الفواتير الجديدة تظهر بدون refresh يدوي
+  // ✅ Polling ذكي: نعمل refetch لما الصفحة تاخد focus أو ترجع visible بشرط مرور فترة تهدئة
   useEffect(() => {
     if (!path) return
 
     let pollTimer: ReturnType<typeof setInterval> | null = null
     let isMounted = true
 
+    function shouldRefetchOnFocus(): boolean {
+      if (!path) return false;
+      const entry = sessionCache.get(path);
+      if (!entry) return true;
+      return Date.now() - entry.ts >= FOCUS_REFETCH_COOLDOWN_MS;
+    }
+
     function startPolling() {
       if (pollTimer) return
-      // كل 30 ثانية نعمل refetch صامت (silent)
-      // (focus/visibilitychange بيعملوا refetch فوري لما اليوزر يرجع للتاب، فمفيش داعي لـ interval أقصر)
       pollTimer = setInterval(() => {
         if (!isMounted) return
         if (document.visibilityState === 'visible') {
-          fetchData(false) // useCache=false عشان نضمن fetch حقيقي
+          fetchData(false)
         }
       }, 30_000)
     }
@@ -214,8 +222,7 @@ export function useApi<T>(path: string | null) {
 
     function handleVisibilityChange() {
       if (document.visibilityState === 'visible') {
-        // ✅ اليوزر رجع للتب → refetch فوري
-        fetchData(false)
+        if (shouldRefetchOnFocus()) fetchData(false)
         startPolling()
       } else {
         stopPolling()
@@ -223,8 +230,7 @@ export function useApi<T>(path: string | null) {
     }
 
     function handleFocus() {
-      // ✅ اليوزر عمل focus على النافذة (click مثلاً) → refetch
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && shouldRefetchOnFocus()) {
         fetchData(false)
       }
     }

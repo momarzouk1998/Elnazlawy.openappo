@@ -60,13 +60,23 @@ export default function CustomersPage() {
 ============================================ */
 function CustomersTab() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [show, setShow] = useState(false);
   const [page, setPage] = useState(1);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, loading, refetch } = useApi<{ items: Customer[]; total: number; limit: number; page: number }>(
-    `/api/customers?search=${encodeURIComponent(search)}&limit=50&page=${page}`
+    `/api/customers?search=${encodeURIComponent(debouncedSearch)}&limit=50&page=${page}`
   );
 
   useEffect(() => {

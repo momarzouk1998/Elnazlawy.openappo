@@ -95,7 +95,16 @@ function StockTab({ profile }: { profile: any }) {
   const [category, setCategory] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showBulkAdd, setShowBulkAdd] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inlineForm, setInlineForm] = useState<{
     name: string;
@@ -122,7 +131,7 @@ function StockTab({ profile }: { profile: any }) {
   if (storeId) params.set('store_id', storeId);
   if (category) params.set('category', category);
   if (lowOnly) params.set('low_stock', '1');
-  if (search) params.set('search', search);
+  if (debouncedSearch) params.set('search', debouncedSearch);
   params.set('page', page.toString());
 
   const { data: summaryData, loading: summaryLoading, refetch: refetchSummary } = useApi<any>('/api/inventory/summary');

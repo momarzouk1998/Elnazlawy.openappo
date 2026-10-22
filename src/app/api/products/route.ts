@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const skipStats = searchParams.get('skip_stats') === '1';
   const statsCacheKey = `stats:${JSON.stringify(where)}:${profile.can_see_cost}`;
   const cachedStats = statsCache.get(statsCacheKey);
 
@@ -123,8 +124,8 @@ export async function GET(request: NextRequest) {
         inventory_items: { select: { current_stock: true, store_id: true, store: { select: { name: true } } } },
       },
     }),
-    prisma.products.count({ where }),
-    cachedStats && Date.now() - cachedStats.ts < STATS_TTL_MS
+    skipStats ? Promise.resolve(0) : prisma.products.count({ where }),
+    skipStats || (cachedStats && Date.now() - cachedStats.ts < STATS_TTL_MS)
       ? Promise.resolve(null)
       : prisma.products.findMany({
           where,
@@ -136,25 +137,24 @@ export async function GET(request: NextRequest) {
         }),
   ]);
 
-  let totalStockValue: number;
-  let lowStockCount: number;
+  let totalStockValue = 0;
+  let lowStockCount = 0;
 
-  if (allProductsForStats) {
-    totalStockValue = 0;
-    lowStockCount = 0;
-    for (const p of allProductsForStats) {
-      const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
-      if (pStock <= Number(p.reorder_level || 0)) {
-        lowStockCount++;
+  if (!skipStats) {
+    if (allProductsForStats) {
+      for (const p of allProductsForStats) {
+        const pStock = p.inventory_items.reduce((s, i) => s + Number(i.current_stock), 0);
+        if (pStock <= Number(p.reorder_level || 0)) {
+          lowStockCount++;
+        }
+        if (profile.can_see_cost) {
+          totalStockValue += pStock * Number(p.last_purchase_price || 0);
+        }
       }
-      if (profile.can_see_cost) {
-        totalStockValue += pStock * Number(p.last_purchase_price || 0);
-      }
+      statsCache.set(statsCacheKey, { data: { totalStockValue, lowStockCount }, ts: Date.now() });
+    } else if (cachedStats) {
+      ({ totalStockValue, lowStockCount } = cachedStats.data);
     }
-    statsCache.set(statsCacheKey, { data: { totalStockValue, lowStockCount }, ts: Date.now() });
-  } else {
-    // من الكاش (أحدث من 10 ثوانٍ)
-    ({ totalStockValue, lowStockCount } = cachedStats!.data);
   }
 
   // Augment with total stock

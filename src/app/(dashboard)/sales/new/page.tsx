@@ -29,6 +29,7 @@ interface CartItem {
 export default function POSPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [primaryStoreId, setPrimaryStoreId] = useState("");
@@ -42,9 +43,15 @@ export default function POSPage() {
   const [showNewProduct, setShowNewProduct] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [smartSplitItem, setSmartSplitItem] = useState<{ product: Product, requestedQty: number, currentStoreId: string, itemIdx?: number } | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=100`);
-  const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000');
+  const { data: productsData, loading: loadingProducts } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=100&skip_stats=1`);
+  const { data: customers } = useApi<{ items: Customer[] }>('/api/customers?limit=5000&compact=1');
   const { data: stores } = useApi<{ items: Store[] }>('/api/stores');
   const { data: treasuriesData } = useApi<{ items: { id: string; name: string; current_balance: number }[] }>('/api/treasury');
 

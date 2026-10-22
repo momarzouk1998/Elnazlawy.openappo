@@ -7,16 +7,24 @@ export async function GET() {
   if (!profile) return NextResponse.json({ ok: false, error: { code: 'UNAUTHORIZED' } }, { status: 401 });
 
   try {
-    const stores = await prisma.stores.findMany({
-      where: { is_active: true },
-      select: { id: true, name: true }
-    });
-
-    const inventory = await prisma.inventory.findMany({
-      include: {
-        product: { select: { last_purchase_price: true } }
-      }
-    });
+    const [stores, inventory, categoriesRaw] = await Promise.all([
+      prisma.stores.findMany({
+        where: { is_active: true },
+        select: { id: true, name: true },
+      }),
+      prisma.inventory.findMany({
+        select: {
+          store_id: true,
+          current_stock: true,
+          product: { select: { last_purchase_price: true } },
+        },
+      }),
+      prisma.products.findMany({
+        where: { is_active: true, category: { not: null } },
+        select: { category: true },
+        distinct: ['category'],
+      }),
+    ]);
 
     const summaryMap = new Map();
     for (const store of stores) {
@@ -51,10 +59,6 @@ export async function GET() {
       return acc;
     }, { total_items: 0, total_qty: 0, total_value: 0 });
 
-    const categoriesRaw = await prisma.products.findMany({
-      where: { is_active: true, category: { not: null } },
-      select: { category: true },
-    });
     const categories = Array.from(
       new Set(categoriesRaw.map(c => c.category?.trim()).filter(Boolean) as string[])
     ).sort((a, b) => a.localeCompare(b, 'ar'));

@@ -175,33 +175,45 @@ export async function POST(request: NextRequest) {
 
       // 6. Decrement inventory (فقط لو مكتملة وليست عرض سعر)
       if (willBeCompleted && !isQuotation) {
-        // التحقق من المخزون أولاً مع row lock
+        // تجميع الكميات المطلوبة لكل (product_id + store_id) لتفادي استعلامات متكررة في حالة تكرار الصنف
+        const requiredByStoreProduct = new Map<string, { product_id: string; store_id: string; qty: number }>();
         for (const item of invoiceItems) {
-          const inv = await tx.inventory.findUnique({
-            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-          });
-          
+          const key = `${item.product_id}::${item.store_id}`;
+          const prev = requiredByStoreProduct.get(key);
+          if (prev) prev.qty += Number(item.quantity);
+          else requiredByStoreProduct.set(key, { product_id: item.product_id, store_id: item.store_id, qty: Number(item.quantity) });
+        }
+
+        // Batch fetch لكل أرصدة المخزون المطلوبة في استعلام واحد بدلاً من N استعلام
+        const existingInventories = await tx.inventory.findMany({
+          where: {
+            OR: Array.from(requiredByStoreProduct.values()).map(r => ({
+              product_id: r.product_id,
+              store_id: r.store_id,
+            })),
+          },
+          select: { id: true, product_id: true, store_id: true, current_stock: true },
+        });
+        const invMap = new Map(existingInventories.map(inv => [`${inv.product_id}::${inv.store_id}`, inv]));
+
+        for (const req of requiredByStoreProduct.values()) {
+          const inv = invMap.get(`${req.product_id}::${req.store_id}`);
           const available = inv ? Number(inv.current_stock) : 0;
-          if (available < Number(item.quantity)) {
-            throw new Error(`الصنف غیر متوفر بالكمية المطلوبة (متاح: ${available})`);
+          if (available < req.qty) {
+            throw new Error(`الصنف غير متوفر بالكمية المطلوبة (متاح: ${available})`);
           }
         }
-        
-        // خصم المخزون بعد التأكد
-        for (const item of invoiceItems) {
-          // Upsert inventory record
-          const inv = await tx.inventory.upsert({
-            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-            update: {},
-            create: { product_id: item.product_id, store_id: item.store_id, current_stock: 0 },
-          });
-          
-          // Decrement stock
-          await tx.inventory.update({
-            where: { id: inv.id },
-            data: { current_stock: { decrement: item.quantity } },
-          });
-        }
+
+        // خصم المخزون مباشرة بالتوازي داخل الـ transaction (خطوة واحدة لكل صنف بدلاً من upsert + update)
+        await Promise.all(
+          Array.from(requiredByStoreProduct.values()).map(req => {
+            const inv = invMap.get(`${req.product_id}::${req.store_id}`)!;
+            return tx.inventory.update({
+              where: { id: inv.id },
+              data: { current_stock: { decrement: req.qty } },
+            });
+          })
+        );
       }
 
       // 7. Net profit

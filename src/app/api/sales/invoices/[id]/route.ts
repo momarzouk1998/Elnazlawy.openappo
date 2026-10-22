@@ -169,34 +169,45 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (!wasCompleted && isCompletedNow && !isQuotation) {
         // من مسودة/قيد التنفيذ → مكتملة: تحقق من المخزون وخصمه + تسجيل المدفوعات ورصيد العميل
 
-        // التحقق من المخزون أولاً (قبل أي تعديل)
+        // التحقق من المخزون وخصمه دفعة واحدة (Batch) لتسريع حفظ الفاتورة الكبيرة
+        const requiredByStoreProduct = new Map<string, { product_id: string; product_name: string; store_id: string; qty: number }>();
         for (const it of existing.items) {
           if (!it.store_id) continue;
-          const inv = await tx.inventory.findUnique({
-            where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
-          });
-          const available = inv ? Number(inv.current_stock) : 0;
-          if (available < Number(it.quantity)) {
-            throw new Error(`المخزون غير كافٍ للصنف "${it.product_name}" (متاح: ${available})`);
-          }
+          const key = `${it.product_id}::${it.store_id}`;
+          const prev = requiredByStoreProduct.get(key);
+          if (prev) prev.qty += Number(it.quantity);
+          else requiredByStoreProduct.set(key, { product_id: it.product_id, product_name: it.product_name, store_id: it.store_id, qty: Number(it.quantity) });
         }
 
-        // خصم المخزون
-        for (const it of existing.items) {
-          if (!it.store_id) continue;
-
-          // Upsert inventory
-          const inv = await tx.inventory.upsert({
-            where: { product_id_store_id: { product_id: it.product_id, store_id: it.store_id } },
-            update: {},
-            create: { product_id: it.product_id, store_id: it.store_id, current_stock: 0 },
+        if (requiredByStoreProduct.size > 0) {
+          const existingInventories = await tx.inventory.findMany({
+            where: {
+              OR: Array.from(requiredByStoreProduct.values()).map(r => ({
+                product_id: r.product_id,
+                store_id: r.store_id,
+              })),
+            },
+            select: { id: true, product_id: true, store_id: true, current_stock: true },
           });
+          const invMap = new Map(existingInventories.map(inv => [`${inv.product_id}::${inv.store_id}`, inv]));
 
-          // Decrement stock
-          await tx.inventory.update({
-            where: { id: inv.id },
-            data: { current_stock: { decrement: it.quantity } },
-          });
+          for (const req of requiredByStoreProduct.values()) {
+            const inv = invMap.get(`${req.product_id}::${req.store_id}`);
+            const available = inv ? Number(inv.current_stock) : 0;
+            if (available < req.qty) {
+              throw new Error(`المخزون غير كافٍ للصنف "${req.product_name}" (متاح: ${available})`);
+            }
+          }
+
+          await Promise.all(
+            Array.from(requiredByStoreProduct.values()).map(req => {
+              const inv = invMap.get(`${req.product_id}::${req.store_id}`)!;
+              return tx.inventory.update({
+                where: { id: inv.id },
+                data: { current_stock: { decrement: req.qty } },
+              });
+            })
+          );
         }
 
         // التعامل مع المدفوعات إن وجدت

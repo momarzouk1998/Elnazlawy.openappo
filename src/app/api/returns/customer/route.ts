@@ -113,14 +113,16 @@ export async function POST(request: NextRequest) {
       });
       await tx.customer_return_invoice_items.createMany({ data: itemsToCreate });
 
-      // 4. زيادة المخزون لكل صنف (المرتجع يضيف للمخزن)
-      for (const item of returnItems) {
-        await tx.inventory.upsert({
-          where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-          create: { product_id: item.product_id, store_id: item.store_id, current_stock: item.quantity },
-          update: { current_stock: { increment: item.quantity } },
-        });
-      }
+      // 4. زيادة المخزون لكل صنف بالتوازي (المرتجع يضيف للمخزن)
+      await Promise.all(
+        returnItems.map((item: any) =>
+          tx.inventory.upsert({
+            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
+            create: { product_id: item.product_id, store_id: item.store_id, current_stock: item.quantity },
+            update: { current_stock: { increment: item.quantity } },
+          })
+        )
+      );
 
       // 5. تعديل رصيد العميل (المرتجع ينقص ما عليه)
       if (returnData.customer_id && returnData.total_amount) {

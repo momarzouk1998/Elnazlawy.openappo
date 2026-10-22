@@ -16,9 +16,18 @@ export async function GET(request: NextRequest) {
 
   const where: Prisma.customersWhereInput = { is_active: true };
   if (search) where.name = { contains: search, mode: 'insensitive' };
+  const compact = searchParams.get('compact') === '1';
 
   const [items, total] = await Promise.all([
-    prisma.customers.findMany({ where, orderBy: { name: 'asc' }, take: limit, skip: offset }),
+    compact
+      ? prisma.customers.findMany({
+          where,
+          orderBy: { name: 'asc' },
+          take: limit,
+          skip: offset,
+          select: { id: true, name: true, phone: true, balance: true },
+        })
+      : prisma.customers.findMany({ where, orderBy: { name: 'asc' }, take: limit, skip: offset }),
     prisma.customers.count({ where }),
   ]);
   return NextResponse.json(

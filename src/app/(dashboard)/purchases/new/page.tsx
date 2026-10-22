@@ -13,14 +13,21 @@ interface CartItem { product_id: string; product_name: string; store_id: string;
 export default function NewPurchasePage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [supplierId, setSupplierId] = useState("");
   const [primaryStoreId, setPrimaryStoreId] = useState("");
   const [status, setStatus] = useState("قيد التنفيذ");
   const [notes, setNotes] = useState("");
   const [showNewProduct, setShowNewProduct] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { mutate, loading: saving } = useApiMutation();
-  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(search)}&limit=30`);
+  const { data: productsData } = useApi<{ items: Product[] }>(`/api/products?search=${encodeURIComponent(debouncedSearch)}&limit=30&skip_stats=1`);
   const { data: suppliersData } = useApi<{ items: Supplier[] }>('/api/suppliers?limit=200');
   const { data: storesData } = useApi<{ items: Store[] }>('/api/stores');
 

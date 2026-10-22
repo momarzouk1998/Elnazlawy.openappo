@@ -75,14 +75,31 @@ export async function POST(request: NextRequest) {
       const maxN = await tx.supplier_return_invoices.aggregate({ _max: { return_number: true } });
       const return_number = (maxN._max.return_number || 0) + 1;
 
-      // 2. التحقق من وجود المخزون الكافي قبل الخصم
+      // 2. جلب الأصناف وأرصدة المخزون دفعة واحدة (Batch) والتحقق قبل الخصم
+      const productIds = Array.from(new Set(returnItems.map((i: any) => i.product_id)));
+      const [products, existingInventories] = await Promise.all([
+        tx.products.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true },
+        }),
+        tx.inventory.findMany({
+          where: {
+            OR: returnItems.map((item: any) => ({
+              product_id: item.product_id,
+              store_id: item.store_id,
+            })),
+          },
+          select: { id: true, product_id: true, store_id: true, current_stock: true },
+        }),
+      ]);
+      const productMap = new Map(products.map(p => [p.id, p]));
+      const invMap = new Map(existingInventories.map(inv => [`${inv.product_id}::${inv.store_id}`, inv]));
+
       for (const item of returnItems) {
-        const inv = await tx.inventory.findUnique({
-          where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-        });
+        const inv = invMap.get(`${item.product_id}::${item.store_id}`);
         const available = inv ? Number(inv.current_stock) : 0;
         if (available < Number(item.quantity)) {
-          const prod = await tx.products.findUnique({ where: { id: item.product_id }, select: { name: true } });
+          const prod = productMap.get(item.product_id);
           throw new Error(`المخزون غير كافٍ للصنف "${prod?.name || item.product_id}" (متاح: ${available}, مطلوب: ${item.quantity})`);
         }
       }
@@ -102,13 +119,6 @@ export async function POST(request: NextRequest) {
       });
 
       // 4. إنشاء البنود
-      const productIds = returnItems.map((i: any) => i.product_id);
-      const products = await tx.products.findMany({
-        where: { id: { in: productIds } },
-        select: { id: true, name: true },
-      });
-      const productMap = new Map(products.map(p => [p.id, p]));
-
       const itemsToCreate = returnItems.map((item: any) => {
         const product = productMap.get(item.product_id);
         if (!product) throw new Error(`الصنف غير موجود: ${item.product_id}`);
@@ -125,13 +135,15 @@ export async function POST(request: NextRequest) {
       });
       await tx.supplier_return_invoice_items.createMany({ data: itemsToCreate });
 
-      // 5. خصم المخزون (مرتجع مورد = بضاعة تخرج من المخزن للمورد)
-      for (const item of returnItems) {
-        await tx.inventory.update({
-          where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
-          data: { current_stock: { decrement: item.quantity } },
-        });
-      }
+      // 5. خصم المخزون بالتوازي (مرتجع مورد = بضاعة تخرج من المخزن للمورد)
+      await Promise.all(
+        returnItems.map((item: any) =>
+          tx.inventory.update({
+            where: { product_id_store_id: { product_id: item.product_id, store_id: item.store_id } },
+            data: { current_stock: { decrement: item.quantity } },
+          })
+        )
+      );
 
       // 6. تعديل رصيد المورد (المرتجع ينقص ما علينا له)
       if (returnData.supplier_id && returnData.total_amount) {
