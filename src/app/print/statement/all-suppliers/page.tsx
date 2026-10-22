@@ -187,14 +187,22 @@ export default async function AllSuppliersStatementPage() {
 
           {/* Suppliers table */}
           <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.82rem' }}>
+            <colgroup>
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '38%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead>
               <tr style={{ backgroundColor: C.gray, color: C.white }}>
-                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '6%' }}>#</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', border: `1px solid ${C.border}`, width: '38%' }}>اسم المورد</th>
-                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>حالة الحساب</th>
-                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>إجمالي المشتريات</th>
-                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>إجمالي المدفوعات</th>
-                <th style={{ padding: '8px 4px', textAlign: 'center', border: `1px solid ${C.border}`, width: '14%' }}>صافي الرصيد</th>
+                <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>#</th>
+                <th className="nowrap" style={{ padding: '7px 6px', textAlign: 'right', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>اسم المورد</th>
+                <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>حالة الحساب</th>
+                <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>إجمالي المشتريات</th>
+                <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>إجمالي المدفوعات</th>
+                <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>صافي الرصيد</th>
               </tr>
             </thead>
             <tbody>

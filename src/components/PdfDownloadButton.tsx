@@ -49,8 +49,33 @@ export function PdfDownloadButton({
         return;
       }
 
+      // انتظار اكتمال تحميل الخطوط العربية قبل تصوير الـ Canvas لمنع شقلبة أو تقطيع الحروف
+      if (typeof document !== "undefined" && (document as any).fonts?.ready) {
+        try {
+          await (document as any).fonts.ready;
+        } catch {}
+      }
+
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
+
+      // حساب نقاط الفصل الآمنة (نهايات صفوف الجداول والبلوكات) نسبةً إلى أعلى العنصر
+      // عشان لما الفاتورة أو الكشف يتقسم على أكتر من صفحة A4، السكينة متقطعش سطر في النص
+      const rootRect = statementElement.getBoundingClientRect();
+      const safeBreakRatios: number[] = [];
+      if (rootRect.height > 0) {
+        const breakables = statementElement.querySelectorAll(
+          "tbody tr, tfoot tr, thead, .no-split-block"
+        );
+        breakables.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const topRatio = (r.top - rootRect.top) / rootRect.height;
+          const bottomRatio = (r.bottom - rootRect.top) / rootRect.height;
+          if (topRatio > 0 && topRatio < 1) safeBreakRatios.push(topRatio);
+          if (bottomRatio > 0 && bottomRatio < 1) safeBreakRatios.push(bottomRatio);
+        });
+        safeBreakRatios.sort((a, b) => a - b);
+      }
 
       const canvas = await html2canvas(statementElement, {
         useCORS: true,
@@ -64,6 +89,11 @@ export function PdfDownloadButton({
           const tempCanvas = clonedDoc.createElement("canvas");
           const ctx = tempCanvas.getContext("2d");
 
+          // تثبيت الاتجاه وخصائص النص العربي على الجذر المستنسخ لمنع شقلبة الكلمات في html2canvas
+          clonedElement.style.direction = "rtl";
+          clonedElement.style.letterSpacing = "0px";
+          clonedElement.style.fontVariantLigatures = "normal";
+
           // 1. تنظيف جميع وسوم <style> في الصفحة المستنسخة من أي oklch
           const styleTags = clonedDoc.querySelectorAll("style");
           styleTags.forEach((styleTag) => {
@@ -72,10 +102,24 @@ export function PdfDownloadButton({
             }
           });
 
-          // 1.1. تأمين التفاف النصوص في خلايا الجداول المستنسخة لمنع أي تداخل
-          const clonedCells = clonedDoc.querySelectorAll("th, td");
+          // 1.1. تأمين رؤوس الجداول (th) من التكسير، وتأمين التفاف النصوص في خلايا البيانات (td)
+          const clonedHeaders = clonedDoc.querySelectorAll("th");
+          clonedHeaders.forEach((th: any) => {
+            th.style.whiteSpace = "nowrap";
+            th.style.wordBreak = "keep-all";
+            th.style.overflowWrap = "normal";
+            th.style.direction = "rtl";
+            th.style.letterSpacing = "0px";
+          });
+
+          const clonedCells = clonedDoc.querySelectorAll("td");
           clonedCells.forEach((cell: any) => {
-            if (!cell.classList.contains("nowrap")) {
+            cell.style.direction = "rtl";
+            cell.style.letterSpacing = "0px";
+            if (cell.classList.contains("nowrap")) {
+              cell.style.whiteSpace = "nowrap";
+              cell.style.wordBreak = "keep-all";
+            } else {
               cell.style.whiteSpace = "normal";
               cell.style.wordBreak = "break-word";
               cell.style.overflowWrap = "break-word";
@@ -161,12 +205,36 @@ export function PdfDownloadButton({
         pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
       } else {
         // الفواتير الطويلة وكشوفات الحساب الكبيرة تتوزع تلقائياً على صفحات متعددة A4
+        // مع احترام حدود الأسطر (safeBreakRatios) لمنع شطر أي سطر أو رقم بين صفحتين
         const pageCanvasHeight = (canvas.width * printableHeight) / printableWidth;
+        const safeBreakY = safeBreakRatios.map((r) => Math.round(r * canvas.height));
         let positionY = 0;
         let pageCount = 0;
 
-        while (positionY < canvas.height) {
-          const sliceHeight = Math.min(pageCanvasHeight, canvas.height - positionY);
+        while (positionY < canvas.height - 2) {
+          let targetEnd = positionY + pageCanvasHeight;
+          let sliceHeight: number;
+
+          if (targetEnd >= canvas.height - 2) {
+            sliceHeight = canvas.height - positionY;
+          } else {
+            // نبحث عن أقرب نقطة فصل آمنة قبل نهاية الصفحة (بحيث لا تقل الصفحة عن 55% من ارتفاعها)
+            const minAcceptableY = positionY + pageCanvasHeight * 0.55;
+            let bestBreak = -1;
+            for (const by of safeBreakY) {
+              if (by > minAcceptableY && by <= targetEnd) {
+                bestBreak = by;
+              } else if (by > targetEnd) {
+                break;
+              }
+            }
+            sliceHeight = bestBreak !== -1 ? bestBreak - positionY : Math.min(pageCanvasHeight, canvas.height - positionY);
+          }
+
+          if (sliceHeight <= 0) {
+            sliceHeight = Math.min(pageCanvasHeight, canvas.height - positionY);
+          }
+
           const pageCanvas = document.createElement("canvas");
           pageCanvas.width = canvas.width;
           pageCanvas.height = sliceHeight;

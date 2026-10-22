@@ -293,12 +293,12 @@ export default async function CustomerStatementPage({ params }: { params: Promis
               </colgroup>
               <thead>
                 <tr style={{ backgroundColor: C.gray, color: C.white }}>
-                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>التاريخ</th>
-                  <th style={{ padding: '10px 8px', textAlign: 'right', border: `1px solid ${C.border}` }}>البيان</th>
-                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>المرجع</th>
-                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>مدين (عليه)</th>
-                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>دائن (له)</th>
-                  <th style={{ padding: '10px 4px', textAlign: 'center', border: `1px solid ${C.border}` }}>الرصيد</th>
+                  <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>التاريخ</th>
+                  <th className="nowrap" style={{ padding: '7px 8px', textAlign: 'right', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>البيان</th>
+                  <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>المرجع</th>
+                  <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>مدين (عليه)</th>
+                  <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>دائن (له)</th>
+                  <th className="nowrap" style={{ padding: '7px 4px', textAlign: 'center', border: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>الرصيد</th>
                 </tr>
               </thead>
               <tbody>

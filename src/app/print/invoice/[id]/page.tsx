@@ -142,16 +142,19 @@ export default async function InvoicePrintPage({
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '0.75rem', fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif" }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '0.5rem', fontFamily: "'Cairo', 'Segoe UI', Tahoma, sans-serif", direction: 'rtl', letterSpacing: '0px' }}>
       <style>{`
         @media print {
           @page {
-            size: auto;
+            size: A4 portrait;
             margin: 5mm;
           }
           body {
             background: white !important;
             padding: 0 !important;
+            margin: 0 !important;
+            direction: rtl !important;
+            letter-spacing: 0px !important;
           }
           .no-print {
             display: none !important;
@@ -168,16 +171,28 @@ export default async function InvoicePrintPage({
             width: 100% !important;
             table-layout: fixed !important;
           }
-          th, td {
+          thead {
+            display: table-header-group !important;
+          }
+          tfoot {
+            display: table-footer-group !important;
+          }
+          th {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+          }
+          td {
             white-space: normal !important;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
           }
           td.nowrap, th.nowrap {
             white-space: nowrap !important;
+            word-break: keep-all !important;
           }
-          tr {
+          tr, .no-split-block {
             page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -185,26 +200,28 @@ export default async function InvoicePrintPage({
         id="statement"
         className="print-page"
         style={{
-          maxWidth: '620px',
+          maxWidth: '720px',
+          width: '100%',
           margin: '0 auto',
           backgroundColor: C.white,
-          borderRadius: '10px',
-          overflow: 'hidden',
+          borderRadius: '8px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           border: `1px solid ${C.border}`,
           direction: 'rtl',
           textAlign: 'right',
           color: C.text,
           boxSizing: 'border-box',
+          letterSpacing: '0px',
         }}
       >
         {/* Top Accent Line */}
-        <div style={{ height: '4px', background: `linear-gradient(90deg, ${C.orange} 0%, ${C.darkOrange} 100%)` }} />
+        <div style={{ height: '3px', background: `linear-gradient(90deg, ${C.orange} 0%, ${C.darkOrange} 100%)` }} />
 
-        {/* Compact Integrated Header */}
+        {/* Ultra-Compact Integrated Header */}
         <div
+          className="no-split-block"
           style={{
-            padding: '0.75rem 1rem',
+            padding: '0.45rem 0.75rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -213,13 +230,13 @@ export default async function InvoicePrintPage({
           }}
         >
           {/* Logo & Store Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
               style={{
-                width: '52px',
-                height: '52px',
+                width: '40px',
+                height: '40px',
                 backgroundColor: C.white,
-                borderRadius: '8px',
+                borderRadius: '6px',
                 padding: '2px',
                 border: `1.5px solid ${C.orange}`,
                 flexShrink: 0,
@@ -231,14 +248,14 @@ export default async function InvoicePrintPage({
               <img
                 src={LOGO_BASE64}
                 alt="النزلاوي"
-                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px' }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '4px' }}
               />
             </div>
             <div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: C.dark, lineHeight: 1.2 }}>
+              <div style={{ fontSize: '0.98rem', fontWeight: 900, color: C.dark, lineHeight: 1.15 }}>
                 النزلاوي لتجارة وتوزيع الأدوات الكهربائية
               </div>
-              <div style={{ fontSize: '0.7rem', color: C.muted, marginTop: '2px' }}>
+              <div style={{ fontSize: '0.66rem', color: C.muted, marginTop: '1px' }}>
                 للأجهزة الكهربائية والإضاءة الحديثة
               </div>
             </div>
@@ -247,19 +264,21 @@ export default async function InvoicePrintPage({
           {/* Invoice Type & Meta Pill */}
           <div style={{ textAlign: 'left' }}>
             <div
+              className="nowrap"
               style={{
                 display: 'inline-block',
                 background: isCancelled ? C.red : C.orange,
                 color: C.white,
-                padding: '3px 12px',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
+                padding: '2px 10px',
+                borderRadius: '14px',
+                fontSize: '0.74rem',
                 fontWeight: 800,
+                whiteSpace: 'nowrap',
               }}
             >
               {isCancelled ? 'فاتورة ملغاة 🚫' : `فاتورة ${invoice.invoice_type}`}
             </div>
-            <div style={{ fontSize: '0.75rem', marginTop: '4px', color: C.text }}>
+            <div className="nowrap" style={{ fontSize: '0.72rem', marginTop: '2px', color: C.text, whiteSpace: 'nowrap' }}>
               <span style={{ color: C.muted }}>رقم: </span>
               <strong style={{ fontFamily: 'monospace' }}>#{invoice.invoice_number}</strong>
               <span style={{ margin: '0 4px', color: C.border }}>|</span>
@@ -269,22 +288,23 @@ export default async function InvoicePrintPage({
           </div>
         </div>
 
-        {/* Compact Customer & Store Info Bar */}
+        {/* Ultra-Compact Customer & Store Info Bar */}
         <div
+          className="no-split-block"
           style={{
             backgroundColor: '#f8fafc',
             borderBottom: `1px solid ${C.border}`,
-            padding: '0.45rem 1rem',
+            padding: '0.3rem 0.75rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            fontSize: '0.8rem',
+            fontSize: '0.76rem',
           }}
         >
           {invoice.customer ? (
             <div>
               <span style={{ color: C.muted }}>العميل: </span>
-              <strong style={{ fontSize: '0.9rem', color: C.dark }}>{invoice.customer.name}</strong>
+              <strong style={{ fontSize: '0.84rem', color: C.dark }}>{invoice.customer.name}</strong>
               {invoice.customer.phone && (
                 <span style={{ color: C.muted, marginRight: '8px' }}>📞 {invoice.customer.phone}</span>
               )}
@@ -304,15 +324,22 @@ export default async function InvoicePrintPage({
           )}
         </div>
 
-        {/* Items Table */}
-        <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+        {/* Items Table — Compact & Fixed Proportions */}
+        <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', fontSize: '0.75rem', borderCollapse: 'collapse', direction: 'rtl' }}>
+          <colgroup>
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '50%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '18%' }} />
+          </colgroup>
           <thead>
             <tr style={{ backgroundColor: C.tableHeader, color: C.white }}>
-              <th style={{ padding: '6px 8px', textAlign: 'center', width: '32px' }}>م</th>
-              <th style={{ padding: '6px 8px', textAlign: 'right' }}>الصنف</th>
-              <th style={{ padding: '6px 8px', textAlign: 'center', width: '48px' }}>الكمية</th>
-              <th style={{ padding: '6px 8px', textAlign: 'left', width: '75px' }}>السعر</th>
-              <th style={{ padding: '6px 8px', textAlign: 'left', width: '90px' }}>الإجمالي</th>
+              <th className="nowrap" style={{ padding: '4px 4px', textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #475569' }}>م</th>
+              <th className="nowrap" style={{ padding: '4px 6px', textAlign: 'right', whiteSpace: 'nowrap', borderLeft: '1px solid #475569' }}>الصنف</th>
+              <th className="nowrap" style={{ padding: '4px 4px', textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #475569' }}>الكمية</th>
+              <th className="nowrap" style={{ padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #475569' }}>السعر</th>
+              <th className="nowrap" style={{ padding: '4px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>الإجمالي</th>
             </tr>
           </thead>
           <tbody>
@@ -321,20 +348,22 @@ export default async function InvoicePrintPage({
                 key={it.id}
                 style={{
                   backgroundColor: i % 2 === 0 ? C.rowAlt : C.white,
-                  borderBottom: `1px solid #f1f5f9`,
+                  borderBottom: `1px solid #e2e8f0`,
                 }}
               >
-                <td style={{ padding: '5px 8px', textAlign: 'center', color: C.muted }}>{i + 1}</td>
-                <td style={{ padding: '5px 8px', fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                <td className="nowrap" style={{ padding: '3px 4px', textAlign: 'center', color: C.muted, whiteSpace: 'nowrap', borderLeft: '1px solid #f1f5f9', fontSize: '0.72rem' }}>
+                  {i + 1}
+                </td>
+                <td style={{ padding: '3px 6px', fontWeight: 600, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.25, borderLeft: '1px solid #f1f5f9' }}>
                   {it.product_name}
                 </td>
-                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <td className="nowrap" style={{ padding: '3px 4px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap', borderLeft: '1px solid #f1f5f9' }}>
                   {Number(it.quantity)}
                 </td>
-                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                <td className="nowrap" style={{ padding: '3px 6px', textAlign: 'center', fontFamily: 'monospace', whiteSpace: 'nowrap', borderLeft: '1px solid #f1f5f9' }}>
                   {formatEGP(Number(it.unit_price))}
                 </td>
-                <td className="nowrap" style={{ padding: '5px 8px', textAlign: 'left', fontFamily: 'monospace', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                <td className="nowrap" style={{ padding: '3px 6px', textAlign: 'center', fontFamily: 'monospace', fontWeight: 800, whiteSpace: 'nowrap' }}>
                   {formatEGP(Number(it.line_total))}
                 </td>
               </tr>
@@ -344,15 +373,16 @@ export default async function InvoicePrintPage({
 
         {/* Financial Summary & Totals */}
         <div
+          className="no-split-block"
           style={{
-            padding: '0.6rem 1rem',
+            padding: '0.4rem 0.75rem',
             borderTop: `2px solid ${C.orange}`,
             backgroundColor: '#ffffff',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', marginBottom: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', marginBottom: '2px' }}>
             <span style={{ color: C.muted }}>الإجمالي قبل الخصم:</span>
-            <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+            <span className="nowrap" style={{ fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
               {formatEGP(Number(invoice.subtotal))} ج
             </span>
           </div>
@@ -363,16 +393,16 @@ export default async function InvoicePrintPage({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                fontSize: '0.8rem',
+                fontSize: '0.75rem',
                 color: C.yellow,
                 backgroundColor: C.yellowBg,
-                padding: '2px 8px',
+                padding: '1px 6px',
                 borderRadius: '4px',
-                marginBottom: '3px',
+                marginBottom: '2px',
               }}
             >
               <span>الخصم:</span>
-              <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+              <span className="nowrap" style={{ fontFamily: 'monospace', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                 - {formatEGP(Number(invoice.discount))} ج
               </span>
             </div>
@@ -383,32 +413,33 @@ export default async function InvoicePrintPage({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              fontSize: '1.15rem',
+              fontSize: '1.02rem',
               fontWeight: 900,
               borderTop: `1px dashed ${C.border}`,
-              paddingTop: '4px',
+              paddingTop: '3px',
               color: C.red,
             }}
           >
             <span>إجمالي الفاتورة:</span>
-            <span style={{ fontFamily: 'monospace' }}>{formatEGP(Number(invoice.total))} ج</span>
+            <span className="nowrap" style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{formatEGP(Number(invoice.total))} ج</span>
           </div>
         </div>
 
         {/* Customer Balance Section (Compact) */}
         {hasCustomer && prevBalance !== null && newBalance !== null && (
           <div
+            className="no-split-block"
             style={{
-              margin: '0 1rem 0.6rem 1rem',
-              borderRadius: '8px',
+              margin: '0 0.75rem 0.4rem 0.75rem',
+              borderRadius: '6px',
               border: `1px solid ${isCancelled ? '#fca5a5' : C.border}`,
               backgroundColor: isCancelled ? '#fff1f2' : '#f8fafc',
-              fontSize: '0.78rem',
+              fontSize: '0.74rem',
               overflow: 'hidden',
             }}
           >
             {isCancelled && (
-              <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, textAlign: 'center', borderBottom: '1px solid #fca5a5' }}>
+              <div style={{ backgroundColor: '#fee2e2', color: '#b91c1c', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, textAlign: 'center', borderBottom: '1px solid #fca5a5' }}>
                 🚫 تنبيه: هذه الفاتورة ملغاة ولا تؤثر على حساب العميل
               </div>
             )}
@@ -419,40 +450,40 @@ export default async function InvoicePrintPage({
                 textAlign: 'center',
                 borderBottom: `1px solid ${isCancelled ? '#fecdd3' : C.border}`,
                 backgroundColor: isCancelled ? '#ffe4e6' : '#f1f5f9',
-                padding: '4px 0',
+                padding: '3px 0',
                 fontWeight: 700,
                 color: isCancelled ? '#9f1239' : C.muted,
               }}
             >
-              <div>الحساب السابق</div>
-              {!isCancelled && <div>+ الفاتورة الحالية</div>}
-              {!isCancelled && paidOnDate > 0 && <div style={{ color: C.green }}>- المدفوع</div>}
-              <div style={{ color: C.dark }}>{isCancelled ? 'رصيد العميل' : '= المتبقي على العميل'}</div>
+              <div className="nowrap" style={{ whiteSpace: 'nowrap' }}>الحساب السابق</div>
+              {!isCancelled && <div className="nowrap" style={{ whiteSpace: 'nowrap' }}>+ الفاتورة الحالية</div>}
+              {!isCancelled && paidOnDate > 0 && <div className="nowrap" style={{ color: C.green, whiteSpace: 'nowrap' }}>- المدفوع</div>}
+              <div className="nowrap" style={{ color: C.dark, whiteSpace: 'nowrap' }}>{isCancelled ? 'رصيد العميل' : '= المتبقي على العميل'}</div>
             </div>
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: isCancelled ? '1fr 1fr' : paidOnDate > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr',
                 textAlign: 'center',
-                padding: '5px 0',
+                padding: '3px 0',
                 fontFamily: 'monospace',
                 fontWeight: 800,
               }}
             >
-              <div style={{ color: prevBalance > 0.01 ? C.red : prevBalance < -0.01 ? C.green : C.muted }}>
+              <div className="nowrap" style={{ color: prevBalance > 0.01 ? C.red : prevBalance < -0.01 ? C.green : C.muted, whiteSpace: 'nowrap' }}>
                 {formatEGP(prevBalance)} ج
               </div>
               {!isCancelled && (
-                <div style={{ color: C.darkOrange }}>
+                <div className="nowrap" style={{ color: C.darkOrange, whiteSpace: 'nowrap' }}>
                   +{formatEGP(Number(invoice.total))} ج
                 </div>
               )}
               {!isCancelled && paidOnDate > 0 && (
-                <div style={{ color: C.green }}>
+                <div className="nowrap" style={{ color: C.green, whiteSpace: 'nowrap' }}>
                   -{formatEGP(paidOnDate)} ج
                 </div>
               )}
-              <div style={{ color: newBalance > 0.01 ? C.red : newBalance < -0.01 ? C.green : C.dark, fontSize: '0.88rem' }}>
+              <div className="nowrap" style={{ color: newBalance > 0.01 ? C.red : newBalance < -0.01 ? C.green : C.dark, fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
                 {formatEGP(newBalance)} ج
               </div>
             </div>
@@ -461,17 +492,18 @@ export default async function InvoicePrintPage({
 
         {/* Compact Elegant Footer */}
         <div
+          className="no-split-block"
           style={{
             backgroundColor: '#f8fafc',
-            padding: '0.5rem 1rem',
+            padding: '0.35rem 0.75rem',
             borderTop: `1px solid ${C.border}`,
             textAlign: 'center',
-            fontSize: '0.72rem',
+            fontSize: '0.68rem',
             color: '#64748b',
-            lineHeight: 1.4,
+            lineHeight: 1.3,
           }}
         >
-          <div style={{ fontWeight: 700, color: '#334155', marginBottom: '2px' }}>
+          <div style={{ fontWeight: 700, color: '#334155', marginBottom: '1px' }}>
             شكراً لتعاملكم معنا في النزلاوي • 📍 الفيوم - دله شارع نادي قارون بجوار كافيه الثورة
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', fontWeight: 600 }}>
@@ -480,7 +512,7 @@ export default async function InvoicePrintPage({
             <span>المحاسب: <strong style={{ color: C.orange }}>01095463383</strong></span>
           </div>
           {isTax && (
-            <div style={{ marginTop: '2px', color: '#475569', fontSize: '0.68rem', borderTop: '1px dashed #e2e8f0', paddingTop: '2px' }}>
+            <div style={{ marginTop: '2px', color: '#475569', fontSize: '0.65rem', borderTop: '1px dashed #e2e8f0', paddingTop: '2px' }}>
               ⚖️ التسجيل الضريبي: <strong style={{ color: '#dc2626' }}>634 - 128 - 467</strong> | الربع - النزلة - يوسف الصديق
             </div>
           )}

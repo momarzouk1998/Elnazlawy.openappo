@@ -199,17 +199,27 @@ export default async function PrintInventoryReportPage() {
 
               {/* Items Table Container */}
               <div className="table-container" style={{ overflowX: 'auto' }}>
-                <table className="print-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table className="print-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <colgroup>
+                    <col style={{ width: '5%' }} />
+                    <col style={{ width: '33%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '12%' }} />
+                  </colgroup>
                   <thead>
                     <tr style={{ backgroundColor: C.lightBg, color: C.muted, fontWeight: 700, borderBottom: `2px solid ${C.border}` }}>
-                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '35px' }}>#</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'right' }}>اسم الصنف</th>
-                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '90px' }}>الفئة</th>
-                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '60px' }}>الوحدة</th>
-                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '100px' }}>الكمية الحالية</th>
-                      <th style={{ padding: '8px 6px', textAlign: 'center', width: '75px' }}>الحد الأدنى</th>
-                      <th style={{ padding: '8px 8px', textAlign: 'center', width: '85px' }}>سعر الشراء</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '120px' }}>إجمالي التكلفة</th>
+                      <th className="nowrap" style={{ padding: '6px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>#</th>
+                      <th className="nowrap" style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>اسم الصنف</th>
+                      <th className="nowrap" style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>الفئة</th>
+                      <th className="nowrap" style={{ padding: '6px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>الوحدة</th>
+                      <th className="nowrap" style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>الكمية الحالية</th>
+                      <th className="nowrap" style={{ padding: '6px 4px', textAlign: 'center', whiteSpace: 'nowrap' }}>الحد الأدنى</th>
+                      <th className="nowrap" style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>سعر الشراء</th>
+                      <th className="nowrap" style={{ padding: '6px 8px', textAlign: 'center', whiteSpace: 'nowrap' }}>إجمالي التكلفة</th>
                     </tr>
                   </thead>
                   <tbody>
